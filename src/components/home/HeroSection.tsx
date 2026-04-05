@@ -7,8 +7,8 @@ export function HeroSection() {
     <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden">
       {/* Background image */}
       <Image
-        src="/images/worship-hall.avif"
-        alt="명성비전교회 예배당"
+        src="/images/main.jpg"
+        alt="명성비전교회"
         fill
         className="object-cover"
         priority
