@@ -4,7 +4,7 @@ import { useState } from "react";
 import Image from "next/image";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
-import type { GalleryAlbum } from "@/types/notion";
+import type { GalleryAlbum } from "@/types/gallery";
 
 const categories = [
   "전체",
@@ -49,35 +49,40 @@ export function GalleryGrid({ albums }: { albums: GalleryAlbum[] }) {
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((album) => (
-          <button
-            key={album.id}
-            onClick={() => openAlbum(album.images)}
-            className="group overflow-hidden rounded-xl border border-gray-200 text-left shadow-sm transition hover:shadow-md"
-          >
-            <div className="relative aspect-[4/3] bg-gray-100">
-              {album.thumbnail ? (
-                <Image
-                  src={album.thumbnail}
-                  alt={album.title}
-                  fill
-                  className="object-cover transition group-hover:scale-105"
-                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-                />
-              ) : (
-                <div className="flex h-full items-center justify-center text-gray-400">
-                  사진 없음
-                </div>
-              )}
-            </div>
-            <div className="bg-white p-4">
-              <h3 className="font-semibold text-gray-900">{album.title}</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {album.date} &middot; {album.images.length}장
-              </p>
-            </div>
-          </button>
-        ))}
+        {filtered.map((album) => {
+          const imageUrls = album.images.map((img) => img.image_url);
+          const thumb = album.thumbnail_url || imageUrls[0];
+
+          return (
+            <button
+              key={album.id}
+              onClick={() => openAlbum(imageUrls)}
+              className="group overflow-hidden rounded-2xl border border-gray-100 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+            >
+              <div className="relative aspect-[4/3] bg-gray-100">
+                {thumb ? (
+                  <Image
+                    src={thumb}
+                    alt={album.title}
+                    fill
+                    className="object-cover transition-transform duration-500 group-hover:scale-105"
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  />
+                ) : (
+                  <div className="flex h-full items-center justify-center text-gray-400">
+                    사진 없음
+                  </div>
+                )}
+              </div>
+              <div className="bg-white p-4">
+                <h3 className="font-semibold text-gray-900">{album.title}</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  {album.date} &middot; {album.images.length}장
+                </p>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {filtered.length === 0 && (

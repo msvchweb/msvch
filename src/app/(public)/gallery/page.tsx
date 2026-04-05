@@ -1,7 +1,7 @@
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { GalleryGrid } from "@/components/gallery/GalleryGrid";
-import { getGalleryAlbums } from "@/lib/notion";
+import { getGalleryAlbums } from "@/lib/gallery";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "갤러리" };
