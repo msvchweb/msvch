@@ -1,16 +1,24 @@
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronRight } from "lucide-react";
 
 export function HeroSection() {
   return (
-    <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden bg-church-dark">
-      {/* Background layers */}
-      <div className="absolute inset-0 bg-gradient-to-b from-primary-900/90 via-church-dark/70 to-church-dark" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(97,114,243,0.15),transparent_70%)]" />
+    <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden">
+      {/* Background image */}
+      <Image
+        src="/images/worship-hall.avif"
+        alt="명성비전교회 예배당"
+        fill
+        className="object-cover"
+        priority
+      />
+      {/* Overlay */}
+      <div className="absolute inset-0 bg-gradient-to-b from-church-dark/80 via-church-dark/60 to-church-dark/90" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(97,114,243,0.12),transparent_70%)]" />
 
-      {/* Decorative elements */}
-      <div className="absolute left-1/2 top-0 h-[500px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-600/10 blur-3xl" />
-      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-church-gold/30 to-transparent" />
+      {/* Bottom gold line */}
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-church-gold/40 to-transparent" />
 
       {/* Content */}
       <div className="relative z-10 mx-auto max-w-4xl px-4 text-center">
@@ -20,14 +28,17 @@ export function HeroSection() {
           환영합니다
         </div>
 
-        <h1 className="animate-fade-up text-5xl font-bold leading-[1.15] tracking-tight text-white md:text-7xl">
-          명성비전교회
+        <h1 className="animate-fade-up text-4xl font-bold leading-[1.2] tracking-tight text-white sm:text-5xl md:text-6xl">
+          꿈이 있는 건강한 교회
+          <br />
+          <span className="text-church-gold">명성비전교회</span>
+          <span className="text-primary-300">입니다</span>
         </h1>
 
-        <p className="mx-auto mt-6 max-w-md text-lg leading-relaxed text-gray-300 md:text-xl">
-          하나님의 사랑으로 함께하는
-          <br className="hidden sm:block" />
-          따뜻한 공동체입니다
+        <p className="mx-auto mt-6 max-w-md text-lg leading-relaxed text-gray-300">
+          복음의 열매를 맺는 교회
+          <br />
+          제자는 Training! 훈련이다.
         </p>
 
         <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">

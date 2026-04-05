@@ -1,4 +1,5 @@
 import { HeroSection } from "@/components/home/HeroSection";
+import { QuickLinks } from "@/components/home/QuickLinks";
 import { WorshipTimeCard } from "@/components/home/WorshipTimeCard";
 import { RecentNotice } from "@/components/home/RecentNotice";
 import { LatestSermon } from "@/components/home/LatestSermon";
@@ -16,6 +17,7 @@ export default async function HomePage() {
   return (
     <>
       <HeroSection />
+      <QuickLinks />
       <WorshipTimeCard />
       <RecentNotice notices={notices} />
       <LatestSermon sermon={sermon} />

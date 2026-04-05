@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { MapPin, Phone, Mail } from "lucide-react";
 
 export function Footer() {
@@ -12,9 +13,13 @@ export function Footer() {
           {/* Church info */}
           <div>
             <div className="mb-4 flex items-center gap-2.5">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-church-gold">
-                M
-              </div>
+              <Image
+                src="/images/banner.avif"
+                alt="명성비전교회"
+                width={32}
+                height={32}
+                className="rounded-lg"
+              />
               <h3 className="text-lg font-bold text-white">명성비전교회</h3>
             </div>
             <div className="space-y-2.5 text-sm">

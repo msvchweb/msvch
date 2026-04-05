@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { navItems } from "./nav-config";
@@ -28,10 +29,14 @@ export function Header() {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary-600 to-primary-800 text-sm font-bold text-white shadow-sm">
-            M
-          </div>
+        <Link href="/" className="flex items-center gap-2">
+          <Image
+            src="/images/banner.avif"
+            alt="명성비전교회 로고"
+            width={36}
+            height={36}
+            className="rounded-lg"
+          />
           <span className="text-lg font-bold tracking-tight text-gray-900">
             명성비전교회
           </span>

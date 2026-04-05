@@ -8,12 +8,20 @@ export const metadata: Metadata = {
     default: "명성비전교회",
     template: "%s | 명성비전교회",
   },
-  description: "명성비전교회에 오신 것을 환영합니다",
+  description: "꿈이 있는 건강한 교회 명성비전교회입니다",
   metadataBase: new URL("https://www.msvch.org"),
+  icons: {
+    icon: [
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/icon.png", sizes: "48x48", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
+  },
   openGraph: {
     type: "website",
     locale: "ko_KR",
     siteName: "명성비전교회",
+    images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
 };
 
