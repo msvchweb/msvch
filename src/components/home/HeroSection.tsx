@@ -1,34 +1,54 @@
 import Link from "next/link";
+import { ChevronRight } from "lucide-react";
 
 export function HeroSection() {
   return (
-    <section className="relative flex h-[70vh] min-h-[500px] items-center justify-center bg-gradient-to-br from-primary-900 via-primary-800 to-primary-600">
-      <div className="absolute inset-0 bg-[url('/images/hero-pattern.svg')] opacity-10" />
-      <div className="relative z-10 flex flex-col items-center px-4 text-center text-white">
-        <p className="mb-2 text-lg font-medium text-primary-200">
+    <section className="relative flex min-h-[85vh] items-center justify-center overflow-hidden bg-church-dark">
+      {/* Background layers */}
+      <div className="absolute inset-0 bg-gradient-to-b from-primary-900/90 via-church-dark/70 to-church-dark" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(97,114,243,0.15),transparent_70%)]" />
+
+      {/* Decorative elements */}
+      <div className="absolute left-1/2 top-0 h-[500px] w-[800px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary-600/10 blur-3xl" />
+      <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-church-gold/30 to-transparent" />
+
+      {/* Content */}
+      <div className="relative z-10 mx-auto max-w-4xl px-4 text-center">
+        {/* Badge */}
+        <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-sm text-primary-200 backdrop-blur-sm">
+          <span className="h-1.5 w-1.5 rounded-full bg-church-gold" />
           환영합니다
-        </p>
-        <h1 className="text-4xl font-bold leading-tight md:text-6xl">
+        </div>
+
+        <h1 className="animate-fade-up text-5xl font-bold leading-[1.15] tracking-tight text-white md:text-7xl">
           명성비전교회
         </h1>
-        <p className="mt-4 max-w-lg text-lg text-primary-100 md:text-xl">
-          하나님의 사랑으로 함께하는 교회입니다
+
+        <p className="mx-auto mt-6 max-w-md text-lg leading-relaxed text-gray-300 md:text-xl">
+          하나님의 사랑으로 함께하는
+          <br className="hidden sm:block" />
+          따뜻한 공동체입니다
         </p>
-        <div className="mt-8 flex gap-4">
+
+        <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row sm:gap-4">
           <Link
             href="/worship"
-            className="rounded-full bg-white px-8 py-3 font-medium text-primary-700 shadow-lg transition hover:bg-primary-50"
+            className="group flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-sm font-semibold text-gray-900 shadow-lg shadow-white/10 transition-all hover:shadow-xl hover:shadow-white/20"
           >
             예배 안내
+            <ChevronRight size={16} className="transition-transform group-hover:translate-x-0.5" />
           </Link>
           <Link
             href="/intro"
-            className="rounded-full border-2 border-white/80 px-8 py-3 font-medium text-white transition hover:bg-white/10"
+            className="flex items-center gap-2 rounded-full border border-white/20 px-7 py-3.5 text-sm font-semibold text-white transition-all hover:border-white/40 hover:bg-white/5"
           >
             교회 소개
           </Link>
         </div>
       </div>
+
+      {/* Bottom fade */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-church-cream to-transparent" />
     </section>
   );
 }

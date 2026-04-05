@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Container } from "@/components/ui/Container";
+import { LogIn } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -34,14 +34,20 @@ export default function LoginPage() {
   }
 
   return (
-    <Container className="flex items-center justify-center py-20">
+    <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
-        <h1 className="mb-8 text-center text-2xl font-bold text-gray-900">
-          로그인
-        </h1>
+        {/* Logo area */}
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-600 to-primary-800 text-xl font-bold text-white shadow-lg shadow-primary-500/20">
+            M
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900">로그인</h1>
+          <p className="mt-1 text-sm text-gray-500">명성비전교회에 오신 것을 환영합니다</p>
+        </div>
+
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
               이메일
             </label>
             <input
@@ -49,11 +55,12 @@ export default function LoginPage() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              placeholder="email@example.com"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder-gray-400 transition-colors focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
             />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
+            <label className="mb-1.5 block text-sm font-medium text-gray-700">
               비밀번호
             </label>
             <input
@@ -61,25 +68,41 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              placeholder="6자 이상"
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 placeholder-gray-400 transition-colors focus:border-primary-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100"
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && (
+            <div className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-600">
+              {error}
+            </div>
+          )}
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg bg-primary-600 py-2.5 font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-primary-700 py-3 font-semibold text-white shadow-sm transition-all hover:shadow-md hover:shadow-primary-500/20 disabled:opacity-50"
           >
-            {loading ? "로그인 중..." : "로그인"}
+            {loading ? (
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            ) : (
+              <>
+                <LogIn size={16} />
+                로그인
+              </>
+            )}
           </button>
         </form>
-        <p className="mt-4 text-center text-sm text-gray-500">
+
+        <p className="mt-6 text-center text-sm text-gray-500">
           계정이 없으신가요?{" "}
-          <Link href="/signup" className="text-primary-600 hover:underline">
+          <Link
+            href="/signup"
+            className="font-medium text-primary-600 hover:text-primary-700"
+          >
             회원가입
           </Link>
         </p>
       </div>
-    </Container>
+    </div>
   );
 }
