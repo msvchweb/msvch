@@ -15,14 +15,24 @@ const schedule: ScheduleRow[] = [
   {
     day: "일요일",
     items: [
-      { time: "오전 11:00", name: "주일예배" },
-      { time: "오후 1:30", name: "청소년부 예배" },
-      { time: "오후 2:00", name: "청년부 모임" },
+      { time: "오전 8:00", name: "주일예배 1부" },
+      { time: "오전 10:00", name: "주일예배 2부" },
+      { time: "낮 12:00", name: "주일예배 3부 / 영유치부" },
+      { time: "오전 10:00", name: "아동부 (교육관 2층)" },
+      { time: "낮 12:00", name: "청소년부 (교육관 3층)" },
+      { time: "매월 전체주일 오후 2:30", name: "청년부 (본당)" },
     ],
   },
   {
-    day: "월~토",
-    items: [{ time: "오전 5:30", name: "새벽기도회" }],
+    day: "월~금",
+    items: [{ time: "오전 6:00", name: "새벽예배" }],
+  },
+  {
+    day: "토요일",
+    items: [
+      { time: "오전 6:30", name: "새벽예배" },
+      { time: "오후 2:00", name: "토요 노방전도 (2주년교회)" },
+    ],
   },
   {
     day: "수요일",
@@ -30,11 +40,7 @@ const schedule: ScheduleRow[] = [
   },
   {
     day: "금요일",
-    items: [{ time: "오후 9:00", name: "금요기도회" }],
-  },
-  {
-    day: "토요일",
-    items: [{ time: "오후 2:00", name: "탁구 모임" }],
+    items: [{ time: "오후 7:30", name: "금요예배" }],
   },
 ];
 

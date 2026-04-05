@@ -16,11 +16,10 @@ export function Footer() {
               <Image
                 src="/images/banner.avif"
                 alt="명성비전교회"
-                width={32}
-                height={32}
+                width={44}
+                height={44}
                 className="rounded-lg"
               />
-              <h3 className="text-lg font-bold text-white">명성비전교회</h3>
             </div>
             <div className="space-y-2.5 text-sm">
               <p className="flex items-start gap-2.5">
@@ -46,19 +45,19 @@ export function Footer() {
             <ul className="space-y-2 text-sm">
               <li className="flex justify-between">
                 <span>주일예배</span>
-                <span className="text-gray-300">오전 11:00</span>
+                <span className="text-gray-300">8:00 / 10:00 / 12:00</span>
               </li>
               <li className="flex justify-between">
                 <span>수요예배</span>
                 <span className="text-gray-300">오후 7:30</span>
               </li>
               <li className="flex justify-between">
-                <span>금요기도회</span>
-                <span className="text-gray-300">오후 9:00</span>
+                <span>금요예배</span>
+                <span className="text-gray-300">오후 7:30</span>
               </li>
               <li className="flex justify-between">
-                <span>새벽기도회</span>
-                <span className="text-gray-300">오전 5:30</span>
+                <span>새벽예배</span>
+                <span className="text-gray-300">오전 6:00</span>
               </li>
             </ul>
           </div>

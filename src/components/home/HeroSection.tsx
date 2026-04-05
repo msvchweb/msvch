@@ -10,7 +10,7 @@ export function HeroSection() {
         src="/images/main.jpg"
         alt="명성비전교회"
         fill
-        className="object-cover"
+        className="object-cover object-right"
         priority
       />
       {/* Overlay */}

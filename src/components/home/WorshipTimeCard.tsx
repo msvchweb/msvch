@@ -1,8 +1,8 @@
 const worshipTimes = [
-  { name: "주일예배", time: "오전 11:00", day: "매주 일요일", accent: "from-primary-500 to-primary-700" },
+  { name: "주일예배", time: "8:00 / 10:00 / 12:00", day: "매주 일요일 (1·2·3부)", accent: "from-primary-500 to-primary-700" },
   { name: "수요예배", time: "오후 7:30", day: "매주 수요일", accent: "from-emerald-500 to-emerald-700" },
-  { name: "금요기도회", time: "오후 9:00", day: "매주 금요일", accent: "from-violet-500 to-violet-700" },
-  { name: "새벽기도회", time: "오전 5:30", day: "매일", accent: "from-amber-500 to-amber-700" },
+  { name: "금요예배", time: "오후 7:30", day: "매주 금요일", accent: "from-violet-500 to-violet-700" },
+  { name: "새벽예배", time: "오전 6:00", day: "월~금 (토 6:30)", accent: "from-amber-500 to-amber-700" },
 ];
 
 export function WorshipTimeCard() {

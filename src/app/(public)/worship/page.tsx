@@ -17,11 +17,25 @@ interface WorshipInfo {
 
 const worshipList: WorshipInfo[] = [
   {
-    name: "주일예배",
-    time: "오전 11:00",
+    name: "주일예배 1부",
+    time: "오전 8:00",
     day: "매주 일요일",
     location: "본당",
-    description: "온 교회가 함께 드리는 주일 낮 예배입니다.",
+    description: "첫째 시간 주일 예배입니다.",
+  },
+  {
+    name: "주일예배 2부",
+    time: "오전 10:00",
+    day: "매주 일요일",
+    location: "본당",
+    description: "둘째 시간 주일 예배입니다.",
+  },
+  {
+    name: "주일예배 3부",
+    time: "낮 12:00",
+    day: "매주 일요일",
+    location: "본당",
+    description: "셋째 시간 주일 예배입니다.",
   },
   {
     name: "수요예배",
@@ -31,15 +45,15 @@ const worshipList: WorshipInfo[] = [
     description: "말씀과 기도로 한 주의 중심을 세우는 예배입니다.",
   },
   {
-    name: "금요기도회",
-    time: "오후 9:00",
+    name: "금요예배",
+    time: "오후 7:30",
     day: "매주 금요일",
     location: "본당",
-    description: "뜨거운 기도로 주의 능력을 경험하는 시간입니다.",
+    description: "기도와 찬양으로 드리는 금요 예배입니다.",
   },
   {
-    name: "새벽기도회",
-    time: "오전 5:30",
+    name: "새벽예배",
+    time: "오전 6:00 (토 6:30)",
     day: "매일 (월~토)",
     location: "본당",
     description: "하루를 말씀과 기도로 시작하는 새벽 예배입니다.",

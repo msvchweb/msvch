@@ -1,5 +1,6 @@
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
+import Image from "next/image";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -13,9 +14,13 @@ export default function GreetingsPage() {
       <Container>
         <div className="mx-auto max-w-3xl">
           <div className="mb-8 flex flex-col items-center gap-6 md:flex-row">
-            <div className="flex h-[200px] w-[160px] items-center justify-center rounded-lg bg-gray-100 text-gray-400">
-              목사님 사진
-            </div>
+            <Image
+              src="/images/pastor.avif"
+              alt="이양재 목사"
+              width={160}
+              height={200}
+              className="rounded-xl object-cover shadow-md"
+            />
             <div>
               <h2 className="text-xl font-bold text-gray-900">담임목사 이양재</h2>
               <p className="mt-1 text-gray-500">대한예수교장로회(통합) 명성비전교회</p>

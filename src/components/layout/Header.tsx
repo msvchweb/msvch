@@ -32,14 +32,11 @@ export function Header() {
         <Link href="/" className="flex items-center gap-2">
           <Image
             src="/images/banner.avif"
-            alt="명성비전교회 로고"
-            width={36}
-            height={36}
+            alt="명성비전교회"
+            width={48}
+            height={48}
             className="rounded-lg"
           />
-          <span className="text-lg font-bold tracking-tight text-gray-900">
-            명성비전교회
-          </span>
         </Link>
 
         {/* Desktop nav */}
