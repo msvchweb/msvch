@@ -1,38 +1,76 @@
-import type { SermonVideo, YouTubeSearchResponse } from "@/types/youtube";
+import type { SermonVideo } from "@/types/youtube";
 
-export async function getSermonVideos(maxResults = 20): Promise<SermonVideo[]> {
-  const apiKey = process.env.YOUTUBE_API_KEY;
-  const channelId = process.env.YOUTUBE_CHANNEL_ID;
+const CHANNEL_ID = "UCcJc6fm6McCxvpizoe3T4YQ";
+const RSS_URL = `https://www.youtube.com/feeds/videos.xml?channel_id=${CHANNEL_ID}`;
 
-  if (!apiKey || !channelId || apiKey === "placeholder") {
-    return [];
+interface RssEntry {
+  videoId: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  publishedAt: string;
+}
+
+function parseXmlTag(xml: string, tag: string): string {
+  const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`);
+  const match = xml.match(regex);
+  return match ? match[1].trim() : "";
+}
+
+function parseXmlAttr(xml: string, tag: string, attr: string): string {
+  const regex = new RegExp(`<${tag}[^>]*${attr}="([^"]*)"[^>]*/?>`, "i");
+  const match = xml.match(regex);
+  return match ? match[1] : "";
+}
+
+function decodeHtmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function parseEntries(xml: string): RssEntry[] {
+  const entries: RssEntry[] = [];
+  const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
+  let match: RegExpExecArray | null;
+
+  while ((match = entryRegex.exec(xml)) !== null) {
+    const entry = match[1];
+    const videoId = parseXmlTag(entry, "yt:videoId");
+    const title = decodeHtmlEntities(parseXmlTag(entry, "title"));
+    const description = decodeHtmlEntities(parseXmlTag(entry, "media:description"));
+    const thumbnail = parseXmlAttr(entry, "media:thumbnail", "url");
+    const published = parseXmlTag(entry, "published");
+
+    if (videoId) {
+      entries.push({
+        videoId,
+        title,
+        description,
+        thumbnail: thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+        publishedAt: published,
+      });
+    }
   }
 
-  const params = new URLSearchParams({
-    part: "snippet",
-    channelId,
-    maxResults: String(maxResults),
-    order: "date",
-    type: "video",
-    key: apiKey,
-  });
+  return entries;
+}
 
-  const res = await fetch(
-    `https://www.googleapis.com/youtube/v3/search?${params.toString()}`,
-    { next: { revalidate: 3600 } }
-  );
+export async function getSermonVideos(maxResults = 15): Promise<SermonVideo[]> {
+  try {
+    const res = await fetch(RSS_URL, { next: { revalidate: 1800 } });
+    if (!res.ok) return [];
 
-  if (!res.ok) return [];
+    const xml = await res.text();
+    const entries = parseEntries(xml);
 
-  const data = (await res.json()) as YouTubeSearchResponse;
-
-  return data.items.map((item) => ({
-    videoId: item.id.videoId,
-    title: item.snippet.title,
-    description: item.snippet.description,
-    thumbnail: item.snippet.thumbnails.high.url,
-    publishedAt: item.snippet.publishedAt,
-  }));
+    return entries.slice(0, maxResults);
+  } catch {
+    return [];
+  }
 }
 
 export async function getLatestSermon(): Promise<SermonVideo | null> {

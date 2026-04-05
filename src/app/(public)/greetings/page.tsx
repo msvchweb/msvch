@@ -17,8 +17,8 @@ export default function GreetingsPage() {
               목사님 사진
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900">담임목사</h2>
-              <p className="mt-1 text-gray-500">명성비전교회</p>
+              <h2 className="text-xl font-bold text-gray-900">담임목사 이양재</h2>
+              <p className="mt-1 text-gray-500">대한예수교장로회(통합) 명성비전교회</p>
             </div>
           </div>
           <div className="prose max-w-none text-gray-700">

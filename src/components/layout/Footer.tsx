@@ -25,11 +25,11 @@ export function Footer() {
             <div className="space-y-2.5 text-sm">
               <p className="flex items-start gap-2.5">
                 <MapPin size={15} className="mt-0.5 shrink-0 text-church-gold" />
-                서울특별시 동작구
+                서울시 동작구 사당로 16바길 9
               </p>
               <p className="flex items-center gap-2.5">
                 <Phone size={15} className="shrink-0 text-church-gold" />
-                02-XXX-XXXX
+                02-534-0691
               </p>
               <p className="flex items-center gap-2.5">
                 <Mail size={15} className="shrink-0 text-church-gold" />
