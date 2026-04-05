@@ -12,13 +12,21 @@ interface CaptionEvent {
   segs?: { utf8: string }[];
 }
 
+const USER_AGENT =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
 export async function getYouTubeCaptions(videoId: string): Promise<string> {
-  // Fetch video page to extract caption URL
-  const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`);
+  // Fetch video page with browser user-agent
+  const pageRes = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    headers: { "User-Agent": USER_AGENT },
+    cache: "no-store",
+  });
   const html = await pageRes.text();
 
   // Extract auto-caption URL
-  const captionMatch = html.match(/"captionTracks":\[.*?"baseUrl":"(.*?)"/);
+  const captionMatch = html.match(
+    /"captionTracks":\[.*?"baseUrl":"(.*?)"/
+  );
   if (!captionMatch) {
     throw new Error("자막을 찾을 수 없습니다. 이 영상에 자막이 없을 수 있습니다.");
   }
@@ -27,13 +35,16 @@ export async function getYouTubeCaptions(videoId: string): Promise<string> {
     .replace(/\\u0026/g, "&")
     .replace(/\\"/g, '"');
 
-  // Fetch caption as JSON
-  const captionRes = await fetch(`${captionUrl}&fmt=json3`);
+  // Fetch caption as JSON3
+  const captionRes = await fetch(`${captionUrl}&fmt=json3`, {
+    headers: { "User-Agent": USER_AGENT },
+    cache: "no-store",
+  });
   if (!captionRes.ok) {
-    throw new Error("자막을 가져올 수 없습니다.");
+    throw new Error("자막 데이터를 가져올 수 없습니다.");
   }
 
-  const captionData = await captionRes.json() as { events: CaptionEvent[] };
+  const captionData = (await captionRes.json()) as { events: CaptionEvent[] };
 
   // Extract text from caption events
   const text = captionData.events
@@ -43,6 +54,10 @@ export async function getYouTubeCaptions(videoId: string): Promise<string> {
     .replace(/\n/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  if (!text) {
+    throw new Error("자막이 비어있습니다.");
+  }
 
   return text;
 }
