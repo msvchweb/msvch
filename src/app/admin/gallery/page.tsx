@@ -14,7 +14,7 @@ export default function AdminGalleryPage() {
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
-  const [date, setDate] = useState("");
+  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
@@ -66,7 +66,7 @@ export default function AdminGalleryPage() {
     });
     if (!error) {
       setTitle("");
-      setDate("");
+      setDate(new Date().toISOString().split("T")[0]);
       setShowForm(false);
       loadAlbums();
     }
