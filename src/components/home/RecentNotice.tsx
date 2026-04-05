@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { formatDate } from "@/lib/utils";
 import { ArrowRight, Bell } from "lucide-react";
-import type { NoticeItem } from "@/types/notion";
+import type { Notice } from "@/types/notice";
 
-export function RecentNotice({ notices }: { notices: NoticeItem[] }) {
+export function RecentNotice({ notices }: { notices: Notice[] }) {
   return (
     <section className="py-20">
       <div className="mx-auto max-w-7xl px-4 lg:px-8">
@@ -39,8 +39,8 @@ export function RecentNotice({ notices }: { notices: NoticeItem[] }) {
                       <Bell size={10} />
                       긴급
                     </span>
-                  ) : notice.category ? (
-                    <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-500">
+                  ) : notice.category && notice.category !== "일반" ? (
+                    <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600">
                       {notice.category}
                     </span>
                   ) : null}

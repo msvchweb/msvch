@@ -1,18 +1,14 @@
 import { Container } from "@/components/ui/Container";
-import { getNoticeBySlug, getNotices } from "@/lib/notion";
+import { getNoticeBySlug } from "@/lib/notices";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 import type { Metadata } from "next";
 
 export const revalidate = 3600;
 
 type Params = Promise<{ slug: string }>;
-
-export async function generateStaticParams() {
-  const notices = await getNotices();
-  return notices.map((n) => ({ slug: n.slug }));
-}
 
 export async function generateMetadata({
   params,
@@ -45,15 +41,14 @@ export default async function NoticeDetailPage({
 
         <h1 className="text-2xl font-bold text-gray-900">{notice.title}</h1>
         {notice.date && (
-          <p className="mt-2 text-sm text-gray-400">{notice.date}</p>
+          <p className="mt-2 text-sm text-gray-400">{formatDate(notice.date)}</p>
         )}
 
         <hr className="my-6 border-gray-200" />
 
-        <article
-          className="prose max-w-none text-gray-700"
-          dangerouslySetInnerHTML={{ __html: notice.content }}
-        />
+        <article className="prose max-w-none whitespace-pre-line text-gray-700">
+          {notice.content}
+        </article>
       </div>
     </Container>
   );

@@ -1,7 +1,7 @@
 import { FileText, Download } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { getWeeklies } from "@/lib/notion";
+import { getWeeklies } from "@/lib/notices";
 import { formatDateKorean } from "@/lib/utils";
 import type { Metadata } from "next";
 
@@ -20,7 +20,7 @@ export default async function WeeklyPage() {
             weeklies.map((w) => (
               <div
                 key={w.id}
-                className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-6 py-4"
+                className="flex items-center justify-between rounded-xl border border-gray-100 bg-white px-6 py-4 shadow-sm"
               >
                 <div className="flex items-center gap-3">
                   <FileText className="text-primary-500" size={20} />
@@ -33,9 +33,9 @@ export default async function WeeklyPage() {
                     )}
                   </div>
                 </div>
-                {w.pdfUrl && (
+                {w.pdf_url && (
                   <a
-                    href={w.pdfUrl}
+                    href={w.pdf_url}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-1 rounded-md bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-600 hover:bg-primary-100"

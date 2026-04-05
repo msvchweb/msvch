@@ -10,8 +10,12 @@ export default async function AdminDashboard() {
     .from("profiles")
     .select("*", { count: "exact", head: true });
 
-  const { count: postCount } = await supabase
-    .from("group_posts")
+  const { count: noticeCount } = await supabase
+    .from("notices")
+    .select("*", { count: "exact", head: true });
+
+  const { count: albumCount } = await supabase
+    .from("gallery_albums")
     .select("*", { count: "exact", head: true });
 
   return (
@@ -19,22 +23,8 @@ export default async function AdminDashboard() {
       <h1 className="mb-8 text-2xl font-bold text-gray-900">대시보드</h1>
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="전체 회원" value={memberCount ?? 0} />
-        <StatCard label="그룹 게시글" value={postCount ?? 0} />
-        <div className="rounded-xl border border-gray-200 bg-white p-6">
-          <p className="text-sm text-gray-500">Notion CMS</p>
-          <p className="mt-2 text-sm text-gray-700">
-            공지사항, 주보, 갤러리는{" "}
-            <a
-              href="https://notion.so"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-primary-600 underline"
-            >
-              Notion
-            </a>
-            에서 관리하세요.
-          </p>
-        </div>
+        <StatCard label="공지사항" value={noticeCount ?? 0} />
+        <StatCard label="갤러리 앨범" value={albumCount ?? 0} />
       </div>
     </div>
   );

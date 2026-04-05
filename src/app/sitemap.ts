@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { getNotices } from "@/lib/notion";
+import { getNotices } from "@/lib/notices";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = "https://www.msvch.org";

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
-import { getNotices } from "@/lib/notion";
+import { getNotices } from "@/lib/notices";
 import { formatDate } from "@/lib/utils";
 import type { Metadata } from "next";
 
@@ -15,7 +15,7 @@ export default async function NoticePage() {
     <>
       <PageHeader title="공지사항" />
       <Container>
-        <div className="mx-auto max-w-3xl divide-y divide-gray-100 rounded-xl border border-gray-200 bg-white">
+        <div className="mx-auto max-w-3xl divide-y divide-gray-100 rounded-2xl border border-gray-100 bg-white shadow-sm">
           {notices.length > 0 ? (
             notices.map((notice) => (
               <Link
@@ -24,8 +24,14 @@ export default async function NoticePage() {
                 className="flex items-center justify-between px-6 py-4 transition hover:bg-gray-50"
               >
                 <div className="flex items-center gap-3">
-                  {notice.category && (
-                    <span className="rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                  {notice.category && notice.category !== "일반" && (
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        notice.category === "긴급"
+                          ? "bg-red-50 text-red-600"
+                          : "bg-blue-50 text-blue-600"
+                      }`}
+                    >
                       {notice.category}
                     </span>
                   )}
@@ -34,7 +40,7 @@ export default async function NoticePage() {
                   </span>
                 </div>
                 {notice.date && (
-                  <time className="shrink-0 text-sm text-gray-400">
+                  <time className="shrink-0 text-sm tabular-nums text-gray-400">
                     {formatDate(notice.date)}
                   </time>
                 )}

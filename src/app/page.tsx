@@ -3,7 +3,7 @@ import { QuickLinks } from "@/components/home/QuickLinks";
 import { WorshipTimeCard } from "@/components/home/WorshipTimeCard";
 import { RecentNotice } from "@/components/home/RecentNotice";
 import { LatestSermon } from "@/components/home/LatestSermon";
-import { getNotices } from "@/lib/notion";
+import { getNotices } from "@/lib/notices";
 import { getLatestSermon } from "@/lib/youtube";
 
 export const revalidate = 3600;
