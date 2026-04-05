@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { getYouTubeCaptions, summarizeSermon } from "@/lib/gemini";
+import { summarizeSermonFromVideo } from "@/lib/gemini";
 import type { SermonVideo } from "@/types/youtube";
+
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   const cookieStore = await cookies();
@@ -40,19 +42,15 @@ export async function POST(request: NextRequest) {
   const body = await request.json() as { sermon: SermonVideo; saveAsNotice: boolean };
 
   try {
-    // 1. Extract captions
-    const captions = await getYouTubeCaptions(body.sermon.videoId);
+    // Summarize with Gemini (directly from video or description)
+    const summary = await summarizeSermonFromVideo(body.sermon);
 
-    // 2. Summarize with Gemini
-    const summary = await summarizeSermon(body.sermon, captions);
-
-    // 3. Optionally save as notice
+    // Optionally save as notice
     if (body.saveAsNotice) {
       const slug = `sermon-${body.sermon.videoId}`;
       const title = `[설교요약] ${body.sermon.title}`;
       const date = body.sermon.publishedAt.split("T")[0];
 
-      // Check if already exists
       const { data: existing } = await supabase
         .from("notices")
         .select("id")
@@ -66,12 +64,8 @@ export async function POST(request: NextRequest) {
           .eq("id", existing.id);
       } else {
         await supabase.from("notices").insert({
-          title,
-          slug,
-          category: "일반",
-          content: summary,
-          date,
-          is_public: true,
+          title, slug, category: "일반",
+          content: summary, date, is_public: true,
         });
       }
     }
