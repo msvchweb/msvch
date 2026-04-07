@@ -3,10 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { tabItems, hiddenPrefixes, iconMap } from "./tab-config";
+import { useNewContent } from "@/lib/use-new-content";
 import { cn } from "@/lib/utils";
 
 export function BottomTabBar() {
   const pathname = usePathname();
+  const { dots } = useNewContent(pathname);
 
   if (hiddenPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     return null;
@@ -23,6 +25,8 @@ export function BottomTabBar() {
           const isActive = tab.exact
             ? pathname === tab.href
             : pathname === tab.href || pathname.startsWith(tab.href + "/");
+          const hasBadge =
+            tab.badgeKeys?.some((key) => dots[key]) ?? false;
 
           return (
             <Link
@@ -39,9 +43,14 @@ export function BottomTabBar() {
               {isActive && (
                 <span className="absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary-600" />
               )}
-              {Icon && (
-                <Icon size={22} strokeWidth={isActive ? 2.2 : 1.5} />
-              )}
+              <span className="relative">
+                {Icon && (
+                  <Icon size={22} strokeWidth={isActive ? 2.2 : 1.5} />
+                )}
+                {hasBadge && (
+                  <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-accent-rose ring-2 ring-white" />
+                )}
+              </span>
               <span
                 className={cn(
                   "text-[0.625rem] leading-tight",

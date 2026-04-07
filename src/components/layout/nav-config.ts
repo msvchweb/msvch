@@ -2,6 +2,8 @@ export interface NavItem {
   label: string;
   href: string;
   children?: NavItem[];
+  /** 레드닷 표시를 위한 콘텐츠 키 */
+  badgeKey?: string;
 }
 
 export const navItems: NavItem[] = [
@@ -19,8 +21,8 @@ export const navItems: NavItem[] = [
     href: "/worship",
     children: [
       { label: "\uc608\ubc30 \uc548\ub0b4", href: "/worship" },
-      { label: "\uc8fc\ubcf4", href: "/weekly" },
-      { label: "\uc124\uad50 \uc601\uc0c1", href: "/sermons" },
+      { label: "\uc8fc\ubcf4", href: "/weekly", badgeKey: "weeklies" },
+      { label: "\uc124\uad50 \uc601\uc0c1", href: "/sermons", badgeKey: "sermons" },
       { label: "\uc2dc\uac04\ud45c", href: "/timetable" },
     ],
   },
@@ -38,8 +40,8 @@ export const navItems: NavItem[] = [
     label: "\uc18c\uc2dd",
     href: "/notice",
     children: [
-      { label: "\uacf5\uc9c0\uc0ac\ud56d", href: "/notice" },
-      { label: "\uac24\ub7ec\ub9ac", href: "/gallery" },
+      { label: "\uacf5\uc9c0\uc0ac\ud56d", href: "/notice", badgeKey: "notices" },
+      { label: "\uac24\ub7ec\ub9ac", href: "/gallery", badgeKey: "gallery" },
     ],
   },
   {

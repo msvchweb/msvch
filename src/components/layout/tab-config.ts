@@ -12,15 +12,17 @@ export interface TabItem {
   icon: string;
   /** 경로 매칭 시 정확히 일치해야 하는지 여부 */
   exact?: boolean;
+  /** 레드닷 표시를 위한 콘텐츠 키 (하나라도 새 콘텐츠면 표시) */
+  badgeKeys?: string[];
 }
 
 /** 탭 항목 — 순서가 곧 표시 순서 */
 export const tabItems: TabItem[] = [
   { key: "home", label: "홈", href: "/", icon: "home", exact: true },
-  { key: "worship", label: "예배", href: "/worship", icon: "heart" },
-  { key: "sermons", label: "설교", href: "/sermons", icon: "play" },
-  { key: "notice", label: "소식", href: "/notice", icon: "bell" },
-  { key: "more", label: "더보기", href: "/menu", icon: "ellipsis" },
+  { key: "worship", label: "예배", href: "/worship", icon: "heart", badgeKeys: ["weeklies"] },
+  { key: "sermons", label: "설교", href: "/sermons", icon: "play", badgeKeys: ["sermons"] },
+  { key: "notice", label: "소식", href: "/notice", icon: "bell", badgeKeys: ["notices"] },
+  { key: "more", label: "더보기", href: "/menu", icon: "ellipsis", badgeKeys: ["gallery"] },
 ];
 
 /** 탭바를 숨길 경로 접두사 */

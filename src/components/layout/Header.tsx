@@ -4,13 +4,32 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { navItems } from "./nav-config";
+import { useNewContent } from "@/lib/use-new-content";
 import { cn } from "@/lib/utils";
+
+function RedDot() {
+  return (
+    <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-accent-rose" />
+  );
+}
+
+/** 네비 항목(부모 포함) 중 하나라도 새 콘텐츠가 있는지 확인 */
+function hasChildBadge(
+  children: typeof navItems[number]["children"],
+  dots: Record<string, boolean>,
+): boolean {
+  if (!children) return false;
+  return children.some((child) => child.badgeKey && dots[child.badgeKey]);
+}
 
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const pathname = usePathname();
+  const { dots } = useNewContent(pathname);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -48,6 +67,7 @@ export function Header() {
                 className="relative rounded-lg px-3.5 py-2 text-[0.9rem] font-medium text-gray-600 transition-colors hover:text-gray-900"
               >
                 {item.label}
+                {hasChildBadge(item.children, dots) && <RedDot />}
                 <span className="absolute inset-x-3.5 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full bg-primary-600 transition-transform group-hover:scale-x-100" />
               </Link>
               {item.children && (
@@ -57,9 +77,10 @@ export function Header() {
                       <Link
                         key={child.href}
                         href={child.href}
-                        className="block rounded-lg px-3.5 py-2.5 text-sm text-gray-600 transition-colors hover:bg-primary-50 hover:text-primary-700"
+                        className="flex items-center justify-between rounded-lg px-3.5 py-2.5 text-sm text-gray-600 transition-colors hover:bg-primary-50 hover:text-primary-700"
                       >
                         {child.label}
+                        {child.badgeKey && dots[child.badgeKey] && <RedDot />}
                       </Link>
                     ))}
                   </div>
@@ -71,11 +92,15 @@ export function Header() {
 
         {/* Mobile toggle */}
         <button
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 lg:hidden"
+          className="relative flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 lg:hidden"
           onClick={() => setMobileOpen(!mobileOpen)}
           aria-label={mobileOpen ? "메뉴 닫기" : "메뉴 열기"}
         >
           {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+          {!mobileOpen &&
+            navItems.some((item) => hasChildBadge(item.children, dots)) && (
+              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-rose ring-2 ring-white" />
+            )}
         </button>
       </div>
 
@@ -90,7 +115,10 @@ export function Header() {
                 }
                 className="flex w-full items-center justify-between py-3 text-[0.95rem] font-medium text-gray-800"
               >
-                {item.label}
+                <span className="flex items-center">
+                  {item.label}
+                  {hasChildBadge(item.children, dots) && <RedDot />}
+                </span>
                 {item.children && (
                   <ChevronDown
                     size={16}
@@ -107,10 +135,11 @@ export function Header() {
                     <Link
                       key={child.href}
                       href={child.href}
-                      className="block rounded-md py-2 text-sm text-gray-500 transition-colors hover:text-primary-600"
+                      className="flex items-center rounded-md py-2 text-sm text-gray-500 transition-colors hover:text-primary-600"
                       onClick={() => setMobileOpen(false)}
                     >
                       {child.label}
+                      {child.badgeKey && dots[child.badgeKey] && <RedDot />}
                     </Link>
                   ))}
                 </div>
