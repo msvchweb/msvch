@@ -1,5 +1,6 @@
 import { Home, Heart, Play, Bell, Ellipsis } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import type { ContentKey } from "@/app/api/new-content/route";
 
 export interface TabItem {
   /** 탭 고유 식별자 */
@@ -13,13 +14,13 @@ export interface TabItem {
   /** 경로 매칭 시 정확히 일치해야 하는지 여부 */
   exact?: boolean;
   /** 레드닷 표시를 위한 콘텐츠 키 (하나라도 새 콘텐츠면 표시) */
-  badgeKeys?: string[];
+  badgeKeys?: ContentKey[];
 }
 
 /** 탭 항목 — 순서가 곧 표시 순서 */
 export const tabItems: TabItem[] = [
   { key: "home", label: "홈", href: "/", icon: "home", exact: true },
-  { key: "worship", label: "예배", href: "/worship", icon: "heart", badgeKeys: ["weeklies"] },
+  { key: "worship", label: "예배", href: "/worship", icon: "heart", badgeKeys: ["weeklies", "sermons"] },
   { key: "sermons", label: "설교", href: "/sermons", icon: "play", badgeKeys: ["sermons"] },
   { key: "notice", label: "소식", href: "/notice", icon: "bell", badgeKeys: ["notices"] },
   { key: "more", label: "더보기", href: "/menu", icon: "ellipsis", badgeKeys: ["gallery"] },

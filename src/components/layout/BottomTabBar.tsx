@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { tabItems, hiddenPrefixes, iconMap } from "./tab-config";
-import { useNewContent } from "@/lib/use-new-content";
+import { useNewContent } from "@/lib/new-content-provider";
 import { cn } from "@/lib/utils";
 
 export function BottomTabBar() {
   const pathname = usePathname();
-  const { dots } = useNewContent(pathname);
+  const { dots } = useNewContent();
 
   if (hiddenPrefixes.some((prefix) => pathname.startsWith(prefix))) {
     return null;
@@ -48,7 +48,13 @@ export function BottomTabBar() {
                   <Icon size={22} strokeWidth={isActive ? 2.2 : 1.5} />
                 )}
                 {hasBadge && (
-                  <span className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-accent-rose ring-2 ring-white" />
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className="absolute -right-1 -top-0.5 h-2 w-2 rounded-full bg-accent-rose ring-2 ring-white"
+                    />
+                    <span className="sr-only">(새 항목)</span>
+                  </>
                 )}
               </span>
               <span

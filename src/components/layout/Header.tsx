@@ -4,21 +4,26 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
-import { usePathname } from "next/navigation";
 import { navItems } from "./nav-config";
-import { useNewContent } from "@/lib/use-new-content";
+import { useNewContent } from "@/lib/new-content-provider";
 import { cn } from "@/lib/utils";
+import type { ContentKey } from "@/app/api/new-content/route";
 
 function RedDot() {
   return (
-    <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-accent-rose" />
+    <>
+      <span
+        aria-hidden="true"
+        className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-accent-rose"
+      />
+      <span className="sr-only">(새 항목)</span>
+    </>
   );
 }
 
-/** 네비 항목(부모 포함) 중 하나라도 새 콘텐츠가 있는지 확인 */
 function hasChildBadge(
   children: typeof navItems[number]["children"],
-  dots: Record<string, boolean>,
+  dots: Record<ContentKey, boolean>,
 ): boolean {
   if (!children) return false;
   return children.some((child) => child.badgeKey && dots[child.badgeKey]);
@@ -28,8 +33,7 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
-  const pathname = usePathname();
-  const { dots } = useNewContent(pathname);
+  const { dots } = useNewContent();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
@@ -99,7 +103,13 @@ export function Header() {
           {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           {!mobileOpen &&
             navItems.some((item) => hasChildBadge(item.children, dots)) && (
-              <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-rose ring-2 ring-white" />
+              <>
+                <span
+                  aria-hidden="true"
+                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-rose ring-2 ring-white"
+                />
+                <span className="sr-only">(새 항목 있음)</span>
+              </>
             )}
         </button>
       </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import {
   BookOpen,
   Church,
@@ -13,14 +12,15 @@ import {
   HandHeart,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import { useNewContent } from "@/lib/use-new-content";
+import type { ContentKey } from "@/app/api/new-content/route";
+import { useNewContent } from "@/lib/new-content-provider";
 
 interface MenuItem {
   label: string;
   href: string;
   icon: LucideIcon;
   description: string;
-  badgeKey?: string;
+  badgeKey?: ContentKey;
 }
 
 interface MenuSection {
@@ -60,8 +60,7 @@ const menuSections: MenuSection[] = [
 ];
 
 export function MenuContent() {
-  const pathname = usePathname();
-  const { dots } = useNewContent(pathname);
+  const { dots } = useNewContent();
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
@@ -82,7 +81,13 @@ export function MenuContent() {
                   <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">
                     <item.icon size={20} />
                     {item.badgeKey && dots[item.badgeKey] && (
-                      <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent-rose ring-2 ring-white" />
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-accent-rose ring-2 ring-white"
+                        />
+                        <span className="sr-only">(새 항목)</span>
+                      </>
                     )}
                   </div>
                   <div>
