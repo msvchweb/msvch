@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
-import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { BottomTabBar } from "@/components/layout/BottomTabBar";
-import { NewContentProvider } from "@/lib/new-content-provider";
+import { NavigationShell } from "@/components/layout/NavigationShell";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -35,12 +33,9 @@ export default function RootLayout({
   return (
     <html lang="ko" className="h-full antialiased">
       <body className="flex min-h-full flex-col font-sans">
-        <NewContentProvider>
-          <Header />
-          <main className="flex-1 pb-14 lg:pb-0">{children}</main>
-          <Footer />
-          <BottomTabBar />
-        </NewContentProvider>
+        <NavigationShell />
+        <main className="flex-1 pb-14 lg:pb-0">{children}</main>
+        <Footer />
       </body>
     </html>
   );

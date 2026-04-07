@@ -14,10 +14,20 @@ export type ContentKey = keyof NewContentDates;
 
 export const revalidate = 600;
 
+/** YouTube RSS를 타임아웃 포함하여 가져옴 (캐시 히트 시 즉시) */
+async function getLatestSermonDate(): Promise<string | null> {
+  try {
+    const videos = await getSermonVideos(1);
+    return videos[0]?.publishedAt ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   const supabase = await createClient();
 
-  const [noticeRes, galleryRes, weeklyRes, sermons] = await Promise.all([
+  const [noticeRes, galleryRes, weeklyRes, sermonDate] = await Promise.all([
     supabase
       .from("notices")
       .select("date")
@@ -38,12 +48,12 @@ export async function GET() {
       .order("date", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    getSermonVideos(1),
+    getLatestSermonDate(),
   ]);
 
   const dates: NewContentDates = {
     notices: noticeRes.data?.date ?? null,
-    sermons: sermons[0]?.publishedAt ?? null,
+    sermons: sermonDate,
     gallery: galleryRes.data?.created_at ?? null,
     weeklies: weeklyRes.data?.date ?? null,
   };
