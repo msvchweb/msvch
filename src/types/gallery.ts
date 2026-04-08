@@ -2,6 +2,7 @@ export interface GalleryAlbum {
   id: string;
   title: string;
   category: string | null;
+  tags: string[];
   date: string | null;
   thumbnail_url: string | null;
   is_public: boolean;

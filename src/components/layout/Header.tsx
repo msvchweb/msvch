@@ -29,6 +29,13 @@ function hasChildBadge(
   return children.some((child) => child.badgeKey && dots[child.badgeKey]);
 }
 
+function hasBadge(
+  item: typeof navItems[number],
+  dots: Record<ContentKey, boolean>,
+): boolean {
+  return !!(item.badgeKey && dots[item.badgeKey]) || hasChildBadge(item.children, dots);
+}
+
 export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
@@ -78,7 +85,7 @@ export function Header() {
                 className="relative rounded-lg px-3.5 py-2 text-[0.9rem] font-medium text-gray-600 transition-colors hover:text-gray-900"
               >
                 {item.label}
-                {hasChildBadge(item.children, dots) && <RedDot />}
+                {hasBadge(item, dots) && <RedDot />}
                 <span className="absolute inset-x-3.5 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full bg-primary-600 transition-transform group-hover:scale-x-100" />
               </Link>
               {item.children && (
@@ -109,7 +116,7 @@ export function Header() {
         >
           {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           {!mobileOpen &&
-            navItems.some((item) => hasChildBadge(item.children, dots)) && (
+            navItems.some((item) => hasBadge(item, dots)) && (
               <>
                 <span
                   aria-hidden="true"
@@ -126,40 +133,51 @@ export function Header() {
         <nav className="animate-slide-down border-t border-gray-100 bg-white px-4 pb-6 pt-4 lg:hidden">
           {navItems.map((item) => (
             <div key={item.href} className="border-b border-gray-50 last:border-0">
-              <button
-                onClick={() =>
-                  setOpenSubmenu(openSubmenu === item.href ? null : item.href)
-                }
-                className="flex w-full items-center justify-between py-3 text-[0.95rem] font-medium text-gray-800"
-              >
-                <span className="flex items-center">
+              {item.children ? (
+                <>
+                  <button
+                    onClick={() =>
+                      setOpenSubmenu(openSubmenu === item.href ? null : item.href)
+                    }
+                    className="flex w-full items-center justify-between py-3 text-[0.95rem] font-medium text-gray-800"
+                  >
+                    <span className="flex items-center">
+                      {item.label}
+                      {hasBadge(item, dots) && <RedDot />}
+                    </span>
+                    <ChevronDown
+                      size={16}
+                      className={cn(
+                        "text-gray-400 transition-transform duration-200",
+                        openSubmenu === item.href && "rotate-180 text-primary-600"
+                      )}
+                    />
+                  </button>
+                  {openSubmenu === item.href && (
+                    <div className="mb-3 ml-1 space-y-0.5 border-l-2 border-primary-100 pl-4">
+                      {item.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className="flex items-center rounded-md py-2 text-sm text-gray-500 transition-colors hover:text-primary-600"
+                          onClick={() => setMobileOpen(false)}
+                        >
+                          {child.label}
+                          {child.badgeKey && dots[child.badgeKey] && <RedDot />}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <Link
+                  href={item.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="flex w-full items-center py-3 text-[0.95rem] font-medium text-gray-800"
+                >
                   {item.label}
-                  {hasChildBadge(item.children, dots) && <RedDot />}
-                </span>
-                {item.children && (
-                  <ChevronDown
-                    size={16}
-                    className={cn(
-                      "text-gray-400 transition-transform duration-200",
-                      openSubmenu === item.href && "rotate-180 text-primary-600"
-                    )}
-                  />
-                )}
-              </button>
-              {item.children && openSubmenu === item.href && (
-                <div className="mb-3 ml-1 space-y-0.5 border-l-2 border-primary-100 pl-4">
-                  {item.children.map((child) => (
-                    <Link
-                      key={child.href}
-                      href={child.href}
-                      className="flex items-center rounded-md py-2 text-sm text-gray-500 transition-colors hover:text-primary-600"
-                      onClick={() => setMobileOpen(false)}
-                    >
-                      {child.label}
-                      {child.badgeKey && dots[child.badgeKey] && <RedDot />}
-                    </Link>
-                  ))}
-                </div>
+                  {item.badgeKey && dots[item.badgeKey] && <RedDot />}
+                </Link>
               )}
             </div>
           ))}

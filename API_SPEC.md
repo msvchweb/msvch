@@ -90,6 +90,27 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 
 ---
 
+### GET `/api/gallery`
+
+갤러리 앨범 목록. 태그 기반 필터링 지원 (모바일 앱 호환).
+
+- **인증**: 불필요
+- **캐시**: ISR 1시간 (`revalidate: 3600`)
+- **쿼리 파라미터**:
+  - `tag` (반복 가능) — AND 필터. 모든 태그를 포함하는 앨범만 반환
+  - `anyTag` (반복 가능) — OR 필터. 하나라도 포함하면 반환
+  - `limit` — 최대 결과 수
+- **응답**: `GalleryAlbum[]`
+
+```
+GET /api/gallery                                → 전체
+GET /api/gallery?tag=교회학교&tag=영유치부       → AND 필터
+GET /api/gallery?anyTag=예배&anyTag=교회행사      → OR 필터
+GET /api/gallery?tag=봉사센터&limit=5             → 제한
+```
+
+---
+
 ## 서버 사이드 데이터 함수
 
 API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수:
@@ -99,7 +120,7 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `getNotices()` | `src/lib/notices.ts` | 공개 공지사항 목록 (날짜 역순) |
 | `getNoticeBySlug(slug)` | `src/lib/notices.ts` | 단건 공지 조회 |
 | `getWeeklies()` | `src/lib/notices.ts` | 주보 목록 (최근 20개) |
-| `getGalleryAlbums()` | `src/lib/gallery.ts` | 공개 앨범 + 이미지 |
+| `getGalleryAlbums(options?)` | `src/lib/gallery.ts` | 공개 앨범 + 이미지 (태그 필터 지원) |
 | `getSermonVideos(max)` | `src/lib/youtube.ts` | YouTube RSS 설교 목록 |
 | `getLatestSermon()` | `src/lib/youtube.ts` | 최신 설교 1건 |
 | `summarizeSermonFromVideo(sermon)` | `src/lib/gemini.ts` | Gemini 설교 요약 |

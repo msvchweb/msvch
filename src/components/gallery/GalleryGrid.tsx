@@ -15,15 +15,33 @@ const categories = [
   "새가족",
 ];
 
+const subCategories: Record<string, string[]> = {
+  교회학교: ["전체", "영유치부", "아동부", "청소년부", "청년부"],
+  봉사센터: ["전체", "반찬", "이미용", "비전문화", "탁구"],
+};
+
 export function GalleryGrid({ albums }: { albums: GalleryAlbum[] }) {
   const [filter, setFilter] = useState("전체");
+  const [subFilter, setSubFilter] = useState("전체");
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
 
-  const filtered =
-    filter === "전체"
-      ? albums
-      : albums.filter((a) => a.category === filter);
+  const hasSubCategories = filter in subCategories;
+
+  const filtered = albums.filter((a) => {
+    if (filter === "전체") return true;
+    const matchCategory = a.tags.includes(filter) || a.category === filter;
+    if (!matchCategory) return false;
+    if (hasSubCategories && subFilter !== "전체") {
+      return a.tags.includes(subFilter);
+    }
+    return true;
+  });
+
+  function handleCategoryChange(cat: string) {
+    setFilter(cat);
+    setSubFilter("전체");
+  }
 
   function openAlbum(images: string[]) {
     setLightboxImages(images);
@@ -32,11 +50,12 @@ export function GalleryGrid({ albums }: { albums: GalleryAlbum[] }) {
 
   return (
     <>
-      <div className="mb-8 flex flex-wrap gap-2">
+      {/* 1차 카테고리 */}
+      <div className="mb-4 flex flex-wrap gap-2">
         {categories.map((cat) => (
           <button
             key={cat}
-            onClick={() => setFilter(cat)}
+            onClick={() => handleCategoryChange(cat)}
             className={`rounded-full px-4 py-2 text-sm font-medium transition ${
               filter === cat
                 ? "bg-primary-600 text-white"
@@ -47,6 +66,25 @@ export function GalleryGrid({ albums }: { albums: GalleryAlbum[] }) {
           </button>
         ))}
       </div>
+
+      {/* 2차 하위부서 */}
+      {hasSubCategories && (
+        <div className="mb-8 flex flex-wrap gap-2">
+          {subCategories[filter].map((sub) => (
+            <button
+              key={sub}
+              onClick={() => setSubFilter(sub)}
+              className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
+                subFilter === sub
+                  ? "bg-gray-900 text-white"
+                  : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+              }`}
+            >
+              {sub}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {filtered.map((album) => {

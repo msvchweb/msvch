@@ -11,56 +11,44 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   {
     label: "교회소개",
-    href: "/intro",
+    href: "/greetings",
     children: [
       { label: "인사말", href: "/greetings" },
-      { label: "교회소개", href: "/intro" },
-      { label: "오시는 길", href: "/map" },
+      { label: "공지사항", href: "/notice", badgeKey: "notices" },
+      { label: "예배안내", href: "/worship" },
+      { label: "섬기는 이들", href: "/staff" },
+      { label: "찾아오시는 길", href: "/map" },
+      { label: "주보", href: "/weekly", badgeKey: "weeklies" },
     ],
   },
   {
-    label: "예배",
-    href: "/worship",
-    children: [
-      { label: "예배 안내", href: "/worship" },
-      { label: "주보", href: "/weekly", badgeKey: "weeklies" },
-      { label: "설교 영상", href: "/sermons", badgeKey: "sermons" },
-      { label: "시간표", href: "/timetable" },
-    ],
+    label: "말씀영상",
+    href: "/sermons",
+    badgeKey: "sermons",
+  },
+  {
+    label: "비전갤러리",
+    href: "/gallery",
+    badgeKey: "gallery",
   },
   {
     label: "교회학교",
     href: "/churchschool",
     children: [
-      { label: "유아부", href: "/churchschool/infant" },
-      { label: "초등부", href: "/churchschool/elementary" },
+      { label: "영유치부", href: "/churchschool/infant" },
+      { label: "아동부", href: "/churchschool/elementary" },
       { label: "청소년부", href: "/churchschool/teen" },
       { label: "청년부", href: "/churchschool/youth" },
     ],
   },
   {
-    label: "소식",
-    href: "/notice",
+    label: "봉사센터",
+    href: "/volunteer-center",
     children: [
-      { label: "공지사항", href: "/notice", badgeKey: "notices" },
-      { label: "갤러리", href: "/gallery", badgeKey: "gallery" },
-    ],
-  },
-  {
-    label: "문화사역",
-    href: "/ministry",
-    children: [
-      { label: "미용봉사", href: "/ministry/beauty" },
-      { label: "탁구", href: "/ministry/tabletennis" },
-      { label: "반찬사역", href: "/ministry/sidedish" },
-    ],
-  },
-  {
-    label: "커뮤니티",
-    href: "/groups",
-    children: [
-      { label: "그룹", href: "/groups" },
-      { label: "봉사", href: "/volunteer" },
+      { label: "사랑의 반찬나눔", href: "/volunteer-center/sidedish" },
+      { label: "사랑의 이미용봉사", href: "/volunteer-center/beauty" },
+      { label: "비전문화학교", href: "/volunteer-center/culture" },
+      { label: "탁구교실", href: "/volunteer-center/tabletennis" },
     ],
   },
 ];

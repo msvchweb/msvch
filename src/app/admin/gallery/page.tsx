@@ -8,6 +8,11 @@ import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
 
 const CATEGORIES = ["예배", "교회학교", "교회행사", "봉사센터", "새가족"] as const;
 
+const SUB_CATEGORIES: Record<string, string[]> = {
+  교회학교: ["영유치부", "아동부", "청소년부", "청년부"],
+  봉사센터: ["반찬", "이미용", "비전문화", "탁구"],
+};
+
 export default function AdminGalleryPage() {
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
   const [loading, setLoading] = useState(true);
@@ -15,6 +20,7 @@ export default function AdminGalleryPage() {
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
+  const [subCategory, setSubCategory] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
@@ -45,6 +51,7 @@ export default function AdminGalleryPage() {
       id: album.id as string,
       title: album.title as string,
       category: album.category as string | null,
+      tags: (album.tags as string[] | null) ?? [],
       date: album.date as string | null,
       thumbnail_url: album.thumbnail_url as string | null,
       is_public: album.is_public as boolean,
@@ -58,14 +65,19 @@ export default function AdminGalleryPage() {
 
   async function createAlbum(e: React.FormEvent) {
     e.preventDefault();
+    const tags: string[] = [category];
+    if (subCategory) tags.push(subCategory);
+
     const { error } = await supabase.from("gallery_albums").insert({
       title,
       category,
+      tags,
       date: date || null,
       is_public: false,
     });
     if (!error) {
       setTitle("");
+      setSubCategory("");
       setDate(new Date().toISOString().split("T")[0]);
       setShowForm(false);
       loadAlbums();
@@ -201,6 +213,23 @@ export default function AdminGalleryPage() {
                 ))}
               </select>
             </div>
+            {SUB_CATEGORIES[category] && (
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  하위부서
+                </label>
+                <select
+                  value={subCategory}
+                  onChange={(e) => setSubCategory(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                >
+                  <option value="">선택 안함</option>
+                  {SUB_CATEGORIES[category].map((sub) => (
+                    <option key={sub} value={sub}>{sub}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-sm font-medium text-gray-700">
                 날짜

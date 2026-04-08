@@ -30,19 +30,17 @@ src/
 │   ├── sitemap.ts               # SEO
 │   │
 │   ├── (public)/                # 공개 페이지 (인증 불필요)
-│   │   ├── churchschool/        # 교회학교
-│   │   ├── gallery/             # 갤러리
+│   │   ├── churchschool/        # 교회학교 (영유치부/아동부/청소년부/청년부)
+│   │   ├── gallery/             # 비전갤러리 (2단계 카테고리 필터)
 │   │   ├── greetings/           # 인사말
-│   │   ├── intro/               # 교회소개
-│   │   ├── map/                 # 오시는 길
+│   │   ├── map/                 # 찾아오시는 길
 │   │   ├── menu/                # 더보기 메뉴 (탭바 연동)
-│   │   ├── ministry/            # 문화사역
 │   │   ├── notice/              # 공지사항
-│   │   ├── sermons/             # 설교 영상
-│   │   ├── timetable/           # 시간표
-│   │   ├── volunteer/           # 봉사
+│   │   ├── sermons/             # 말씀영상
+│   │   ├── staff/               # 섬기는 이들
+│   │   ├── volunteer-center/    # 봉사센터 (반찬/이미용/문화/탁구)
 │   │   ├── weekly/              # 주보
-│   │   └── worship/             # 예배 안내
+│   │   └── worship/             # 예배안내 (시간표 통합)
 │   │
 │   ├── (auth)/                  # 인증 페이지
 │   │   ├── login/
@@ -60,6 +58,7 @@ src/
 │   │   └── weeklies/
 │   │
 │   └── api/                     # API 라우트
+│       ├── gallery/             # 갤러리 목록 (태그 필터, 모바일 호환)
 │       ├── og/                  # OG 이미지 생성 (Edge)
 │       ├── revalidate/          # ISR 캐시 무효화
 │       ├── sermon-summary/      # Gemini 설교 요약
@@ -117,15 +116,18 @@ src/
 
 ### Header (데스크톱)
 - `lg:flex` — 수평 드롭다운 메뉴
-- 6개 카테고리: 교회소개, 예배, 교회학교, 소식, 문화사역, 커뮤니티
+- 5개 카테고리: 교회소개, 말씀영상, 비전갤러리, 교회학교, 봉사센터
+- children 없는 메뉴(말씀영상, 비전갤러리)는 단일 링크로 동작
+- 상위 메뉴 자체의 badgeKey도 레드닷 표시 지원
 - 설정: `nav-config.ts` (`NavItem[]`)
 
 ### Header (모바일)
 - `lg:hidden` — 햄버거 → 아코디언 메뉴
+- children 없는 항목은 `<Link>`, 있는 항목은 `<button>` + accordion
 
 ### BottomTabBar (모바일/태블릿)
 - `lg:hidden` — 5개 고정 탭
-- 탭: 홈, 예배, 설교, 소식, 더보기
+- 탭: 홈, 말씀, 갤러리, 소식, 더보기
 - 설정: `tab-config.ts` (`TabItem[]`)
 - 숨김: `/admin/*`, `/login`, `/signup`
 

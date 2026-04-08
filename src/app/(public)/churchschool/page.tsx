@@ -21,7 +21,7 @@ interface Department {
 const departments: Department[] = [
   {
     slug: "infant",
-    title: "유아부",
+    title: "영유치부",
     ageGroup: "0~7세",
     icon: Baby,
     gradient: "from-pink-500 to-rose-600",
@@ -29,7 +29,7 @@ const departments: Department[] = [
   },
   {
     slug: "elementary",
-    title: "초등부",
+    title: "아동부",
     ageGroup: "초등 1~6학년",
     icon: BookOpen,
     gradient: "from-emerald-500 to-green-600",

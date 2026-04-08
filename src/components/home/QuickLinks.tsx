@@ -26,11 +26,11 @@ const links: QuickLink[] = [
     title: "교회학교",
     href: "/churchschool",
     image: "/images/churchschool.avif",
-    description: "유아부, 초등부, 청소년부, 청년부",
+    description: "영유치부, 아동부, 청소년부, 청년부",
   },
   {
     title: "봉사센터",
-    href: "/volunteer",
+    href: "/volunteer-center",
     image: "/images/volunteer.avif",
     description: "지역사회를 섬기는 봉사 사역",
   },

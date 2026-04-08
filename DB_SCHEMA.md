@@ -169,7 +169,8 @@ interface Weekly {
 |------|------|------|
 | `id` | `uuid` PK | 자동 생성 |
 | `title` | `text NOT NULL` | 앨범 제목 |
-| `category` | `text` | `'예배'`, `'교회학교'`, `'교회행사'`, `'봉사센터'`, `'새가족'` (nullable) |
+| `category` | `text` | `'예배'`, `'교회학교'`, `'교회행사'`, `'봉사센터'`, `'새가족'` (nullable, 하위호환) |
+| `tags` | `text[] DEFAULT '{}'` | 태그 배열 (예: `{'교회학교','영유치부'}`). GIN 인덱스 적용 |
 | `date` | `date` | 날짜 (nullable) |
 | `thumbnail_url` | `text` | 썸네일 URL (nullable) |
 | `is_public` | `boolean DEFAULT true` | 공개 여부 |
@@ -177,12 +178,15 @@ interface Weekly {
 
 **RLS 정책**: 공개 앨범 읽기, admin 쓰기
 
+**인덱스**: `idx_gallery_albums_tags` — GIN 인덱스 (tags 배열 검색)
+
 **TypeScript 타입** (`src/types/gallery.ts`):
 ```ts
 interface GalleryAlbum {
   id: string;
   title: string;
   category: string | null;
+  tags: string[];
   date: string | null;
   thumbnail_url: string | null;
   is_public: boolean;
@@ -238,3 +242,4 @@ interface GalleryImage {
 | `supabase/migrations/001_initial.sql` | profiles, groups, group_posts + 초기 데이터 |
 | `supabase/migrations/002_gallery.sql` | gallery_albums, gallery_images + storage |
 | `supabase/migrations/003_notices_weeklies.sql` | notices, weeklies + storage |
+| `supabase/migrations/004_gallery_tags.sql` | gallery_albums에 tags 컬럼 + GIN 인덱스 |

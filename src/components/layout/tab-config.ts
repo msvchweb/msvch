@@ -1,4 +1,4 @@
-import { Home, Heart, Play, Bell, Ellipsis } from "lucide-react";
+import { Home, Play, Images, BookOpen, Ellipsis } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ContentKey } from "@/app/api/new-content/route";
 
@@ -20,9 +20,9 @@ export interface TabItem {
 /** 탭 항목 — 순서가 곧 표시 순서 */
 export const tabItems: TabItem[] = [
   { key: "home", label: "홈", href: "/", icon: "home", exact: true },
-  { key: "worship", label: "예배", href: "/worship", icon: "heart", badgeKeys: ["weeklies", "sermons"] },
-  { key: "sermons", label: "설교", href: "/sermons", icon: "play", badgeKeys: ["sermons"] },
-  { key: "notice", label: "소식", href: "/notice", icon: "bell", badgeKeys: ["notices"] },
+  { key: "sermons", label: "말씀", href: "/sermons", icon: "play", badgeKeys: ["sermons"] },
+  { key: "gallery", label: "갤러리", href: "/gallery", icon: "images", badgeKeys: ["gallery"] },
+  { key: "notice", label: "소식", href: "/notice", icon: "book-open", badgeKeys: ["notices"] },
   { key: "more", label: "더보기", href: "/menu", icon: "ellipsis", badgeKeys: ["gallery"] },
 ];
 
@@ -32,8 +32,8 @@ export const hiddenPrefixes = ["/admin", "/login", "/signup"];
 /** 웹 전용: 아이콘 문자열 → Lucide 컴포넌트 매핑 */
 export const iconMap: Record<string, LucideIcon> = {
   home: Home,
-  heart: Heart,
   play: Play,
-  bell: Bell,
+  images: Images,
+  "book-open": BookOpen,
   ellipsis: Ellipsis,
 };
