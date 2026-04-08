@@ -1,4 +1,4 @@
-import { Home, Play, Images, BookOpen, Ellipsis } from "lucide-react";
+import { Home, Play, Images, GraduationCap, Ellipsis } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ContentKey } from "@/app/api/new-content/route";
 
@@ -22,7 +22,7 @@ export const tabItems: TabItem[] = [
   { key: "home", label: "홈", href: "/", icon: "home", exact: true },
   { key: "sermons", label: "말씀", href: "/sermons", icon: "play", badgeKeys: ["sermons"] },
   { key: "gallery", label: "갤러리", href: "/gallery", icon: "images", badgeKeys: ["gallery"] },
-  { key: "notice", label: "소식", href: "/notice", icon: "book-open", badgeKeys: ["notices"] },
+  { key: "churchschool", label: "교회학교", href: "/churchschool", icon: "graduation-cap" },
   { key: "more", label: "더보기", href: "/menu", icon: "ellipsis", badgeKeys: ["gallery"] },
 ];
 
@@ -34,6 +34,6 @@ export const iconMap: Record<string, LucideIcon> = {
   home: Home,
   play: Play,
   images: Images,
-  "book-open": BookOpen,
+  "graduation-cap": GraduationCap,
   ellipsis: Ellipsis,
 };
