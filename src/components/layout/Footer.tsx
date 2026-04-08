@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { MapPin, Phone, Mail } from "lucide-react";
+import { InstagramIcon } from "@/components/icons/InstagramIcon";
 
 export function Footer() {
   return (
@@ -35,6 +36,15 @@ export function Footer() {
                 info@msvch.org
               </p>
             </div>
+            <a
+              href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-flex items-center gap-2 text-sm transition-colors hover:text-white"
+            >
+              <InstagramIcon size={18} className="text-church-gold" />
+              @msvch_main
+            </a>
           </div>
 
           {/* Worship times */}

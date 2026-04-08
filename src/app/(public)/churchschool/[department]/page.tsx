@@ -3,6 +3,7 @@ import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getGalleryAlbums } from "@/lib/gallery";
 import Image from "next/image";
+import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 
@@ -23,6 +24,7 @@ interface DepartmentInfo {
   organization: OrgMember[];
   prayers: string[];
   galleryTag: string;
+  instagram?: { url: string; handle: string };
 }
 
 const departments: Record<string, DepartmentInfo> = {
@@ -79,6 +81,7 @@ const departments: Record<string, DepartmentInfo> = {
       "아이들을 통하여 가정과 학교와 삶이 변화되길.",
     ],
     galleryTag: "아동부",
+    instagram: { url: "https://www.instagram.com/msvch_children?igsh=MXJmbDdzeTkzdWw3eQ==", handle: "@msvch_children" },
   },
   teen: {
     title: "청소년부",
@@ -106,6 +109,7 @@ const departments: Record<string, DepartmentInfo> = {
       "아이들을 통하여 가정과 학교와 삶이 변화되길.",
     ],
     galleryTag: "청소년부",
+    instagram: { url: "https://www.instagram.com/msvch_middle?igsh=Y3prOHR0d2trajRn", handle: "@msvch_middle" },
   },
   youth: {
     title: "청년부",
@@ -134,6 +138,7 @@ const departments: Record<string, DepartmentInfo> = {
       "청년의 때에 악과 선을 분별할 수 있도록.",
     ],
     galleryTag: "청년부",
+    instagram: { url: "https://www.instagram.com/msvch_insta?igsh=dWJlZ3J2ZDhwZGdq", handle: "@msvch_insta" },
   },
 };
 
@@ -176,6 +181,21 @@ export default async function DepartmentPage({
       <PageHeader title={dept.title} description={dept.description} />
       <Container>
         <div className="mx-auto max-w-3xl space-y-8">
+          {/* 인스타그램 */}
+          {dept.instagram && (
+            <div className="flex justify-center">
+              <a
+                href={dept.instagram.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm transition hover:border-pink-300 hover:text-pink-600"
+              >
+                <InstagramIcon size={18} className="text-pink-500" />
+                {dept.instagram.handle}
+              </a>
+            </div>
+          )}
+
           {/* 갤러리 사진 */}
           {photos.length > 0 && (
             <Link

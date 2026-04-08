@@ -4,6 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
+import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { navItems } from "./nav-config";
 import { useNewContent } from "@/lib/new-content-provider";
 import { cn } from "@/lib/utils";
@@ -107,6 +108,17 @@ export function Header() {
             </div>
           ))}
         </nav>
+
+        {/* Instagram (desktop) */}
+        <a
+          href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hidden rounded-lg p-2 text-gray-400 transition-colors hover:text-pink-500 lg:block"
+          aria-label="Instagram"
+        >
+          <InstagramIcon size={20} />
+        </a>
 
         {/* Mobile toggle */}
         <button
