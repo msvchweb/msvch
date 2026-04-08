@@ -56,16 +56,16 @@ export function Header() {
           <Image
             src="/images/banner.avif"
             alt="명성비전교회"
-            width={48}
-            height={48}
-            className="hidden rounded-lg lg:block"
+            width={164}
+            height={40}
+            className="hidden h-9 w-auto lg:block"
           />
           <Image
             src="/images/banner.avif"
             alt="명성비전교회"
-            width={64}
-            height={64}
-            className="rounded-lg lg:hidden"
+            width={164}
+            height={40}
+            className="h-10 w-auto lg:hidden"
           />
         </Link>
 

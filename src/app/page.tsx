@@ -15,22 +15,12 @@ export default async function HomePage() {
   ]);
 
   return (
-    <div id="home-snap">
-      <section className="snap-section-hero">
-        <HeroSection />
-      </section>
-      <section className="snap-section">
-        <QuickLinks />
-      </section>
-      <section className="snap-section">
-        <WorshipTimeCard />
-      </section>
-      <section className="snap-section">
-        <RecentNotice notices={notices} />
-      </section>
-      <section className="snap-section">
-        <LatestSermon sermon={sermon} />
-      </section>
-    </div>
+    <>
+      <HeroSection />
+      <QuickLinks />
+      <WorshipTimeCard />
+      <RecentNotice notices={notices} />
+      <LatestSermon sermon={sermon} />
+    </>
   );
 }

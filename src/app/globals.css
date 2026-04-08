@@ -50,27 +50,7 @@ html {
   scroll-behavior: smooth;
 }
 
-/* Mobile scroll snap for homepage */
-@media (max-width: 767px) {
-  html:has(#home-snap) {
-    scroll-snap-type: y mandatory;
-  }
 
-  #home-snap .snap-section {
-    scroll-snap-align: start;
-    min-height: 100dvh;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-  }
-
-  /* Hero already has its own height */
-  #home-snap .snap-section-hero {
-    scroll-snap-align: start;
-    min-height: auto;
-    display: block;
-  }
-}
 
 body {
   font-family: var(--font-sans);
