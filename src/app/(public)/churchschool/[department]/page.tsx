@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getGalleryAlbums } from "@/lib/gallery";
@@ -177,19 +178,22 @@ export default async function DepartmentPage({
         <div className="mx-auto max-w-3xl space-y-8">
           {/* 갤러리 사진 */}
           {photos.length > 0 && (
-            <div className="grid grid-cols-3 gap-2 overflow-hidden rounded-2xl">
+            <Link
+              href={`/gallery?category=교회학교&sub=${dept.galleryTag}`}
+              className="grid grid-cols-3 gap-2 overflow-hidden rounded-2xl"
+            >
               {photos.map((photo) => (
                 <div key={photo.id} className="relative aspect-[4/3]">
                   <Image
                     src={photo.image_url}
                     alt=""
                     fill
-                    className="object-cover"
+                    className="object-cover transition-transform duration-300 hover:scale-105"
                     sizes="(max-width: 768px) 33vw, 250px"
                   />
                 </div>
               ))}
-            </div>
+            </Link>
           )}
 
           {/* 기본 정보 */}

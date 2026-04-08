@@ -7,14 +7,25 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "갤러리" };
 export const revalidate = 3600;
 
-export default async function GalleryPage() {
+type SearchParams = Promise<{ category?: string; sub?: string }>;
+
+export default async function GalleryPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
+  const { category, sub } = await searchParams;
   const albums = await getGalleryAlbums();
 
   return (
     <>
-      <PageHeader title="갤러리" description="교회 활동 사진을 확인하세요" />
+      <PageHeader title="비전갤러리" description="교회 활동 사진을 확인하세요" />
       <Container>
-        <GalleryGrid albums={albums} />
+        <GalleryGrid
+          albums={albums}
+          initialCategory={category}
+          initialSub={sub}
+        />
       </Container>
     </>
   );

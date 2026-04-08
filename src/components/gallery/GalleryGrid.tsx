@@ -20,9 +20,15 @@ const subCategories: Record<string, string[]> = {
   봉사센터: ["전체", "반찬", "이미용", "비전문화", "탁구"],
 };
 
-export function GalleryGrid({ albums }: { albums: GalleryAlbum[] }) {
-  const [filter, setFilter] = useState("전체");
-  const [subFilter, setSubFilter] = useState("전체");
+interface GalleryGridProps {
+  albums: GalleryAlbum[];
+  initialCategory?: string;
+  initialSub?: string;
+}
+
+export function GalleryGrid({ albums, initialCategory, initialSub }: GalleryGridProps) {
+  const [filter, setFilter] = useState(initialCategory || "전체");
+  const [subFilter, setSubFilter] = useState(initialSub || "전체");
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
 
