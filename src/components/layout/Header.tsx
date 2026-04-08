@@ -52,13 +52,20 @@ export function Header() {
     >
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 lg:px-8">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2">
+        <Link href="/" className="flex items-center gap-2 max-lg:absolute max-lg:left-1/2 max-lg:-translate-x-1/2">
           <Image
             src="/images/banner.avif"
             alt="명성비전교회"
             width={48}
             height={48}
-            className="rounded-lg"
+            className="hidden rounded-lg lg:block"
+          />
+          <Image
+            src="/images/banner.avif"
+            alt="명성비전교회"
+            width={64}
+            height={64}
+            className="rounded-lg lg:hidden"
           />
         </Link>
 

@@ -6,7 +6,7 @@ export function PageHeader({
   description?: string;
 }) {
   return (
-    <div className="relative overflow-hidden bg-gradient-to-b from-gray-50 to-white py-20 text-center">
+    <div className="relative overflow-hidden bg-gradient-to-b from-gray-50 to-white py-10 text-center md:py-20">
       {/* Decorative circles */}
       <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-primary-50/50" />
       <div className="absolute -bottom-16 -left-16 h-48 w-48 rounded-full bg-church-gold-light/30" />

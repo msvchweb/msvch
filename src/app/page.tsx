@@ -15,12 +15,22 @@ export default async function HomePage() {
   ]);
 
   return (
-    <>
-      <HeroSection />
-      <QuickLinks />
-      <WorshipTimeCard />
-      <RecentNotice notices={notices} />
-      <LatestSermon sermon={sermon} />
-    </>
+    <div className="snap-y snap-mandatory md:snap-none">
+      <div className="snap-start">
+        <HeroSection />
+      </div>
+      <div className="snap-start">
+        <QuickLinks />
+      </div>
+      <div className="snap-start">
+        <WorshipTimeCard />
+      </div>
+      <div className="snap-start">
+        <RecentNotice notices={notices} />
+      </div>
+      <div className="snap-start">
+        <LatestSermon sermon={sermon} />
+      </div>
+    </div>
   );
 }
