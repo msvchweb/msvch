@@ -121,7 +121,7 @@ export function Header() {
         </a>
 
         {/* Mobile: Instagram + toggle */}
-        <div className="flex items-center gap-1 lg:hidden">
+        <div className="ml-auto flex items-center gap-1 lg:hidden">
           <a
             href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
             target="_blank"
