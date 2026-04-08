@@ -109,7 +109,7 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Instagram (desktop) */}
+        {/* Instagram */}
         <a
           href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
           target="_blank"
@@ -120,24 +120,35 @@ export function Header() {
           <InstagramIcon size={20} />
         </a>
 
-        {/* Mobile toggle */}
-        <button
-          className="relative flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100 lg:hidden"
-          onClick={() => setMobileOpen(!mobileOpen)}
-          aria-label={mobileOpen ? "메뉴 닫기" : "메뉴 열기"}
-        >
-          {mobileOpen ? <X size={22} /> : <Menu size={22} />}
-          {!mobileOpen &&
-            navItems.some((item) => hasBadge(item, dots)) && (
-              <>
-                <span
-                  aria-hidden="true"
-                  className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-rose ring-2 ring-white"
-                />
-                <span className="sr-only">(새 항목 있음)</span>
-              </>
-            )}
-        </button>
+        {/* Mobile: Instagram + toggle */}
+        <div className="flex items-center gap-1 lg:hidden">
+          <a
+            href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-400 transition-colors hover:text-pink-500"
+            aria-label="Instagram"
+          >
+            <InstagramIcon size={20} />
+          </a>
+          <button
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100"
+            onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label={mobileOpen ? "메뉴 닫기" : "메뉴 열기"}
+          >
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
+            {!mobileOpen &&
+              navItems.some((item) => hasBadge(item, dots)) && (
+                <>
+                  <span
+                    aria-hidden="true"
+                    className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-accent-rose ring-2 ring-white"
+                  />
+                  <span className="sr-only">(새 항목 있음)</span>
+                </>
+              )}
+          </button>
+        </div>
       </div>
 
       {/* Mobile menu */}
