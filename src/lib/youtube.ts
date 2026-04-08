@@ -1,83 +1,50 @@
 import type { SermonVideo } from "@/types/youtube";
 
-const CHANNEL_ID = "UCcJc6fm6McCxvpizoe3T4YQ";
-const RSS_URL = `https://www.youtube.com/feeds/videos.xml?channel_id=${CHANNEL_ID}`;
+const API_KEY = process.env.YOUTUBE_API_KEY ?? "";
+const UPLOADS_PLAYLIST_ID = "UUcJc6fm6McCxvpizoe3T4YQ";
 
-interface RssEntry {
-  videoId: string;
+interface PlaylistItemSnippet {
   title: string;
   description: string;
-  thumbnail: string;
   publishedAt: string;
+  resourceId: { videoId: string };
+  thumbnails?: { high?: { url: string } };
 }
 
-function parseXmlTag(xml: string, tag: string): string {
-  const regex = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`);
-  const match = xml.match(regex);
-  return match ? match[1].trim() : "";
-}
-
-function parseXmlAttr(xml: string, tag: string, attr: string): string {
-  const regex = new RegExp(`<${tag}[^>]*${attr}="([^"]*)"[^>]*/?>`, "i");
-  const match = xml.match(regex);
-  return match ? match[1] : "";
-}
-
-function decodeHtmlEntities(text: string): string {
-  return text
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-function parseEntries(xml: string): RssEntry[] {
-  const entries: RssEntry[] = [];
-  const entryRegex = /<entry>([\s\S]*?)<\/entry>/g;
-  let match: RegExpExecArray | null;
-
-  while ((match = entryRegex.exec(xml)) !== null) {
-    const entry = match[1];
-    const videoId = parseXmlTag(entry, "yt:videoId");
-    const title = decodeHtmlEntities(parseXmlTag(entry, "title"));
-    const description = decodeHtmlEntities(parseXmlTag(entry, "media:description"));
-    const thumbnail = parseXmlAttr(entry, "media:thumbnail", "url");
-    const published = parseXmlTag(entry, "published");
-
-    if (videoId) {
-      entries.push({
-        videoId,
-        title,
-        description,
-        thumbnail: thumbnail || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-        publishedAt: published,
-      });
-    }
-  }
-
-  return entries;
+interface PlaylistItemsResponse {
+  items?: { snippet: PlaylistItemSnippet }[];
+  nextPageToken?: string;
 }
 
 export async function getSermonVideos(maxResults = 15): Promise<SermonVideo[]> {
+  if (!API_KEY) {
+    console.error("YOUTUBE_API_KEY is not set");
+    return [];
+  }
+
   try {
-    const res = await fetch(RSS_URL, {
-      next: { revalidate: 1800 },
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; msvch/1.0)",
-      },
-    });
+    const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${UPLOADS_PLAYLIST_ID}&maxResults=${maxResults}&key=${API_KEY}`;
+    const res = await fetch(url, { next: { revalidate: 1800 } });
+
     if (!res.ok) {
-      console.error(`YouTube RSS fetch failed: ${res.status} ${res.statusText}`);
+      console.error(`YouTube API failed: ${res.status} ${res.statusText}`);
       return [];
     }
 
-    const xml = await res.text();
-    const entries = parseEntries(xml);
+    const data: PlaylistItemsResponse = await res.json();
+    if (!data.items) return [];
 
-    return entries.slice(0, maxResults);
+    return data.items.map((item) => ({
+      videoId: item.snippet.resourceId.videoId,
+      title: item.snippet.title,
+      description: item.snippet.description,
+      thumbnail:
+        item.snippet.thumbnails?.high?.url ??
+        `https://i.ytimg.com/vi/${item.snippet.resourceId.videoId}/hqdefault.jpg`,
+      publishedAt: item.snippet.publishedAt,
+    }));
   } catch (error) {
-    console.error("YouTube RSS fetch error:", error);
+    console.error("YouTube API error:", error);
     return [];
   }
 }
