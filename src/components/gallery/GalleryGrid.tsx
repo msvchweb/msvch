@@ -1,10 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Image from "next/image";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
-import type { GalleryAlbum } from "@/types/gallery";
+import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
+
+const PAGE_SIZE = 20;
 
 const categories = [
   "전체",
@@ -29,8 +31,10 @@ interface GalleryGridProps {
 export function GalleryGrid({ albums, initialCategory, initialSub }: GalleryGridProps) {
   const [filter, setFilter] = useState(initialCategory || "전체");
   const [subFilter, setSubFilter] = useState(initialSub || "전체");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [loadingAlbumId, setLoadingAlbumId] = useState<string | null>(null);
 
   const hasSubCategories = filter in subCategories;
 
@@ -44,15 +48,48 @@ export function GalleryGrid({ albums, initialCategory, initialSub }: GalleryGrid
     return true;
   });
 
+  const visible = filtered.slice(0, visibleCount);
+  const hasMore = visibleCount < filtered.length;
+
   function handleCategoryChange(cat: string) {
     setFilter(cat);
     setSubFilter("전체");
+    setVisibleCount(PAGE_SIZE);
   }
 
-  function openAlbum(images: string[]) {
-    setLightboxImages(images);
-    setLightboxOpen(true);
+  function handleSubChange(sub: string) {
+    setSubFilter(sub);
+    setVisibleCount(PAGE_SIZE);
   }
+
+  const openAlbum = useCallback(async (album: GalleryAlbum) => {
+    // 썸네일만 있는 경우 API에서 이미지 로드
+    if (album.images.length > 0) {
+      setLightboxImages(album.images.map((img) => img.image_url));
+      setLightboxOpen(true);
+      return;
+    }
+
+    setLoadingAlbumId(album.id);
+    try {
+      const res = await fetch(`/api/gallery/${album.id}/images`);
+      if (!res.ok) throw new Error("fetch failed");
+      const images: GalleryImage[] = await res.json();
+      const urls = images.map((img) => img.image_url);
+      if (urls.length > 0) {
+        setLightboxImages(urls);
+        setLightboxOpen(true);
+      }
+    } catch {
+      // 실패 시 썸네일이라도 표시
+      if (album.thumbnail_url) {
+        setLightboxImages([album.thumbnail_url]);
+        setLightboxOpen(true);
+      }
+    } finally {
+      setLoadingAlbumId(null);
+    }
+  }, []);
 
   return (
     <>
@@ -79,7 +116,7 @@ export function GalleryGrid({ albums, initialCategory, initialSub }: GalleryGrid
           {subCategories[filter].map((sub) => (
             <button
               key={sub}
-              onClick={() => setSubFilter(sub)}
+              onClick={() => handleSubChange(sub)}
               className={`rounded-full px-3 py-1.5 text-xs font-medium transition ${
                 subFilter === sub
                   ? "bg-gray-900 text-white"
@@ -92,21 +129,22 @@ export function GalleryGrid({ albums, initialCategory, initialSub }: GalleryGrid
         </div>
       )}
 
+      {/* 앨범 그리드 */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((album) => {
-          const imageUrls = album.images.map((img) => img.image_url);
-          const thumb = album.thumbnail_url || imageUrls[0];
+        {visible.map((album) => {
+          const isLoading = loadingAlbumId === album.id;
 
           return (
             <button
               key={album.id}
-              onClick={() => openAlbum(imageUrls)}
-              className="group overflow-hidden rounded-2xl border border-gray-100 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+              onClick={() => openAlbum(album)}
+              disabled={isLoading}
+              className="group overflow-hidden rounded-2xl border border-gray-100 text-left shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg disabled:opacity-70"
             >
               <div className="relative aspect-[4/3] bg-gray-100">
-                {thumb ? (
+                {album.thumbnail_url ? (
                   <Image
-                    src={thumb}
+                    src={album.thumbnail_url}
                     alt={album.title}
                     fill
                     className="object-cover transition-transform duration-500 group-hover:scale-105"
@@ -117,17 +155,34 @@ export function GalleryGrid({ albums, initialCategory, initialSub }: GalleryGrid
                     사진 없음
                   </div>
                 )}
+                {isLoading && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
+                  </div>
+                )}
               </div>
               <div className="bg-white p-4">
                 <h3 className="font-semibold text-gray-900">{album.title}</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  {album.date} &middot; {album.images.length}장
+                  {album.date}
                 </p>
               </div>
             </button>
           );
         })}
       </div>
+
+      {/* 더보기 */}
+      {hasMore && (
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+            className="rounded-full border border-gray-300 px-8 py-2.5 text-sm font-medium text-gray-600 transition hover:border-gray-400 hover:text-gray-900"
+          >
+            더보기 ({filtered.length - visibleCount}개 남음)
+          </button>
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <p className="py-12 text-center text-gray-400">

@@ -173,6 +173,7 @@ export default async function DepartmentPage({
   const albums = await getGalleryAlbums({
     tags: ["교회학교", dept.galleryTag],
     limit: 3,
+    withImages: true,
   });
   const photos = albums.flatMap((a) => a.images).slice(0, 6);
 
