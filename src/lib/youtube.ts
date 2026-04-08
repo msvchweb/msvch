@@ -61,14 +61,23 @@ function parseEntries(xml: string): RssEntry[] {
 
 export async function getSermonVideos(maxResults = 15): Promise<SermonVideo[]> {
   try {
-    const res = await fetch(RSS_URL, { next: { revalidate: 1800 } });
-    if (!res.ok) return [];
+    const res = await fetch(RSS_URL, {
+      next: { revalidate: 1800 },
+      headers: {
+        "User-Agent": "Mozilla/5.0 (compatible; msvch/1.0)",
+      },
+    });
+    if (!res.ok) {
+      console.error(`YouTube RSS fetch failed: ${res.status} ${res.statusText}`);
+      return [];
+    }
 
     const xml = await res.text();
     const entries = parseEntries(xml);
 
     return entries.slice(0, maxResults);
-  } catch {
+  } catch (error) {
+    console.error("YouTube RSS fetch error:", error);
     return [];
   }
 }
