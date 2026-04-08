@@ -1,7 +1,9 @@
+import Link from "next/link";
+
 const worshipTimes = [
   { name: "주일예배", time: "8:00 / 10:00 / 12:00", day: "매주 일요일 (1·2·3부)", accent: "from-primary-500 to-primary-700" },
   { name: "수요예배", time: "오후 7:30", day: "매주 수요일", accent: "from-emerald-500 to-emerald-700" },
-  { name: "금요예배", time: "오후 7:30", day: "매주 금요일", accent: "from-violet-500 to-violet-700" },
+  { name: "금요기도회", time: "오후 8:30", day: "매주 금요일", accent: "from-violet-500 to-violet-700" },
   { name: "새벽예배", time: "오전 6:00", day: "월~금 (토 6:30)", accent: "from-amber-500 to-amber-700" },
 ];
 
@@ -17,8 +19,9 @@ export function WorshipTimeCard() {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {worshipTimes.map((item) => (
-            <div
+            <Link
               key={item.name}
+              href="/worship"
               className="group relative overflow-hidden rounded-2xl bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
             >
               {/* Top accent bar */}
@@ -33,7 +36,7 @@ export function WorshipTimeCard() {
               <p className="mt-1 text-2xl font-extrabold tracking-tight text-primary-600">
                 {item.time}
               </p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
