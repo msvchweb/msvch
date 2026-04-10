@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
-import { summarizeSermonFromVideo } from "@/lib/gemini";
+import { summarizeSermonFromVideo, GeminiUnavailableError } from "@/lib/gemini";
 import type { SermonVideo } from "@/types/youtube";
 
 export const maxDuration = 60;
@@ -73,6 +73,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ summary });
   } catch (err) {
     const message = err instanceof Error ? err.message : "알 수 없는 오류";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const status = err instanceof GeminiUnavailableError ? 503 : 500;
+    return NextResponse.json({ error: message }, { status });
   }
 }

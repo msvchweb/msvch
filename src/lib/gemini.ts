@@ -8,6 +8,56 @@ interface GeminiResponse {
   }[];
 }
 
+// 503/429/500/502/504는 일시적 장애로 보고 재시도/폴백 대상
+const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+
+// 1차 → 폴백 순서. 앞에서부터 순차적으로 시도한다.
+const MODEL_FALLBACK_CHAIN = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-flash-latest",
+];
+
+export class GeminiUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GeminiUnavailableError";
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function callGemini(
+  model: string,
+  apiKey: string,
+  prompt: string
+): Promise<{ ok: true; text: string } | { ok: false; status: number; body: string }> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: prompt }] }],
+      }),
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.text();
+    return { ok: false, status: res.status, body };
+  }
+
+  const data = (await res.json()) as GeminiResponse;
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    return { ok: false, status: 500, body: "Gemini 응답에 텍스트가 없습니다." };
+  }
+  return { ok: true, text };
+}
+
 export async function summarizeSermonFromVideo(
   sermon: SermonVideo
 ): Promise<string> {
@@ -43,22 +93,34 @@ ${sermon.description}
 
 한국어로, 경어체로 작성해주세요.`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-      }),
-    }
-  );
+  let lastTransientStatus = 0;
+  let lastErrorBody = "";
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API 오류: ${res.status} ${errText}`);
+  // 모델별로 지수 백오프 재시도. 일시적 오류면 다음 모델로 폴백.
+  for (const model of MODEL_FALLBACK_CHAIN) {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const result = await callGemini(model, apiKey, prompt);
+
+      if (result.ok) return result.text;
+
+      // 일시적 오류가 아니면 즉시 throw (재시도/폴백 의미 없음)
+      if (!RETRYABLE_STATUS.has(result.status)) {
+        throw new Error(`Gemini API 오류: ${result.status} ${result.body}`);
+      }
+
+      lastTransientStatus = result.status;
+      lastErrorBody = result.body;
+
+      // 다음 시도 전 지수 백오프 (1s → 2s → 4s)
+      if (attempt < maxAttempts) {
+        await sleep(1000 * Math.pow(2, attempt - 1));
+      }
+    }
+    // 이 모델에서 재시도 다 소진 → 다음 폴백 모델로
   }
 
-  const data = (await res.json()) as GeminiResponse;
-  return data.candidates[0].content.parts[0].text;
+  throw new GeminiUnavailableError(
+    `AI 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요. (마지막 상태: ${lastTransientStatus} ${lastErrorBody.slice(0, 200)})`
+  );
 }
