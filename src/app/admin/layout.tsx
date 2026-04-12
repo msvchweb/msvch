@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutDashboard, FileText, ImageIcon, Newspaper, Sparkles } from "lucide-react";
+import { LayoutDashboard, FileText, ImageIcon, Newspaper, Sparkles, Video } from "lucide-react";
 
 const adminNav = [
   { label: "대시보드", href: "/admin", icon: LayoutDashboard },
@@ -7,6 +7,7 @@ const adminNav = [
   { label: "주보", href: "/admin/weeklies", icon: FileText },
   { label: "갤러리", href: "/admin/gallery", icon: ImageIcon },
   { label: "설교 요약", href: "/admin/sermons", icon: Sparkles },
+  { label: "쇼츠", href: "/admin/shorts", icon: Video },
 ];
 
 export default function AdminLayout({

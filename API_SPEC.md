@@ -111,6 +111,72 @@ GET /api/gallery?tag=봉사센터&limit=5             → 제한
 
 ---
 
+### GET `/api/shorts`
+
+쇼츠 작업 목록 조회. 각 job에 clips 배열 포함.
+
+- **인증**: 불필요 (공개 조회). admin이면 모든 상태의 clips 표시, 비인증이면 approved만.
+- **캐시**: 없음 (`revalidate: 0`)
+- **쿼리 파라미터**:
+  - `status` — 특정 상태 필터 (예: `ready_for_review`)
+  - `published` — `true`이면 발행 완료 건만
+  - `limit` — 최대 결과 수 (기본 20)
+- **응답**: `ShortsJobWithClips[]`
+
+```
+GET /api/shorts                           → 전체 (최신 20개)
+GET /api/shorts?published=true&limit=10   → 발행된 쇼츠 (모바일용)
+GET /api/shorts?status=ready_for_review   → 검수 대기 (Admin용)
+```
+
+---
+
+### POST `/api/shorts/trigger`
+
+GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인을 시작한다.
+
+- **인증**: admin 역할 필수
+- **요청 본문**:
+
+```ts
+{
+  videoId: string;
+  videoTitle: string;
+  videoPublishedAt?: string;
+  videoThumbnail?: string;
+}
+```
+
+- **응답 (200)**: `{ jobId: string; status: "pending" }`
+- **에러 응답**:
+  - `400` — 필수 필드 누락
+  - `401` — 미인증
+  - `403` — 비admin
+  - `409` — 이미 해당 videoId로 작업 존재 (`{ error, jobId }`)
+  - `502` — GitHub Actions 트리거 실패
+
+---
+
+### POST `/api/shorts/[id]/approve`
+
+쇼츠 클립을 승인한다.
+
+- **인증**: admin 역할 필수
+- **요청 본문**: 없음
+- **응답 (200)**: `{ ok: true }`
+
+---
+
+### POST `/api/shorts/[id]/reject`
+
+쇼츠 클립을 반려한다.
+
+- **인증**: admin 역할 필수
+- **요청 본문**: `{ note?: string }`
+- **응답 (200)**: `{ ok: true }`
+
+---
+
 ## 서버 사이드 데이터 함수
 
 API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수:
@@ -124,6 +190,8 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `getSermonVideos(max)` | `src/lib/youtube.ts` | YouTube RSS 설교 목록 |
 | `getLatestSermon()` | `src/lib/youtube.ts` | 최신 설교 1건 |
 | `summarizeSermonFromVideo(sermon)` | `src/lib/gemini.ts` | Gemini 설교 요약 |
+| `callGeminiWithFallback(prompt)` | `src/lib/gemini.ts` | 범용 Gemini 호출 (폴백+재시도) |
+| `requireAdmin()` | `src/lib/admin-auth.ts` | API 라우트 admin 인증 헬퍼 |
 
 ---
 
@@ -139,6 +207,8 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | 서비스 | 용도 | 환경변수 |
 |--------|------|----------|
 | Supabase | DB + Auth + Storage | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
-| YouTube RSS | 설교 영상 | 없음 (공개 피드) |
-| Google Gemini | AI 설교 요약 | `GEMINI_API_KEY` |
+| YouTube Data API v3 | 설교 영상 목록 | `YOUTUBE_API_KEY` |
+| Google Gemini | AI 설교 요약 + 쇼츠 하이라이트 | `GEMINI_API_KEY` |
 | Next.js ISR | 캐시 무효화 | `REVALIDATE_SECRET` |
+| Google Maps Embed | 찾아오시는 길 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` |
+| GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |

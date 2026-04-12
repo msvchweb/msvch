@@ -58,12 +58,44 @@ async function callGemini(
   return { ok: true, text };
 }
 
-export async function summarizeSermonFromVideo(
-  sermon: SermonVideo
-): Promise<string> {
+/**
+ * 폴백 체인 + 지수 백오프 재시도를 포함한 범용 Gemini 호출.
+ * scripts/shorts/ 및 API 라우트에서 재사용 가능.
+ */
+export async function callGeminiWithFallback(prompt: string): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY가 설정되지 않았습니다.");
 
+  let lastTransientStatus = 0;
+  let lastErrorBody = "";
+
+  for (const model of MODEL_FALLBACK_CHAIN) {
+    const maxAttempts = 3;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      const result = await callGemini(model, apiKey, prompt);
+      if (result.ok) return result.text;
+
+      if (!RETRYABLE_STATUS.has(result.status)) {
+        throw new Error(`Gemini API 오류: ${result.status} ${result.body}`);
+      }
+
+      lastTransientStatus = result.status;
+      lastErrorBody = result.body;
+
+      if (attempt < maxAttempts) {
+        await sleep(1000 * Math.pow(2, attempt - 1));
+      }
+    }
+  }
+
+  throw new GeminiUnavailableError(
+    `AI 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요. (마지막 상태: ${lastTransientStatus} ${lastErrorBody.slice(0, 200)})`
+  );
+}
+
+export async function summarizeSermonFromVideo(
+  sermon: SermonVideo
+): Promise<string> {
   const prompt = `당신은 교회 설교 요약 전문가입니다. 아래 설교 정보를 바탕으로 교인들이 읽기 좋은 설교 요약을 작성해주세요.
 
 설교 제목: ${sermon.title}
@@ -93,34 +125,5 @@ ${sermon.description}
 
 한국어로, 경어체로 작성해주세요.`;
 
-  let lastTransientStatus = 0;
-  let lastErrorBody = "";
-
-  // 모델별로 지수 백오프 재시도. 일시적 오류면 다음 모델로 폴백.
-  for (const model of MODEL_FALLBACK_CHAIN) {
-    const maxAttempts = 3;
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const result = await callGemini(model, apiKey, prompt);
-
-      if (result.ok) return result.text;
-
-      // 일시적 오류가 아니면 즉시 throw (재시도/폴백 의미 없음)
-      if (!RETRYABLE_STATUS.has(result.status)) {
-        throw new Error(`Gemini API 오류: ${result.status} ${result.body}`);
-      }
-
-      lastTransientStatus = result.status;
-      lastErrorBody = result.body;
-
-      // 다음 시도 전 지수 백오프 (1s → 2s → 4s)
-      if (attempt < maxAttempts) {
-        await sleep(1000 * Math.pow(2, attempt - 1));
-      }
-    }
-    // 이 모델에서 재시도 다 소진 → 다음 폴백 모델로
-  }
-
-  throw new GeminiUnavailableError(
-    `AI 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요. (마지막 상태: ${lastTransientStatus} ${lastErrorBody.slice(0, 200)})`
-  );
+  return callGeminiWithFallback(prompt);
 }

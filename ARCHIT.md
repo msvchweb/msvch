@@ -55,6 +55,7 @@ src/
 │   │   ├── gallery/
 │   │   ├── notices/
 │   │   ├── sermons/
+│   │   ├── shorts/              # 쇼츠 관리 (생성/검수/승인)
 │   │   └── weeklies/
 │   │
 │   └── api/                     # API 라우트
@@ -62,7 +63,8 @@ src/
 │       ├── og/                  # OG 이미지 생성 (Edge)
 │       ├── revalidate/          # ISR 캐시 무효화
 │       ├── sermon-summary/      # Gemini 설교 요약
-│       └── sermons/             # 설교 목록
+│       ├── sermons/             # 설교 목록
+│       └── shorts/              # 쇼츠 CRUD + 트리거 (모바일 호환)
 │
 ├── components/
 │   ├── layout/                  # 레이아웃 컴포넌트
@@ -96,14 +98,16 @@ src/
 │   │   ├── client.ts            # 브라우저 Supabase 클라이언트
 │   │   └── server.ts            # 서버 Supabase 클라이언트
 │   ├── gallery.ts               # 갤러리 데이터
-│   ├── gemini.ts                # Gemini AI 호출
+│   ├── admin-auth.ts             # API admin 인증 헬퍼
+│   ├── gemini.ts                # Gemini AI 호출 (폴백 체인)
 │   ├── notices.ts               # 공지/주보 데이터
 │   ├── utils.ts                 # cn(), formatDate()
-│   └── youtube.ts               # YouTube RSS 파싱
+│   └── youtube.ts               # YouTube Data API v3
 │
 ├── types/
 │   ├── gallery.ts
 │   ├── notice.ts
+│   ├── shorts.ts                # ShortsJob, ShortsClip, ShortsSettings
 │   ├── supabase.ts
 │   └── youtube.ts
 │
@@ -133,7 +137,7 @@ src/
 
 ### Admin 사이드바
 - `admin/layout.tsx` — 좌측 사이드바
-- 5개 메뉴: 대시보드, 공지사항, 주보, 갤러리, 설교 요약
+- 6개 메뉴: 대시보드, 공지사항, 주보, 갤러리, 설교 요약, 쇼츠
 
 ---
 
@@ -151,6 +155,15 @@ Supabase DB ←── notices.ts (저장) ──→ Notice[]
 
 Supabase Storage ← gallery 버킷 (이미지)
                  ← weeklies 버킷 (PDF)
+                 ← shorts 버킷 (mp4, 임시)
+
+GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
+    │               ├── yt-dlp (다운로드 + 자막)
+    │               ├── Gemini (하이라이트 선정 + 메타데이터)
+    │               ├── FFmpeg (9:16 크롭 + 자막 번인)
+    │               └── Supabase (업로드 + DB 저장)
+    │
+    └── POST /api/shorts/trigger ← Admin UI "쇼츠 생성" 버튼
 ```
 
 ---
@@ -209,6 +222,8 @@ middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*)
 
 ## 배포
 
-- **플랫폼**: Cloudflare Pages (목표)
+- **플랫폼**: Vercel (GitHub 자동 배포)
 - **빌드**: `npm run build` → Next.js static + dynamic
-- **환경변수**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `GEMINI_API_KEY`, `REVALIDATE_SECRET`
+- **CI/CD**: GitHub Actions (쇼츠 생성 파이프라인)
+- **환경변수 (Vercel)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`
+- **GitHub Secrets**: `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`

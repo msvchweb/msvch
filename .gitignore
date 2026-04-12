@@ -40,6 +40,12 @@ yarn-error.log*
 
 # personal files
 claudeprompt
+SESSION_LOG.md
+TODO.md
+PLAN.md
+ACCOUNTS.md
+research.md
+/scripts
 
 # vercel
 .vercel

@@ -1,0 +1,42 @@
+name: Generate sermon shorts
+
+on:
+  workflow_dispatch:
+    inputs:
+      videoId:
+        description: "YouTube video ID"
+        required: true
+      jobId:
+        description: "Supabase shorts_jobs.id"
+        required: true
+
+concurrency:
+  group: sermon-shorts
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          pipx install yt-dlp
+
+      - name: Run shorts pipeline
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          npx tsx scripts/shorts/run.ts \
+            --videoId="${{ inputs.videoId }}" \
+            --jobId="${{ inputs.jobId }}"
