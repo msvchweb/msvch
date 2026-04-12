@@ -1,6 +1,7 @@
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Clock, MapPin, Users } from "lucide-react";
+import Image from "next/image";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "예배안내" };
@@ -123,6 +124,22 @@ export default function WorshipPage() {
   return (
     <>
       <PageHeader title="예배안내" description="하나님께 드리는 예배에 함께해 주세요" />
+
+      {/* 안내 이미지 */}
+      <section className="bg-white py-8">
+        <Container className="py-0">
+          <div className="mx-auto max-w-4xl overflow-hidden rounded-2xl shadow-sm">
+            <Image
+              src="/images/infomap.png"
+              alt="명성비전교회 예배 안내"
+              width={1200}
+              height={800}
+              className="h-auto w-full"
+              priority
+            />
+          </div>
+        </Container>
+      </section>
 
       {/* 주요 예배 */}
       <section className="bg-gradient-to-b from-white to-primary-50/30 py-12">
