@@ -45,7 +45,8 @@ TODO.md
 PLAN.md
 ACCOUNTS.md
 research.md
-/scripts
+/scripts/migrate-*
+/scripts/*.mjs
 
 # vercel
 .vercel
