@@ -17,7 +17,11 @@ export async function POST(
       .eq("id", id);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("Approve clip error:", error);
+      return NextResponse.json(
+        { error: "승인 처리에 실패했습니다." },
+        { status: 500 },
+      );
     }
 
     return NextResponse.json({ ok: true });

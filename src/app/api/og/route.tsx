@@ -4,8 +4,9 @@ import { NextRequest } from "next/server";
 export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
-  const title =
+  const rawTitle =
     request.nextUrl.searchParams.get("title") ?? "명성비전교회";
+  const title = rawTitle.slice(0, 100).replace(/[\x00-\x1f]/g, "");
 
   return new ImageResponse(
     (

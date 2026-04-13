@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate } from "@/lib/utils";
+import { GroupPostSchema } from "@/lib/validation";
 import type { GroupPost } from "@/types/supabase";
 
 export function DiscussionList({
@@ -21,6 +22,12 @@ export function DiscussionList({
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    const check = GroupPostSchema.safeParse({ title, content });
+    if (!check.success) {
+      alert(check.error.issues[0].message);
+      return;
+    }
+
     setSubmitting(true);
 
     const {
@@ -34,8 +41,8 @@ export function DiscussionList({
     const { error } = await supabase.from("group_posts").insert({
       group_id: groupId,
       author_id: user.id,
-      title,
-      content,
+      title: check.data.title,
+      content: check.data.content,
     });
 
     if (!error) {
@@ -75,6 +82,7 @@ export function DiscussionList({
             onChange={(e) => setTitle(e.target.value)}
             placeholder="제목"
             required
+            maxLength={100}
             className="mb-3 w-full rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-primary-500 focus:outline-none"
           />
           <textarea
@@ -83,6 +91,7 @@ export function DiscussionList({
             placeholder="내용을 입력하세요"
             required
             rows={5}
+            maxLength={5000}
             className="mb-3 w-full resize-none rounded-lg border border-gray-300 px-4 py-2.5 text-gray-900 focus:border-primary-500 focus:outline-none"
           />
           <button

@@ -83,6 +83,8 @@ interface Group {
 - 인증된 사용자: INSERT 가능
 - 작성자만: UPDATE, DELETE 가능
 
+**앱 레벨 제약** (`GroupPostSchema`): title 100자, content 5,000자
+
 **TypeScript 타입**:
 ```ts
 interface GroupPost {
@@ -117,6 +119,8 @@ interface GroupPost {
 **RLS 정책**:
 - 공개 공지: 모든 사용자 SELECT 가능
 - admin만: INSERT, UPDATE, DELETE
+
+**앱 레벨 제약** (`NoticeSchema`): title 200자, content 50,000자, slug 100자
 
 **TypeScript 타입** (`src/types/notice.ts`):
 ```ts
@@ -341,6 +345,14 @@ interface ShortsClip {
 | `shorts` | public | 쇼츠 mp4 (임시, 발행 후 삭제 가능) |
 
 각 버킷 정책: 누구나 읽기, admin만 업로드/삭제. `shorts` 버킷은 service_role도 업로드/삭제 가능 (GitHub Actions용).
+
+### 업로드 제한 (앱 레벨, `src/lib/validation.ts`)
+
+| 버킷 | 허용 확장자 | 최대 크기 | 비고 |
+|-------|-----------|----------|------|
+| `gallery` | jpg, jpeg, png, gif, webp | 10MB/파일 | 한 번에 최대 30장 |
+| `weeklies` | pdf | 20MB/파일 | |
+| `shorts` | (GitHub Actions에서 업로드) | - | 앱 레벨 제한 없음 |
 
 ---
 

@@ -4,6 +4,13 @@ import { useState, useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Trash2, Upload, FileText, X } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import {
+  validateFile,
+  safeExtension,
+  ALLOWED_PDF_EXTENSIONS,
+  MAX_PDF_SIZE,
+  WeeklySchema,
+} from "@/lib/validation";
 import type { Weekly } from "@/types/notice";
 
 export default function AdminWeekliesPage() {
@@ -29,9 +36,14 @@ export default function AdminWeekliesPage() {
 
   async function createWeekly(e: React.FormEvent) {
     e.preventDefault();
+    const check = WeeklySchema.safeParse({ title, date: date || undefined });
+    if (!check.success) {
+      alert(check.error.issues[0].message);
+      return;
+    }
     const { error } = await supabase.from("weeklies").insert({
-      title,
-      date: date || null,
+      title: check.data.title,
+      date: check.data.date || null,
     });
     if (!error) {
       setTitle(""); setDate(""); setShowForm(false);
@@ -40,8 +52,14 @@ export default function AdminWeekliesPage() {
   }
 
   async function uploadPdf(weeklyId: string, file: File) {
+    const check = validateFile(file, ALLOWED_PDF_EXTENSIONS, MAX_PDF_SIZE);
+    if (!check.ok) {
+      alert(check.reason);
+      return;
+    }
+
     setUploading(true);
-    const ext = file.name.split(".").pop();
+    const ext = safeExtension(file.name, ALLOWED_PDF_EXTENSIONS);
     const path = `${weeklyId}.${ext}`;
 
     // Remove old file if exists

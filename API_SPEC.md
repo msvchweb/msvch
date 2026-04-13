@@ -36,11 +36,17 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 
 - **인증**: admin 역할 필수
 - **최대 실행 시간**: 60초
-- **요청 본문**:
+- **요청 본문** (Zod 검증: `SermonSummarySchema`):
 
 ```ts
 {
-  sermon: SermonVideo;
+  sermon: {
+    videoId: string;       // max 50
+    title: string;         // max 300
+    description: string;   // max 10000
+    thumbnail: string;     // max 2000
+    publishedAt: string;   // max 50
+  };
   saveAsNotice: boolean;
 }
 ```
@@ -52,9 +58,11 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 ```
 
 - **에러 응답**:
+  - `400` — `{ error: "잘못된 요청 형식입니다." }`
   - `401` — `{ error: "로그인이 필요합니다." }`
   - `403` — `{ error: "관리자 권한이 필요합니다." }`
-  - `500` — `{ error: string }`
+  - `500` — `{ error: "요약 생성에 실패했습니다." }`
+  - `503` — `{ error: "AI 서버가 일시적으로 혼잡합니다." }`
 
 - **부작용**: `saveAsNotice: true`이면 `notices` 테이블에 upsert (`slug: sermon-{videoId}`)
 
@@ -64,18 +72,20 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 
 온디맨드 ISR 캐시 무효화.
 
-- **인증**: 시크릿 토큰 (`REVALIDATE_SECRET`)
-- **요청 본문**:
+- **인증**: 시크릿 토큰 (`REVALIDATE_SECRET`, 타이밍-세이프 비교)
+- **요청 본문** (Zod 검증: `RevalidateSchema`):
 
 ```ts
 {
   secret: string;
-  paths: string[]; // e.g. ["/", "/sermons"]
+  paths: string[]; // max 20개, 각 `'/'`로 시작, max 500자. e.g. ["/", "/sermons"]
 }
 ```
 
 - **응답 (200)**: `{ revalidated: true }`
-- **에러**: `401` (잘못된 시크릿)
+- **에러**:
+  - `400` — 잘못된 요청 형식
+  - `401` — 잘못된 시크릿
 
 ---
 
@@ -85,7 +95,7 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 
 - **런타임**: Edge
 - **인증**: 불필요
-- **쿼리 파라미터**: `title` (선택, 기본값: "명성비전교회")
+- **쿼리 파라미터**: `title` (선택, 기본값: "명성비전교회", 최대 100자, 제어문자 제거)
 - **응답**: `ImageResponse` (1200x630 PNG)
 
 ---
@@ -99,7 +109,7 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 - **쿼리 파라미터**:
   - `tag` (반복 가능) — AND 필터. 모든 태그를 포함하는 앨범만 반환
   - `anyTag` (반복 가능) — OR 필터. 하나라도 포함하면 반환
-  - `limit` — 최대 결과 수
+  - `limit` — 최대 결과 수 (상한 100, `parseLimit()`)
 - **응답**: `GalleryAlbum[]`
 
 ```
@@ -115,12 +125,12 @@ GET /api/gallery?tag=봉사센터&limit=5             → 제한
 
 쇼츠 작업 목록 조회. 각 job에 clips 배열 포함.
 
-- **인증**: 불필요 (공개 조회). admin이면 모든 상태의 clips 표시, 비인증이면 approved만.
+- **인증**: 선택. admin이면 모든 상태 조회 가능, 비인증/비admin이면 `published`만.
 - **캐시**: 없음 (`revalidate: 0`)
 - **쿼리 파라미터**:
-  - `status` — 특정 상태 필터 (예: `ready_for_review`)
-  - `published` — `true`이면 발행 완료 건만
-  - `limit` — 최대 결과 수 (기본 20)
+  - `status` — 특정 상태 필터, admin 전용 (예: `ready_for_review`)
+  - `published` — `true`이면 발행 완료 건만, admin 전용
+  - `limit` — 최대 결과 수 (기본 20, 상한 100, `parseLimit()`)
 - **응답**: `ShortsJobWithClips[]`
 
 ```
@@ -135,24 +145,25 @@ GET /api/shorts?status=ready_for_review   → 검수 대기 (Admin용)
 
 GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인을 시작한다.
 
-- **인증**: admin 역할 필수
-- **요청 본문**:
+- **인증**: admin 역할 필수 (`requireAdmin()`)
+- **요청 본문** (Zod 검증: `ShortsTriggerSchema`):
 
 ```ts
 {
-  videoId: string;
-  videoTitle: string;
-  videoPublishedAt?: string;
-  videoThumbnail?: string;
+  videoId: string;         // max 50
+  videoTitle: string;      // max 300
+  videoPublishedAt?: string; // max 50
+  videoThumbnail?: string; // max 2000
 }
 ```
 
 - **응답 (200)**: `{ jobId: string; status: "pending" }`
 - **에러 응답**:
-  - `400` — 필수 필드 누락
+  - `400` — 필수 필드 누락 또는 형식 오류
   - `401` — 미인증
   - `403` — 비admin
   - `409` — 이미 해당 videoId로 작업 존재 (`{ error, jobId }`)
+  - `500` — Job 생성 실패
   - `502` — GitHub Actions 트리거 실패
 
 ---
@@ -171,9 +182,38 @@ GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인�
 
 쇼츠 클립을 반려한다.
 
-- **인증**: admin 역할 필수
-- **요청 본문**: `{ note?: string }`
+- **인증**: admin 역할 필수 (`requireAdmin()`)
+- **요청 본문** (Zod 검증: `ShortsRejectSchema`): `{ note?: string }` (max 500자)
 - **응답 (200)**: `{ ok: true }`
+- **에러**: `400` — 반려 사유 500자 초과
+
+---
+
+## 입력 검증
+
+모든 API 라우트의 입력 검증은 `src/lib/validation.ts`에 정의된 Zod 스키마로 수행.
+모바일 앱에서 동일 API를 호출해도 동일한 검증이 적용됨.
+
+| 엔드포인트 | Zod 스키마 | 비고 |
+|-----------|-----------|------|
+| POST `/api/revalidate` | `RevalidateSchema` | paths 최대 20개, 타이밍-세이프 시크릿 비교 |
+| POST `/api/sermon-summary` | `SermonSummarySchema` | 모든 필드 길이 제한 |
+| POST `/api/shorts/trigger` | `ShortsTriggerSchema` | videoId 50자, title 300자 |
+| POST `/api/shorts/[id]/reject` | `ShortsRejectSchema` | note 500자 |
+| GET `/api/gallery` | `parseLimit()` | limit 상한 100 |
+| GET `/api/shorts` | `parseLimit()` | limit 상한 100 |
+
+---
+
+## 보안 헤더
+
+`next.config.ts`의 `headers()` 함수에서 전역 적용:
+
+- `Content-Security-Policy` — 허용 출처 제한 (self + YouTube + Supabase + Gemini)
+- `X-Content-Type-Options: nosniff`
+- `X-Frame-Options: DENY`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
 
 ---
 
@@ -192,6 +232,9 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `summarizeSermonFromVideo(sermon)` | `src/lib/gemini.ts` | Gemini 설교 요약 |
 | `callGeminiWithFallback(prompt)` | `src/lib/gemini.ts` | 범용 Gemini 호출 (폴백+재시도) |
 | `requireAdmin()` | `src/lib/admin-auth.ts` | API 라우트 admin 인증 헬퍼 |
+| `validateFile(file, exts, maxSize)` | `src/lib/validation.ts` | 파일 업로드 검증 (타입 + 크기) |
+| `safeExtension(filename, allowed)` | `src/lib/validation.ts` | 안전한 확장자 추출 |
+| `parseLimit(raw, fallback)` | `src/lib/validation.ts` | limit 파라미터 파싱 (상한 100) |
 
 ---
 

@@ -1,508 +1,811 @@
-# 메뉴 구조 개편 구현 계획
+# 보안 개선 구현 계획
 
-> 원칙: 백엔드(DB/API)는 모바일 앱에서도 그대로 사용할 수 있도록 범용적으로 설계한다.
-> 웹 전용 UI 로직은 프론트엔드에서만 처리한다.
+> 기반: research.md 보안 취약점 분석 보고서 (2026-04-13)
+> 원칙: 모바일 앱 백엔드 재사용 가능하도록 범용 설계
+> 의존성 추가: `zod` (런타임 스키마 검증)
+> 변경 파일: 14개 수정 + 2개 신규
+> **상태: ✅ 구현 완료 (2026-04-13)**
 
 ---
 
-## Phase 1: DB 스키마 + API 확장 (백엔드, 모바일 호환)
+## Phase 1 — 즉시 (CRITICAL) ✅
 
-### Step 1-1: gallery_albums에 tags 컬럼 추가
+### Step 1. 보안 헤더 추가 ✅
 
-현재 `category`는 단일 문자열("예배", "교회학교" 등). 하위부서 필터를 위해 **tags 배열 컬럼**을 추가한다. `sub_category` 단일 값 대신 tags를 쓰는 이유: 하나의 앨범이 여러 태그를 가질 수 있고(예: "교회학교" + "영유치부"), 모바일에서도 태그 기반 필터링을 그대로 쓸 수 있다.
+**파일**: `next.config.ts`
 
-**마이그레이션 파일**: `supabase/migrations/004_gallery_tags.sql`
+현재 `headers()`가 없다. CSP·클릭재킹·MIME 스니핑 방어를 한 번에 추가한다.
 
-```sql
--- gallery_albums에 tags 배열 컬럼 추가
-ALTER TABLE gallery_albums
-  ADD COLUMN tags text[] DEFAULT '{}';
+```typescript
+// next.config.ts — 기존 코드 뒤에 headers() 추가
+import type { NextConfig } from "next";
 
--- 기존 category 값을 tags로 마이그레이션
-UPDATE gallery_albums SET tags = ARRAY[category] WHERE category IS NOT NULL;
+const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "*.ytimg.com" },
+      { protocol: "https", hostname: "*.supabase.co" },
+    ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' https://*.ytimg.com https://*.supabase.co data: blob:",
+              "media-src 'self' https://*.supabase.co",
+              "frame-src https://www.youtube.com https://www.google.com",
+              "connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com",
+              "font-src 'self'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
+  async redirects() {
+    return [
+      // ... 기존 redirects 그대로 유지
+    ];
+  },
+};
 
--- tags 검색 성능을 위한 GIN 인덱스
-CREATE INDEX idx_gallery_albums_tags ON gallery_albums USING GIN (tags);
-
--- category 컬럼은 당분간 유지 (하위호환)
--- 추후 모바일 앱 안정화 후 제거 가능
+export default nextConfig;
 ```
 
-**타입 수정**: `src/types/gallery.ts`
+**변경 범위**: `headers()` 함수 추가. `redirects()`는 그대로.
 
-```ts
-export interface GalleryAlbum {
-  id: string;
-  title: string;
-  category: string | null;   // 하위호환 유지
-  tags: string[];             // 신규
-  date: string | null;
-  thumbnail_url: string | null;
-  is_public: boolean;
-  created_at: string;
-  images: GalleryImage[];
+---
+
+### Step 2. 입력 검증 유틸 + Zod 설치 ✅
+
+**신규 파일**: `src/lib/validation.ts`
+
+모든 API 라우트와 폼에서 재사용할 검증 상수·함수를 한 곳에 모은다.
+모바일 앱도 같은 API를 호출하므로, 서버측 검증이 곧 범용 검증이다.
+
+```bash
+npm install zod
+```
+
+```typescript
+// src/lib/validation.ts
+import { z } from "zod";
+
+// ──────────────────────────────────────────────
+//  공통 상수
+// ──────────────────────────────────────────────
+
+/** API에서 limit 파라미터의 최대값 */
+export const MAX_QUERY_LIMIT = 100;
+
+/** 파일 업로드 */
+export const ALLOWED_IMAGE_EXTENSIONS = ["jpg", "jpeg", "png", "gif", "webp"] as const;
+export const ALLOWED_PDF_EXTENSIONS = ["pdf"] as const;
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024;  // 10 MB
+export const MAX_PDF_SIZE = 20 * 1024 * 1024;    // 20 MB
+export const MAX_UPLOAD_FILES = 30;               // 한 번에 최대 30장
+
+// ──────────────────────────────────────────────
+//  파일 검증
+// ──────────────────────────────────────────────
+
+export function validateFile(
+  file: File,
+  allowedExtensions: readonly string[],
+  maxSize: number,
+): { ok: true } | { ok: false; reason: string } {
+  const ext = file.name.split(".").pop()?.toLowerCase();
+  if (!ext || !allowedExtensions.includes(ext)) {
+    return { ok: false, reason: `허용되지 않는 파일 형식입니다. (허용: ${allowedExtensions.join(", ")})` };
+  }
+  if (file.size > maxSize) {
+    const maxMB = Math.round(maxSize / 1024 / 1024);
+    return { ok: false, reason: `파일 크기가 ${maxMB}MB를 초과합니다.` };
+  }
+  return { ok: true };
+}
+
+/** 안전한 파일 확장자 추출 (경로 조작 방어) */
+export function safeExtension(filename: string, allowed: readonly string[]): string {
+  const ext = filename.split(".").pop()?.toLowerCase() ?? "";
+  return allowed.includes(ext) ? ext : allowed[0];
+}
+
+// ──────────────────────────────────────────────
+//  limit 파라미터 파싱 (gallery, shorts 등)
+// ──────────────────────────────────────────────
+
+export function parseLimit(raw: string | null, fallback: number = 20): number {
+  if (!raw) return fallback;
+  const n = parseInt(raw, 10);
+  if (isNaN(n) || n < 1) return fallback;
+  return Math.min(n, MAX_QUERY_LIMIT);
+}
+
+// ──────────────────────────────────────────────
+//  API 스키마 (Zod)
+// ──────────────────────────────────────────────
+
+/** POST /api/revalidate */
+export const RevalidateSchema = z.object({
+  secret: z.string().min(1),
+  paths: z.array(z.string().startsWith("/").max(500)).min(1).max(20),
+});
+
+/** POST /api/sermon-summary */
+export const SermonSummarySchema = z.object({
+  sermon: z.object({
+    videoId: z.string().min(1).max(50),
+    title: z.string().min(1).max(300),
+    description: z.string().max(10000).default(""),
+    thumbnail: z.string().max(2000).default(""),
+    publishedAt: z.string().min(1).max(50),
+  }),
+  saveAsNotice: z.boolean(),
+});
+
+/** POST /api/shorts/trigger */
+export const ShortsTriggerSchema = z.object({
+  videoId: z.string().min(1).max(50),
+  videoTitle: z.string().min(1).max(300),
+  videoPublishedAt: z.string().max(50).optional(),
+  videoThumbnail: z.string().max(2000).optional(),
+});
+
+/** POST /api/shorts/[id]/reject */
+export const ShortsRejectSchema = z.object({
+  note: z.string().max(500).optional(),
+});
+
+/** 그룹 게시글 (클라이언트 검증용 — 동일한 규칙을 서버 RLS 이후에도 적용) */
+export const GroupPostSchema = z.object({
+  title: z.string().min(1, "제목을 입력하세요").max(100, "제목은 100자까지"),
+  content: z.string().min(1, "내용을 입력하세요").max(5000, "내용은 5,000자까지"),
+});
+
+/** 공지사항 */
+export const NoticeSchema = z.object({
+  title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
+  slug: z.string().max(100).optional(),
+  category: z.enum(["일반", "긴급", "행사"]),
+  content: z.string().min(1, "내용을 입력하세요").max(50000, "내용은 50,000자까지"),
+  date: z.string().optional(),
+});
+
+/** 갤러리 앨범 */
+export const GalleryAlbumSchema = z.object({
+  title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
+  category: z.string().min(1),
+  date: z.string().optional(),
+});
+
+/** 주보 */
+export const WeeklySchema = z.object({
+  title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
+  date: z.string().optional(),
+});
+```
+
+---
+
+### Step 3. Revalidate API — 타이밍-세이프 비교 + Zod 검증 ✅
+
+**파일**: `src/app/api/revalidate/route.ts`
+
+현재 코드:
+```typescript
+if (body.secret !== process.env.REVALIDATE_SECRET) {      // 타이밍 공격 취약
+  return NextResponse.json({ error: "Invalid secret" }, { status: 401 });
+}
+for (const path of body.paths) {                            // 무제한 배열
+  revalidatePath(path);
 }
 ```
 
-### Step 1-2: 갤러리 lib 함수를 태그 필터 지원으로 확장
-
-**수정 파일**: `src/lib/gallery.ts`
-
-```ts
-import { createClient } from "@/lib/supabase/server";
-import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
-
-interface GetAlbumsOptions {
-  tags?: string[];       // 이 태그를 모두 포함하는 앨범 (AND)
-  anyTags?: string[];    // 이 태그 중 하나라도 포함하는 앨범 (OR)
-  limit?: number;
-}
-
-export async function getGalleryAlbums(options: GetAlbumsOptions = {}): Promise<GalleryAlbum[]> {
-  const supabase = await createClient();
-  const { tags, anyTags, limit } = options;
-
-  let query = supabase
-    .from("gallery_albums")
-    .select("*")
-    .eq("is_public", true)
-    .order("date", { ascending: false });
-
-  if (tags && tags.length > 0) {
-    query = query.contains("tags", tags);
-  }
-  if (anyTags && anyTags.length > 0) {
-    query = query.overlaps("tags", anyTags);
-  }
-  if (limit) {
-    query = query.limit(limit);
-  }
-
-  const { data: albums } = await query;
-  if (!albums || albums.length === 0) return [];
-
-  const albumIds = albums.map((a) => a.id as string);
-  const { data: images } = await supabase
-    .from("gallery_images")
-    .select("*")
-    .in("album_id", albumIds)
-    .order("sort_order", { ascending: true });
-
-  return albums.map((album) => ({
-    id: album.id as string,
-    title: album.title as string,
-    category: album.category as string | null,
-    tags: (album.tags as string[]) ?? [],
-    date: album.date as string | null,
-    thumbnail_url: album.thumbnail_url as string | null,
-    is_public: album.is_public as boolean,
-    created_at: album.created_at as string,
-    images: (images?.filter((img) => img.album_id === album.id) ?? []) as GalleryImage[],
-  }));
-}
-```
-
-### Step 1-3: 갤러리 REST API (모바일용)
-
-**신규 파일**: `src/app/api/gallery/route.ts`
-
-```ts
+수정 후 전체:
+```typescript
+// src/app/api/revalidate/route.ts
+import { revalidatePath } from "next/cache";
 import { NextRequest, NextResponse } from "next/server";
-import { getGalleryAlbums } from "@/lib/gallery";
+import { timingSafeEqual } from "crypto";
+import { RevalidateSchema } from "@/lib/validation";
 
-export const revalidate = 3600;
+function safeCompare(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+}
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
-  const tags = searchParams.getAll("tag");
-  const anyTags = searchParams.getAll("anyTag");
-  const limit = searchParams.get("limit");
+export async function POST(request: NextRequest) {
+  const parsed = RevalidateSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
+  }
 
-  const albums = await getGalleryAlbums({
-    tags: tags.length > 0 ? tags : undefined,
-    anyTags: anyTags.length > 0 ? anyTags : undefined,
-    limit: limit ? parseInt(limit, 10) : undefined,
+  const secret = process.env.REVALIDATE_SECRET;
+  if (!secret || !safeCompare(parsed.data.secret, secret)) {
+    return NextResponse.json({ error: "Invalid secret" }, { status: 401 });
+  }
+
+  for (const path of parsed.data.paths) {
+    revalidatePath(path);
+  }
+
+  return NextResponse.json({ revalidated: true });
+}
+```
+
+**변경 요약**:
+- `timingSafeEqual`로 비교 (타이밍 공격 차단)
+- `RevalidateSchema`로 paths 배열 최대 20개 + 각 경로 `/`로 시작 검증
+- 에러 시 일반적 메시지만 반환
+
+---
+
+### Step 4. 파일 업로드 검증 — 갤러리 ✅
+
+**파일**: `src/app/admin/gallery/page.tsx`
+
+`uploadImages` 함수만 수정. 현재 코드 (line 114-151):
+
+```typescript
+async function uploadImages(albumId: string, files: FileList) {
+  setUploading(true);
+  const album = albums.find((a) => a.id === albumId);
+  const existingCount = album?.images.length ?? 0;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const ext = file.name.split(".").pop();           // ← 검증 없음
+    const path = `${albumId}/${Date.now()}-${i}.${ext}`;
+    // ...
+  }
+}
+```
+
+수정 후:
+```typescript
+import {
+  validateFile,
+  safeExtension,
+  ALLOWED_IMAGE_EXTENSIONS,
+  MAX_IMAGE_SIZE,
+  MAX_UPLOAD_FILES,
+} from "@/lib/validation";
+
+async function uploadImages(albumId: string, files: FileList) {
+  if (files.length > MAX_UPLOAD_FILES) {
+    alert(`한 번에 최대 ${MAX_UPLOAD_FILES}장까지 업로드할 수 있습니다.`);
+    return;
+  }
+
+  // 전체 파일 사전 검증
+  for (let i = 0; i < files.length; i++) {
+    const check = validateFile(files[i], ALLOWED_IMAGE_EXTENSIONS, MAX_IMAGE_SIZE);
+    if (!check.ok) {
+      alert(`${files[i].name}: ${check.reason}`);
+      return;
+    }
+  }
+
+  setUploading(true);
+  const album = albums.find((a) => a.id === albumId);
+  const existingCount = album?.images.length ?? 0;
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const ext = safeExtension(file.name, ALLOWED_IMAGE_EXTENSIONS);
+    const path = `${albumId}/${Date.now()}-${i}.${ext}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("gallery")
+      .upload(path, file);
+
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from("gallery")
+        .getPublicUrl(path);
+
+      await supabase.from("gallery_images").insert({
+        album_id: albumId,
+        image_url: urlData.publicUrl,
+        sort_order: existingCount + i,
+      });
+
+      if (existingCount === 0 && i === 0) {
+        await supabase
+          .from("gallery_albums")
+          .update({ thumbnail_url: urlData.publicUrl })
+          .eq("id", albumId);
+      }
+    }
+  }
+
+  setUploading(false);
+  loadAlbums();
+}
+```
+
+`createAlbum`에도 길이 검증 추가 (line 66-85):
+```typescript
+import { GalleryAlbumSchema } from "@/lib/validation";
+
+async function createAlbum(e: React.FormEvent) {
+  e.preventDefault();
+  const check = GalleryAlbumSchema.safeParse({ title, category, date: date || undefined });
+  if (!check.success) {
+    alert(check.error.issues[0].message);
+    return;
+  }
+
+  const tags: string[] = [category];
+  if (subCategory) tags.push(subCategory);
+
+  const { error } = await supabase.from("gallery_albums").insert({
+    title: check.data.title,
+    category: check.data.category,
+    tags,
+    date: check.data.date || null,
+    is_public: false,
+  });
+  if (!error) {
+    setTitle("");
+    setSubCategory("");
+    setDate(new Date().toISOString().split("T")[0]);
+    setShowForm(false);
+    loadAlbums();
+  }
+}
+```
+
+**input 요소에도 `accept` 강화** (line 337-340):
+```html
+<!-- 현재 -->
+<input accept="image/*" ... />
+
+<!-- 수정 -->
+<input accept=".jpg,.jpeg,.png,.gif,.webp" ... />
+```
+
+---
+
+### Step 5. 파일 업로드 검증 — 주보 PDF ✅
+
+**파일**: `src/app/admin/weeklies/page.tsx`
+
+`uploadPdf` 함수 수정 (line 42-67):
+
+```typescript
+import {
+  validateFile,
+  safeExtension,
+  ALLOWED_PDF_EXTENSIONS,
+  MAX_PDF_SIZE,
+  WeeklySchema,
+} from "@/lib/validation";
+
+async function uploadPdf(weeklyId: string, file: File) {
+  const check = validateFile(file, ALLOWED_PDF_EXTENSIONS, MAX_PDF_SIZE);
+  if (!check.ok) {
+    alert(check.reason);
+    return;
+  }
+
+  setUploading(true);
+  const ext = safeExtension(file.name, ALLOWED_PDF_EXTENSIONS); // 항상 "pdf"
+  const path = `${weeklyId}.${ext}`;
+
+  await supabase.storage.from("weeklies").remove([path]);
+
+  const { error: uploadError } = await supabase.storage
+    .from("weeklies")
+    .upload(path, file);
+
+  if (!uploadError) {
+    const { data: urlData } = supabase.storage
+      .from("weeklies")
+      .getPublicUrl(path);
+
+    await supabase
+      .from("weeklies")
+      .update({ pdf_url: urlData.publicUrl })
+      .eq("id", weeklyId);
+  }
+
+  setUploading(false);
+  loadWeeklies();
+}
+```
+
+`createWeekly`에도 검증 추가:
+```typescript
+async function createWeekly(e: React.FormEvent) {
+  e.preventDefault();
+  const check = WeeklySchema.safeParse({ title, date: date || undefined });
+  if (!check.success) {
+    alert(check.error.issues[0].message);
+    return;
+  }
+  const { error } = await supabase.from("weeklies").insert({
+    title: check.data.title,
+    date: check.data.date || null,
+  });
+  if (!error) {
+    setTitle(""); setDate(""); setShowForm(false);
+    loadWeeklies();
+  }
+}
+```
+
+---
+
+## Phase 2 — 이번 주 내 (HIGH) ✅
+
+### Step 6. API 입력 검증 — sermon-summary ✅
+
+**파일**: `src/app/api/sermon-summary/route.ts`
+
+수정: line 42의 `as` 타입 캐스팅을 Zod 검증으로 교체.
+
+```typescript
+import { SermonSummarySchema } from "@/lib/validation";
+
+// line 42 교체
+const parsed = SermonSummarySchema.safeParse(await request.json());
+if (!parsed.success) {
+  return NextResponse.json(
+    { error: "잘못된 요청 형식입니다." },
+    { status: 400 },
+  );
+}
+const { sermon, saveAsNotice } = parsed.data;
+
+// 이하 body.sermon → sermon, body.saveAsNotice → saveAsNotice로 교체
+```
+
+에러 메시지도 정리 (line 74-78):
+```typescript
+} catch (err) {
+  console.error("Sermon summary error:", err);
+  const status = err instanceof GeminiUnavailableError ? 503 : 500;
+  return NextResponse.json(
+    { error: status === 503 ? "AI 서버가 일시적으로 혼잡합니다." : "요약 생성에 실패했습니다." },
+    { status },
+  );
+}
+```
+
+---
+
+### Step 7. API 입력 검증 — shorts/trigger ✅
+
+**파일**: `src/app/api/shorts/trigger/route.ts`
+
+수정: line 15의 `as TriggerBody`를 Zod 검증으로 교체.
+
+```typescript
+import { ShortsTriggerSchema } from "@/lib/validation";
+
+// line 15-22 교체
+const parsed = ShortsTriggerSchema.safeParse(await request.json());
+if (!parsed.success) {
+  return NextResponse.json(
+    { error: "videoId와 videoTitle은 필수이며, 각 필드의 길이 제한을 확인하세요." },
+    { status: 400 },
+  );
+}
+const body = parsed.data;
+```
+
+에러 메시지 정리 (line 95):
+```typescript
+// 현재: error: `Actions 트리거 실패: ${errText.slice(0, 500)}`
+// 수정: 로그에만 상세 기록, 응답은 일반적 메시지
+console.error("GitHub Actions dispatch failed:", errText);
+await supabase
+  .from("shorts_jobs")
+  .update({
+    status: "failed",
+    error: "GitHub Actions 트리거 실패",
+    updated_at: new Date().toISOString(),
+  })
+  .eq("id", job.id);
+```
+
+---
+
+### Step 8. API 입력 검증 — shorts/[id]/reject ✅
+
+**파일**: `src/app/api/shorts/[id]/reject/route.ts`
+
+수정: line 18의 `as RejectBody`를 Zod 검증으로 교체.
+
+```typescript
+import { ShortsRejectSchema } from "@/lib/validation";
+
+// line 18 교체
+const parsed = ShortsRejectSchema.safeParse(await request.json());
+if (!parsed.success) {
+  return NextResponse.json({ error: "반려 사유는 500자까지입니다." }, { status: 400 });
+}
+
+const { error } = await supabase
+  .from("shorts_clips")
+  .update({
+    review_status: "rejected",
+    reviewer_note: parsed.data.note?.trim() || null,
+  })
+  .eq("id", id);
+```
+
+---
+
+### Step 9. API 입력 검증 — gallery, shorts 목록 (limit 상한) ✅
+
+**파일**: `src/app/api/gallery/route.ts`
+
+```typescript
+import { parseLimit } from "@/lib/validation";
+
+// line 10 교체
+// 현재: limit: limitParam ? parseInt(limitParam, 10) : undefined,
+// 수정:
+const limit = limitParam ? parseLimit(limitParam) : undefined;
+```
+
+**파일**: `src/app/api/shorts/route.ts`
+
+```typescript
+import { parseLimit } from "@/lib/validation";
+
+// line 13 교체
+// 현재: const limit = parseInt(searchParams.get("limit") ?? "20", 10);
+// 수정:
+const limit = parseLimit(searchParams.get("limit"), 20);
+```
+
+---
+
+### Step 10. 공지사항 폼 검증 ✅
+
+**파일**: `src/app/admin/notices/page.tsx`
+
+`handleSubmit` 함수 (line 58-79)에 검증 추가:
+
+```typescript
+import { NoticeSchema } from "@/lib/validation";
+
+async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  const check = NoticeSchema.safeParse({
+    title,
+    slug: slug || undefined,
+    category,
+    content,
+    date: date || undefined,
+  });
+  if (!check.success) {
+    alert(check.error.issues[0].message);
+    return;
+  }
+
+  const finalSlug = check.data.slug || generateSlug(title);
+
+  if (editing) {
+    await supabase
+      .from("notices")
+      .update({
+        title: check.data.title,
+        slug: finalSlug,
+        category: check.data.category,
+        content: check.data.content,
+        date: check.data.date || null,
+      })
+      .eq("id", editing.id);
+  } else {
+    await supabase.from("notices").insert({
+      title: check.data.title,
+      slug: finalSlug,
+      category: check.data.category,
+      content: check.data.content,
+      date: check.data.date || null,
+      is_public: false,
+    });
+  }
+  resetForm();
+  loadNotices();
+}
+```
+
+`<textarea>`에 `maxLength` 추가:
+```html
+<textarea maxLength={50000} ... />
+```
+
+---
+
+### Step 11. 그룹 게시글 폼 검증 ✅
+
+**파일**: `src/components/groups/DiscussionList.tsx`
+
+`handleSubmit` 함수 (line 22-55)에 검증 추가:
+
+```typescript
+import { GroupPostSchema } from "@/lib/validation";
+
+async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  const check = GroupPostSchema.safeParse({ title, content });
+  if (!check.success) {
+    alert(check.error.issues[0].message);
+    return;
+  }
+
+  setSubmitting(true);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    setSubmitting(false);
+    return;
+  }
+
+  const { error } = await supabase.from("group_posts").insert({
+    group_id: groupId,
+    author_id: user.id,
+    title: check.data.title,
+    content: check.data.content,
   });
 
-  return NextResponse.json(albums);
+  // ... 이하 동일
 }
 ```
 
-사용 예:
-- `GET /api/gallery` → 전체
-- `GET /api/gallery?tag=교회학교&tag=영유치부` → 교회학교 AND 영유치부
-- `GET /api/gallery?anyTag=예배&anyTag=교회행사` → 예배 OR 교회행사
-
----
-
-## Phase 2: 네비게이션 메뉴 구조 변경
-
-### Step 2-1: nav-config.ts 재작성
-
-**수정 파일**: `src/components/layout/nav-config.ts`
-
-```ts
-import type { ContentKey } from "@/app/api/new-content/route";
-
-export interface NavItem {
-  label: string;
-  href: string;
-  children?: NavItem[];
-  badgeKey?: ContentKey;
-}
-
-export const navItems: NavItem[] = [
-  {
-    label: "교회소개",
-    href: "/greetings",
-    children: [
-      { label: "인사말", href: "/greetings" },
-      { label: "공지사항", href: "/notice", badgeKey: "notices" },
-      { label: "예배안내", href: "/worship" },
-      { label: "섬기는 이들", href: "/staff" },
-      { label: "찾아오시는 길", href: "/map" },
-      { label: "주보", href: "/weekly", badgeKey: "weeklies" },
-    ],
-  },
-  {
-    label: "말씀영상",
-    href: "/sermons",
-    badgeKey: "sermons",
-  },
-  {
-    label: "비전갤러리",
-    href: "/gallery",
-    badgeKey: "gallery",
-  },
-  {
-    label: "교회학교",
-    href: "/churchschool",
-    children: [
-      { label: "영유치부", href: "/churchschool/infant" },
-      { label: "아동부", href: "/churchschool/elementary" },
-      { label: "청소년부", href: "/churchschool/teen" },
-      { label: "청년부", href: "/churchschool/youth" },
-    ],
-  },
-  {
-    label: "봉사센터",
-    href: "/volunteer-center",
-    children: [
-      { label: "사랑의 반찬나눔", href: "/volunteer-center/sidedish" },
-      { label: "사랑의 이미용봉사", href: "/volunteer-center/beauty" },
-      { label: "비전문화학교", href: "/volunteer-center/culture" },
-      { label: "탁구교실", href: "/volunteer-center/tabletennis" },
-    ],
-  },
-];
-```
-
-### Step 2-2: Header.tsx — 상위 badgeKey 지원 + 모바일 단일 링크
-
-**수정 파일**: `src/components/layout/Header.tsx`
-
-현재 레드닷은 children의 badge만 확인. 상위 메뉴의 `badgeKey`도 확인하도록 수정.
-children이 없는 메뉴(말씀영상, 비전갤러리)는 모바일에서 `<button>` 대신 `<Link>`로 렌더링.
-
-**데스크톱 nav 변경 (2곳)**:
-```tsx
-// 기존
-{hasChildBadge(item.children, dots) && <RedDot />}
-
-// 변경 — 자체 badgeKey OR children의 badge
-{((item.badgeKey && dots[item.badgeKey]) || hasChildBadge(item.children, dots)) && <RedDot />}
-```
-
-**모바일 메뉴 변경 — children 유무에 따라 Link/button 분기**:
-```tsx
-{item.children ? (
-  <button
-    onClick={() => setOpenSubmenu(openSubmenu === item.href ? null : item.href)}
-    className="flex w-full items-center justify-between py-3 text-[0.95rem] font-medium text-gray-800"
-  >
-    <span className="flex items-center">
-      {item.label}
-      {((item.badgeKey && dots[item.badgeKey]) || hasChildBadge(item.children, dots)) && <RedDot />}
-    </span>
-    <ChevronDown
-      size={16}
-      className={cn(
-        "text-gray-400 transition-transform duration-200",
-        openSubmenu === item.href && "rotate-180 text-primary-600"
-      )}
-    />
-  </button>
-) : (
-  <Link
-    href={item.href}
-    onClick={() => setMobileOpen(false)}
-    className="flex w-full items-center py-3 text-[0.95rem] font-medium text-gray-800"
-  >
-    {item.label}
-    {item.badgeKey && dots[item.badgeKey] && <RedDot />}
-  </Link>
-)}
-```
-
-### Step 2-3: tab-config.ts 업데이트
-
-**수정 파일**: `src/components/layout/tab-config.ts`
-
-```ts
-import { Home, Play, Images, BookOpen, Heart } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import type { ContentKey } from "@/app/api/new-content/route";
-
-export interface TabItem {
-  key: string;
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  exact?: boolean;
-  badgeKeys?: ContentKey[];
-}
-
-export const tabItems: TabItem[] = [
-  { key: "home", label: "홈", href: "/", icon: Home, exact: true },
-  { key: "sermons", label: "말씀", href: "/sermons", icon: Play, badgeKeys: ["sermons"] },
-  { key: "gallery", label: "갤러리", href: "/gallery", icon: Images, badgeKeys: ["gallery"] },
-  { key: "notice", label: "소식", href: "/notice", icon: BookOpen, badgeKeys: ["notices"] },
-  { key: "more", label: "더보기", href: "/menu", icon: Heart, badgeKeys: ["gallery"] },
-];
-
-export const HIDDEN_PATHS = ["/admin", "/login", "/signup"];
+`<input>`과 `<textarea>`에 `maxLength` 추가:
+```html
+<input maxLength={100} ... />
+<textarea maxLength={5000} ... />
 ```
 
 ---
 
-## Phase 3: 신규 페이지 생성
+### Step 12. 쇼츠 반려 사유 검증 (클라이언트) ✅
 
-### Step 3-1: 섬기는 이들 (/staff)
+**파일**: `src/app/admin/shorts/page.tsx`
 
-**신규 파일**: `src/app/(public)/staff/page.tsx`
+`handleReject` 함수 (line 194-203):
 
-```tsx
-import { Container } from "@/components/ui/Container";
-import { PageHeader } from "@/components/ui/PageHeader";
-import Image from "next/image";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = { title: "섬기는 이들" };
-
-interface StaffMember {
-  name: string;
-  title: string;
-  role: string;
-  image: string;
+```typescript
+// 현재
+async function handleReject(clipId: string) {
+  const note = prompt("반려 사유를 입력하세요:");
+  if (note === null) return;
+  // ... 바로 전송
 }
 
-const staff: StaffMember[] = [
-  { name: "이양재", title: "담임목사", role: "", image: "/images/staff1.avif" },
-  { name: "우 영", title: "목사", role: "교구 / 목장", image: "/images/staff2.avif" },
-  { name: "이준영", title: "전도사", role: "기획 / 청년부", image: "/images/staff3.avif" },
-  { name: "최희성", title: "전도사", role: "행정 미디어 / 청소년부", image: "/images/staff4.avif" },
-  { name: "임한나", title: "전도사", role: "아동부", image: "/images/staff5.avif" },
-  { name: "박가람", title: "교육사", role: "영유치부", image: "/images/staff6.avif" },
-];
+// 수정
+async function handleReject(clipId: string) {
+  const note = prompt("반려 사유를 입력하세요 (최대 500자):");
+  if (note === null) return;
+  if (note.length > 500) {
+    alert("반려 사유는 500자까지입니다.");
+    return;
+  }
+  await fetch(`/api/shorts/${clipId}/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ note: note.trim() || undefined }),
+  });
+  await loadJobs();
+}
+```
 
-export default function StaffPage() {
+---
+
+### Step 13. 에러 메시지 정리 ✅
+
+이미 Step 6, 7에서 대부분 처리. 추가로:
+
+**파일**: `src/app/api/shorts/[id]/approve/route.ts` (line 19)
+
+```typescript
+// 현재: return NextResponse.json({ error: error.message }, { status: 500 });
+// 수정:
+console.error("Approve clip error:", error);
+return NextResponse.json({ error: "승인 처리에 실패했습니다." }, { status: 500 });
+```
+
+**파일**: `src/app/api/shorts/[id]/reject/route.ts` (line 29)
+
+```typescript
+// 현재: return NextResponse.json({ error: error.message }, { status: 500 });
+// 수정:
+console.error("Reject clip error:", error);
+return NextResponse.json({ error: "반려 처리에 실패했습니다." }, { status: 500 });
+```
+
+---
+
+### Step 14. 로그아웃 기능 ✅
+
+**파일**: `src/app/(member)/profile/page.tsx`
+
+프로필 페이지에 로그아웃 버튼을 추가한다. 이 페이지는 현재 서버 컴포넌트이므로,
+로그아웃 버튼만 클라이언트 컴포넌트로 분리한다.
+
+**신규 파일**: `src/components/LogoutButton.tsx`
+
+```typescript
+"use client";
+
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { LogOut } from "lucide-react";
+
+export function LogoutButton() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  async function handleLogout() {
+    await supabase.auth.signOut();
+    router.push("/");
+    router.refresh();
+  }
+
   return (
-    <>
-      <PageHeader title="섬기는 이들" description="명성비전교회를 섬기는 사역자들입니다" />
-      <Container>
-        <div className="mx-auto max-w-4xl">
-          {/* 담임목사 */}
-          <div className="mb-10 flex flex-col items-center gap-6 rounded-2xl border border-gray-200 bg-white p-8 shadow-sm md:flex-row">
-            <Image
-              src={staff[0].image}
-              alt={staff[0].name}
-              width={180}
-              height={220}
-              className="rounded-xl object-cover shadow-md"
-            />
-            <div className="text-center md:text-left">
-              <p className="text-sm font-medium text-primary-600">{staff[0].title}</p>
-              <h2 className="mt-1 text-2xl font-bold text-gray-900">{staff[0].name}</h2>
-            </div>
-          </div>
-
-          {/* 나머지 사역자 */}
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {staff.slice(1).map((member) => (
-              <div
-                key={member.name}
-                className="flex flex-col items-center rounded-xl border border-gray-200 bg-white p-6 shadow-sm"
-              >
-                <Image
-                  src={member.image}
-                  alt={member.name}
-                  width={140}
-                  height={170}
-                  className="rounded-xl object-cover shadow-md"
-                />
-                <p className="mt-4 text-sm font-medium text-primary-600">{member.title}</p>
-                <h3 className="mt-1 text-lg font-bold text-gray-900">{member.name}</h3>
-                {member.role && (
-                  <p className="mt-1 text-sm text-gray-500">{member.role}</p>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </Container>
-    </>
+    <button
+      onClick={handleLogout}
+      className="flex w-full items-center justify-center gap-2 rounded-xl border border-gray-200 py-3 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50 hover:text-red-600"
+    >
+      <LogOut size={16} />
+      로그아웃
+    </button>
   );
 }
 ```
 
-### Step 3-2: 봉사센터 목록 (/volunteer-center)
+**파일**: `src/app/(member)/profile/page.tsx` — `<LogoutButton />` 추가:
 
-**신규 파일**: `src/app/(public)/volunteer-center/page.tsx`
+```typescript
+import { LogoutButton } from "@/components/LogoutButton";
 
-```tsx
-import Link from "next/link";
-import { Container } from "@/components/ui/Container";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { UtensilsCrossed, Scissors, GraduationCap, TableProperties } from "lucide-react";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = { title: "봉사센터" };
-
-const centers = [
-  {
-    slug: "sidedish",
-    title: "사랑의 반찬나눔",
-    description: "홀몸 어르신과 이웃에게 정성스러운 반찬을 만들어 나눕니다",
-    icon: UtensilsCrossed,
-    schedule: "매주 금요일",
-  },
-  {
-    slug: "beauty",
-    title: "사랑의 이미용봉사",
-    description: "지역 주민들과 어르신들을 대상으로 무료 미용봉사를 진행합니다",
-    icon: Scissors,
-    schedule: "매월 셋째 주 토요일",
-  },
-  {
-    slug: "culture",
-    title: "비전문화학교",
-    description: "지역사회를 위한 문화 교육 프로그램을 운영합니다",
-    icon: GraduationCap,
-    schedule: "",
-  },
-  {
-    slug: "tabletennis",
-    title: "탁구교실",
-    description: "교인과 지역 주민이 함께하는 건강한 운동과 교제",
-    icon: TableProperties,
-    schedule: "매주 토요일 오후 2:00",
-  },
-];
-
-export default function VolunteerCenterPage() {
-  return (
-    <>
-      <PageHeader title="봉사센터" description="지역사회를 섬기는 명성비전교회 봉사 사역" />
-      <Container>
-        <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-2">
-          {centers.map((center) => (
-            <Link
-              key={center.slug}
-              href={`/volunteer-center/${center.slug}`}
-              className="group rounded-2xl border border-gray-200 bg-white p-6 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-            >
-              <center.icon size={28} className="text-primary-600" />
-              <h3 className="mt-3 text-lg font-bold text-gray-900">{center.title}</h3>
-              <p className="mt-1 text-sm text-gray-500">{center.description}</p>
-              {center.schedule && (
-                <p className="mt-3 text-xs font-medium text-primary-600">{center.schedule}</p>
-              )}
-            </Link>
-          ))}
-        </div>
-      </Container>
-    </>
-  );
-}
-```
-
-### Step 3-3: 봉사센터 상세 (/volunteer-center/[slug])
-
-**신규 파일**: `src/app/(public)/volunteer-center/[slug]/page.tsx`
-
-기존 `/ministry/[slug]/page.tsx`와 동일한 구조, 데이터만 변경:
-
-```tsx
-import { Container } from "@/components/ui/Container";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { notFound } from "next/navigation";
-import type { Metadata } from "next";
-
-interface CenterInfo {
-  title: string;
-  description: string;
-  schedule: string;
-  content: string;
-}
-
-const centers: Record<string, CenterInfo> = {
-  sidedish: {
-    title: "사랑의 반찬나눔",
-    description: "이웃을 향한 사랑의 반찬 나눔",
-    schedule: "매주 금요일",
-    content: "홀몸 어르신과 이웃에게 정성스러운 반찬을 만들어 나눕니다. 동작구와 함께하는 이웃사랑 나눔의 손길입니다.",
-  },
-  beauty: {
-    title: "사랑의 이미용봉사",
-    description: "지역사회를 섬기는 이미용봉사 사역",
-    schedule: "매월 셋째 주 토요일",
-    content: "지역 주민들과 어르신들을 대상으로 무료 미용봉사를 진행합니다. 작은 섬김이지만 이웃에게 따뜻한 사랑을 전하는 귀한 사역입니다.",
-  },
-  culture: {
-    title: "비전문화학교",
-    description: "지역사회를 위한 문화 교육 프로그램",
-    schedule: "",
-    content: "지역사회를 위한 다양한 문화 교육 프로그램을 운영합니다.",
-  },
-  tabletennis: {
-    title: "탁구교실",
-    description: "건강한 몸과 마음을 위한 탁구 모임",
-    schedule: "매주 토요일 오후 2:00",
-    content: "교인과 지역 주민이 함께하는 탁구 모임입니다. 건강한 운동과 즐거운 교제가 함께합니다.",
-  },
-};
-
-type Params = Promise<{ slug: string }>;
-
-export async function generateStaticParams() {
-  return Object.keys(centers).map((slug) => ({ slug }));
-}
-
-export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
-  const { slug } = await params;
-  const c = centers[slug];
-  return c ? { title: c.title } : {};
-}
-
-export default async function VolunteerCenterDetailPage({ params }: { params: Params }) {
-  const { slug } = await params;
-  const c = centers[slug];
-  if (!c) notFound();
+// return 내부, 카드 닫는 </div> 바로 앞에 추가:
+export default async function ProfilePage() {
+  // ... 기존 코드 ...
 
   return (
     <>
-      <PageHeader title={c.title} description={c.description} />
+      <PageHeader title="내 프로필" />
       <Container>
-        <div className="mx-auto max-w-2xl">
-          <div className="rounded-xl border border-gray-200 bg-white p-8">
-            {c.schedule && (
-              <div className="mb-6 rounded-lg bg-primary-50 px-4 py-3 text-sm text-primary-700">
-                <strong>일정:</strong> {c.schedule}
-              </div>
-            )}
-            <div className="prose max-w-none text-gray-700">
-              <p>{c.content}</p>
-            </div>
+        <div className="mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-8">
+          <div className="space-y-4">
+            {/* ... 기존 name, email, created_at ... */}
+          </div>
+          <div className="mt-8">
+            <LogoutButton />
           </div>
         </div>
       </Container>
@@ -513,304 +816,149 @@ export default async function VolunteerCenterDetailPage({ params }: { params: Pa
 
 ---
 
-## Phase 4: 기존 페이지 수정
+### Step 15. 쇼츠 공개 API 필터링 ✅
 
-### Step 4-1: 인사말 (/greetings) — 사진 한 장으로
+**파일**: `src/app/api/shorts/route.ts`
 
-**수정 파일**: `src/app/(public)/greetings/page.tsx`
+인증되지 않은 요청에는 published 상태만 반환하도록 수정.
+모바일 앱도 동일 API를 사용하므로, 인증 여부로 분기한다.
 
-기존 내용(pastor.avif + 텍스트 3문단)을 greetings.avif 이미지만 표시하도록 변경:
+```typescript
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { parseLimit } from "@/lib/validation";
+import type { ShortsJob, ShortsClip, ShortsJobWithClips } from "@/types/shorts";
 
-```tsx
-import { Container } from "@/components/ui/Container";
-import { PageHeader } from "@/components/ui/PageHeader";
-import Image from "next/image";
-import type { Metadata } from "next";
+export const revalidate = 0;
 
-export const metadata: Metadata = { title: "인사말" };
+export async function GET(req: NextRequest) {
+  const supabase = await createClient();
+  const { searchParams } = req.nextUrl;
 
-export default function GreetingsPage() {
-  return (
-    <>
-      <PageHeader title="인사말" description="명성비전교회에 오신 것을 환영합니다" />
-      <Container>
-        <div className="mx-auto max-w-3xl">
-          <Image
-            src="/images/greetings.avif"
-            alt="명성비전교회 인사말"
-            width={800}
-            height={600}
-            className="w-full rounded-2xl shadow-md"
-            priority
-          />
-        </div>
-      </Container>
-    </>
-  );
+  // 인증 확인 — 비인증 사용자는 published만 조회 가능
+  const { data: { user } } = await supabase.auth.getUser();
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    isAdmin = profile?.role === "admin";
+  }
+
+  const status = searchParams.get("status");
+  const published = searchParams.get("published");
+  const limit = parseLimit(searchParams.get("limit"), 20);
+
+  let jobQuery = supabase
+    .from("shorts_jobs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (!isAdmin) {
+    // 비관리자: published만 조회
+    jobQuery = jobQuery.eq("status", "published");
+  } else {
+    if (status) jobQuery = jobQuery.eq("status", status);
+    if (published === "true") jobQuery = jobQuery.eq("status", "published");
+  }
+
+  const { data: jobs } = await jobQuery;
+  if (!jobs || jobs.length === 0) return NextResponse.json([]);
+
+  const jobIds = jobs.map((j) => j.id as string);
+  const { data: clips } = await supabase
+    .from("shorts_clips")
+    .select("*")
+    .in("job_id", jobIds)
+    .order("clip_index", { ascending: true });
+
+  const clipsByJob: Record<string, ShortsClip[]> = {};
+  for (const clip of (clips ?? []) as ShortsClip[]) {
+    if (!clipsByJob[clip.job_id]) clipsByJob[clip.job_id] = [];
+    clipsByJob[clip.job_id].push(clip);
+  }
+
+  const result: ShortsJobWithClips[] = (jobs as ShortsJob[]).map((job) => ({
+    ...job,
+    clips: clipsByJob[job.id] ?? [],
+  }));
+
+  return NextResponse.json(result);
 }
-```
-
-### Step 4-2: 예배안내 (/worship) — 시간표 통합
-
-**수정 파일**: `src/app/(public)/worship/page.tsx`
-
-기존 6개 카드 + timetable의 상세 데이터를 통합한 완전한 시간표.
-menucategory.md의 교회학교 시간과 timetable 페이지의 데이터를 합친다.
-
-> **주의**: `worship-time.avif` 이미지를 직접 확인하여 빠진 항목이 없는지 반드시 검증.
-
-```tsx
-import { Container } from "@/components/ui/Container";
-import { PageHeader } from "@/components/ui/PageHeader";
-import { Clock, MapPin } from "lucide-react";
-import type { Metadata } from "next";
-
-export const metadata: Metadata = { title: "예배안내" };
-
-interface WorshipInfo {
-  name: string;
-  time: string;
-  day: string;
-  location: string;
-}
-
-const mainWorship: WorshipInfo[] = [
-  { name: "주일예배 1부", time: "오전 8:00", day: "매주 일요일", location: "본당" },
-  { name: "주일예배 2부", time: "오전 10:00", day: "매주 일요일", location: "본당" },
-  { name: "주일예배 3부", time: "낮 12:00", day: "매주 일요일", location: "본당" },
-  { name: "수요예배", time: "오후 7:30", day: "매주 수요일", location: "본당" },
-  { name: "금요기도회", time: "오후 7:30", day: "매주 금요일", location: "본당" },
-  { name: "새벽예배", time: "오전 6:00 (토 6:30)", day: "매일 (월~토)", location: "본당" },
-];
-
-const schoolWorship: WorshipInfo[] = [
-  { name: "영유치부", time: "낮 12:00", day: "매주 일요일", location: "본관 1층" },
-  { name: "아동부", time: "오전 10:00", day: "매주 일요일", location: "교육관 2층" },
-  { name: "청소년부", time: "낮 12:00", day: "매주 일요일", location: "교육관 3층 갈릴리실" },
-  { name: "청년부", time: "오후 2:30", day: "매월 첫째주일", location: "본관 2층" },
-];
-
-const specialMeetings: WorshipInfo[] = [
-  { name: "토요 노방전도", time: "오후 2:00", day: "매주 토요일", location: "2주년교회" },
-];
-
-function WorshipCard({ worship }: { worship: WorshipInfo }) {
-  return (
-    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 className="text-lg font-bold text-gray-900">{worship.name}</h3>
-      <div className="mt-3 space-y-1.5 text-sm">
-        <div className="flex items-center gap-2 text-gray-600">
-          <Clock size={15} className="shrink-0 text-primary-500" />
-          <span>{worship.day} {worship.time}</span>
-        </div>
-        <div className="flex items-center gap-2 text-gray-600">
-          <MapPin size={15} className="shrink-0 text-primary-500" />
-          <span>{worship.location}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export default function WorshipPage() {
-  return (
-    <>
-      <PageHeader title="예배안내" description="하나님께 드리는 예배에 함께해 주세요" />
-      <Container>
-        <div className="mx-auto max-w-4xl space-y-10">
-          <section>
-            <h2 className="mb-4 text-xl font-bold text-gray-900">예배 시간</h2>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {mainWorship.map((w) => <WorshipCard key={w.name} worship={w} />)}
-            </div>
-          </section>
-          <section>
-            <h2 className="mb-4 text-xl font-bold text-gray-900">교회학교</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {schoolWorship.map((w) => <WorshipCard key={w.name} worship={w} />)}
-            </div>
-          </section>
-          <section>
-            <h2 className="mb-4 text-xl font-bold text-gray-900">특별 모임</h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {specialMeetings.map((w) => <WorshipCard key={w.name} worship={w} />)}
-            </div>
-          </section>
-        </div>
-      </Container>
-    </>
-  );
-}
-```
-
-### Step 4-3: 교회학교 부서 페이지 전면 개편
-
-**수정 파일**: `src/app/(public)/churchschool/[department]/page.tsx`
-
-menucategory.md의 상세 데이터(표어, 주제말씀, 교육목표, 조직, 기도제목)를 모두 반영.
-갤러리 사진을 페이지 상단에 배치.
-
-departments 데이터 (4개 부서 전체):
-
-```ts
-const departments: Record<string, DepartmentInfo> = {
-  infant: {
-    title: "영유치부",
-    description: "하나님의 사랑 안에서 자라는 아이들",
-    target: "0~7세",
-    time: "주일 낮 12시",
-    location: "본관 1층",
-    motto: "복음의 열매 맺는 영유치부",
-    verse: "복음으로 쑥쑥쑥! 자라나는 우리 영유치부",
-    goals: [
-      "하나님께서 성령으로 부흥하게 하심을 믿게한다.",
-      "예수님의 성품을 배워 공동체가 하나 되며, 이웃을 섬긴다.",
-      "성령의 인도하심을 경험하며 제자로서 성장한다.",
-    ],
-    organization: [
-      { role: "지도교역자", name: "박가람 교육사" },
-      { role: "위원장", name: "박영옥 권사" },
-      { role: "부장", name: "최은옥 권사" },
-      { role: "총무·회계", name: "이민영" },
-      { role: "서기", name: "이서경" },
-      { role: "교사", name: "종승연, 신경식, 고종인, 강다은" },
-    ],
-    prayers: [
-      "성령의 감동으로 예배하는 어린이 되도록",
-      "아이들 가정에 성령의 지혜와 인내를 부어주시도록",
-      "성령의 능력으로 자라나는 부서가 되도록",
-    ],
-    galleryTag: "영유치부",
-  },
-  elementary: {
-    title: "아동부",
-    // ... (menucategory.md 데이터 그대로)
-    galleryTag: "아동부",
-  },
-  teen: {
-    title: "청소년부",
-    // ... (menucategory.md 데이터 그대로)
-    galleryTag: "청소년부",
-  },
-  youth: {
-    title: "청년부",
-    // ... (menucategory.md 데이터 그대로)
-    galleryTag: "청년부",
-  },
-};
-```
-
-페이지 레이아웃: 갤러리 사진 → 기본정보(대상/시간/장소) → 표어·말씀 → 교육목표 → 조직 → 기도제목
-
-갤러리 연동: `getGalleryAlbums({ tags: ["교회학교", dept.galleryTag], limit: 3 })` 호출하여 상단에 최대 6장 배치.
-
-### Step 4-4: 교회학교 메인 부서명 변경
-
-**수정 파일**: `src/app/(public)/churchschool/page.tsx`
-
-"유아부" → "영유치부", "초등부" → "아동부"로 변경.
-
----
-
-## Phase 5: 갤러리 하위부서 필터
-
-### Step 5-1: GalleryGrid 2단계 필터
-
-**수정 파일**: `src/components/gallery/GalleryGrid.tsx`
-
-교회학교/봉사센터 카테고리 선택 시 하위부서 선택 버튼 추가:
-
-```ts
-const subCategories: Record<string, string[]> = {
-  교회학교: ["전체", "영유치부", "아동부", "청소년부", "청년부"],
-  봉사센터: ["전체", "반찬", "이미용", "비전문화", "탁구"],
-};
-```
-
-1차 카테고리 변경 시 하위부서를 "전체"로 리셋.
-필터링: `album.tags.includes(filter)` (1차) + `album.tags.includes(subFilter)` (2차).
-
-### Step 5-2: admin/gallery 태그 입력
-
-**수정 파일**: `src/app/admin/gallery/page.tsx`
-
-카테고리 셀렉트 아래에 하위부서 선택 추가. 앨범 생성 시 `tags: [category, subCategory]` 저장.
-
-```ts
-const SUB_CATEGORIES: Record<string, string[]> = {
-  교회학교: ["영유치부", "아동부", "청소년부", "청년부"],
-  봉사센터: ["반찬", "이미용", "비전문화", "탁구"],
-};
 ```
 
 ---
 
-## Phase 6: 정리 및 리다이렉트
+## Phase 3 — 이번 달 내 (MEDIUM) ✅
 
-### Step 6-1: next.config.ts 리다이렉트
+### Step 16. OG 이미지 title 검증 ✅
 
-**수정 파일**: `next.config.ts`
+**파일**: `src/app/api/og/route.tsx`
 
-```ts
-async redirects() {
-  return [
-    // 기존 유지
-    { source: "/post/:slug", destination: "/notice/:slug", permanent: true },
-    { source: "/home-1", destination: "/", permanent: true },
-    { source: "/members", destination: "/login", permanent: true },
-    { source: "/teen", destination: "/churchschool/teen", permanent: true },
-    { source: "/youth", destination: "/churchschool/youth", permanent: true },
-    { source: "/infant", destination: "/churchschool/infant", permanent: true },
-    { source: "/elementary", destination: "/churchschool/elementary", permanent: true },
+```typescript
+export async function GET(request: NextRequest) {
+  const rawTitle = request.nextUrl.searchParams.get("title") ?? "명성비전교회";
+  // 길이 제한 + 제어문자 제거
+  const title = rawTitle.slice(0, 100).replace(/[\x00-\x1f]/g, "");
 
-    // ministry → volunteer-center
-    { source: "/ministry", destination: "/volunteer-center", permanent: true },
-    { source: "/ministry/:slug", destination: "/volunteer-center/:slug", permanent: true },
-    { source: "/beauty", destination: "/volunteer-center/beauty", permanent: true },
-    { source: "/tabletennis", destination: "/volunteer-center/tabletennis", permanent: true },
-    { source: "/sidedish", destination: "/volunteer-center/sidedish", permanent: true },
-    { source: "/culture", destination: "/volunteer-center/culture", permanent: true },
-    { source: "/servers", destination: "/volunteer-center", permanent: true },
-
-    // 통합
-    { source: "/intro", destination: "/greetings", permanent: true },
-    { source: "/timetable", destination: "/worship", permanent: true },
-
-    // 기존 그룹
-    { source: "/group/gongji/discussion/:id", destination: "/notice", permanent: true },
-    { source: "/group/jubo/discussion/:id", destination: "/weekly", permanent: true },
-  ];
-},
+  return new ImageResponse(
+    // ... 기존 JSX 그대로
+  );
+}
 ```
-
-### Step 6-2: 파일 삭제
-
-리다이렉트 설정 후 삭제:
-
-```
-src/app/(public)/intro/page.tsx
-src/app/(public)/timetable/page.tsx
-src/app/(public)/ministry/page.tsx
-src/app/(public)/ministry/[slug]/page.tsx
-src/app/(public)/volunteer/page.tsx
-```
-
-> /groups, /profile은 메뉴에서만 제거. 코드는 유지 (로그인 기능).
-
-### Step 6-3: QuickLinks 업데이트
-
-**수정 파일**: `src/components/home/QuickLinks.tsx`
-
-봉사센터 href: `/volunteer` → `/volunteer-center`
 
 ---
 
-## 구현 순서 체크리스트
+### Step 17. REVALIDATE_SECRET 교체 (수동)
 
-- [x] Phase 1: DB 마이그레이션 (tags 컬럼) + gallery lib + API
-- [x] Phase 2: nav-config + Header + tab-config
-- [x] Phase 3: /staff + /volunteer-center 페이지들
-- [x] Phase 4: 인사말 + 예배안내 + 교회학교 부서 + 교회학교 메인
-- [x] Phase 5: GalleryGrid 2단계 필터 + admin gallery 태그
-- [x] Phase 6: 리다이렉트 + 파일 삭제 + QuickLinks
-- [x] 검증: 빌드 성공 + 타입 체크 통과
+**.env.local** 에서 시크릿을 무작위 값으로 교체.
+
+```bash
+# 터미널에서 생성
+node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
+```
+
+```env
+# .env.local
+REVALIDATE_SECRET=<위에서 생성된 64자 랜덤 문자열>
+```
+
+GitHub Actions 등에서 이 값을 참조하는 곳도 함께 변경.
+
+---
+
+## 변경 파일 요약
+
+| # | 파일 | 작업 | Phase |
+|---|------|------|-------|
+| 1 | `package.json` | `zod` 의존성 추가 | 1 |
+| 2 | `next.config.ts` | `headers()` 보안 헤더 추가 | 1 |
+| 3 | `src/lib/validation.ts` | **신규** — 검증 상수·함수·Zod 스키마 | 1 |
+| 4 | `src/app/api/revalidate/route.ts` | 타이밍-세이프 비교 + Zod | 1 |
+| 5 | `src/app/admin/gallery/page.tsx` | 파일 업로드 검증 + 앨범 제목 검증 | 1 |
+| 6 | `src/app/admin/weeklies/page.tsx` | PDF 업로드 검증 + 주보 제목 검증 | 1 |
+| 7 | `src/app/api/sermon-summary/route.ts` | Zod 검증 + 에러 메시지 정리 | 2 |
+| 8 | `src/app/api/shorts/trigger/route.ts` | Zod 검증 + 에러 메시지 정리 | 2 |
+| 9 | `src/app/api/shorts/[id]/reject/route.ts` | Zod 검증 + 에러 메시지 정리 | 2 |
+| 10 | `src/app/api/shorts/[id]/approve/route.ts` | 에러 메시지 정리 | 2 |
+| 11 | `src/app/api/gallery/route.ts` | `parseLimit()` 적용 | 2 |
+| 12 | `src/app/api/shorts/route.ts` | `parseLimit()` + 비인증 필터링 | 2 |
+| 13 | `src/app/admin/notices/page.tsx` | 폼 검증 + maxLength | 2 |
+| 14 | `src/components/groups/DiscussionList.tsx` | 폼 검증 + maxLength | 2 |
+| 15 | `src/app/admin/shorts/page.tsx` | 반려 사유 길이 제한 | 2 |
+| 16 | `src/components/LogoutButton.tsx` | **신규** — 로그아웃 버튼 | 2 |
+| 17 | `src/app/(member)/profile/page.tsx` | LogoutButton 삽입 | 2 |
+| 18 | `src/app/api/og/route.tsx` | title 길이 제한 | 3 |
+| 19 | `.env.local` | REVALIDATE_SECRET 교체 | 3 |
+
+---
+
+## 모바일 호환성 메모
+
+- 모든 검증 로직이 **서버측 API + `src/lib/validation.ts`**에 집중되므로, 모바일 앱은 동일 API를 호출하면 동일한 보안 검증을 받는다.
+- Zod 스키마는 에러 메시지를 한국어로 설정했으므로, 모바일 앱에서도 `error.issues[0].message`를 그대로 사용자에게 표시 가능.
+- 파일 업로드 검증(`validateFile`, `safeExtension`)은 클라이언트 유틸이지만, Supabase Storage의 RLS 정책이 서버측 방어선 역할을 한다. 모바일에서도 동일한 Supabase Storage SDK를 사용하므로 동일 보호 적용.
+- 인증 체계(Supabase Auth JWT)는 웹과 모바일 모두 동일 토큰 사용. 미들웨어는 웹 전용이지만, API 라우트의 `requireAdmin()`은 모바일에서도 작동한다.

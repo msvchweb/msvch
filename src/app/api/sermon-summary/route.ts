@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { summarizeSermonFromVideo, GeminiUnavailableError } from "@/lib/gemini";
-import type { SermonVideo } from "@/types/youtube";
+import { SermonSummarySchema } from "@/lib/validation";
 
 export const maxDuration = 60;
 
@@ -39,17 +39,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
   }
 
-  const body = await request.json() as { sermon: SermonVideo; saveAsNotice: boolean };
+  const parsed = SermonSummarySchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "잘못된 요청 형식입니다." },
+      { status: 400 },
+    );
+  }
+  const { sermon, saveAsNotice } = parsed.data;
 
   try {
-    // Summarize with Gemini (directly from video or description)
-    const summary = await summarizeSermonFromVideo(body.sermon);
+    const summary = await summarizeSermonFromVideo({
+      videoId: sermon.videoId,
+      title: sermon.title,
+      description: sermon.description,
+      thumbnail: sermon.thumbnail,
+      publishedAt: sermon.publishedAt,
+    });
 
-    // Optionally save as notice
-    if (body.saveAsNotice) {
-      const slug = `sermon-${body.sermon.videoId}`;
-      const title = `[설교요약] ${body.sermon.title}`;
-      const date = body.sermon.publishedAt.split("T")[0];
+    if (saveAsNotice) {
+      const slug = `sermon-${sermon.videoId}`;
+      const title = `[설교요약] ${sermon.title}`;
+      const date = sermon.publishedAt.split("T")[0];
 
       const { data: existing } = await supabase
         .from("notices")
@@ -72,8 +83,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ summary });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "알 수 없는 오류";
+    console.error("Sermon summary error:", err);
     const status = err instanceof GeminiUnavailableError ? 503 : 500;
-    return NextResponse.json({ error: message }, { status });
+    return NextResponse.json(
+      { error: status === 503 ? "AI 서버가 일시적으로 혼잡합니다." : "요약 생성에 실패했습니다." },
+      { status },
+    );
   }
 }

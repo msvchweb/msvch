@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGalleryAlbums } from "@/lib/gallery";
+import { parseLimit } from "@/lib/validation";
 
 export const revalidate = 3600;
 
@@ -12,7 +13,7 @@ export async function GET(req: NextRequest) {
   const albums = await getGalleryAlbums({
     tags: tags.length > 0 ? tags : undefined,
     anyTags: anyTags.length > 0 ? anyTags : undefined,
-    limit: limitParam ? parseInt(limitParam, 10) : undefined,
+    limit: limitParam ? parseLimit(limitParam) : undefined,
   });
 
   return NextResponse.json(albums);

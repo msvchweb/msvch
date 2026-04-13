@@ -1,25 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
-
-interface TriggerBody {
-  videoId: string;
-  videoTitle: string;
-  videoPublishedAt?: string;
-  videoThumbnail?: string;
-}
+import { ShortsTriggerSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
     const { supabase } = await requireAdmin();
 
-    const body = (await request.json()) as TriggerBody;
-
-    if (!body.videoId || !body.videoTitle) {
+    const parsed = ShortsTriggerSchema.safeParse(await request.json());
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "videoId와 videoTitle은 필수입니다." },
+        { error: "videoId와 videoTitle은 필수이며, 각 필드의 길이 제한을 확인하세요." },
         { status: 400 },
       );
     }
+    const body = parsed.data;
 
     // 중복 체크
     const { data: existing } = await supabase
@@ -52,8 +46,9 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError || !job) {
+      console.error("Shorts job insert error:", insertError);
       return NextResponse.json(
-        { error: insertError?.message ?? "Job 생성 실패" },
+        { error: "Job 생성에 실패했습니다." },
         { status: 500 },
       );
     }
@@ -88,17 +83,18 @@ export async function POST(request: NextRequest) {
 
     if (!dispatchRes.ok) {
       const errText = await dispatchRes.text();
+      console.error("GitHub Actions dispatch failed:", errText);
       await supabase
         .from("shorts_jobs")
         .update({
           status: "failed",
-          error: `Actions 트리거 실패: ${errText.slice(0, 500)}`,
+          error: "GitHub Actions 트리거 실패",
           updated_at: new Date().toISOString(),
         })
         .eq("id", job.id);
 
       return NextResponse.json(
-        { error: `GitHub Actions 트리거 실패 (${dispatchRes.status})` },
+        { error: "쇼츠 생성 작업을 시작하지 못했습니다." },
         { status: 502 },
       );
     }

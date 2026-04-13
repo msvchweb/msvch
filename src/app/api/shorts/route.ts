@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { parseLimit } from "@/lib/validation";
 import type { ShortsJob, ShortsClip, ShortsJobWithClips } from "@/types/shorts";
 
 export const revalidate = 0;
@@ -8,9 +9,21 @@ export async function GET(req: NextRequest) {
   const supabase = await createClient();
   const { searchParams } = req.nextUrl;
 
+  // 인증 확인 — 비관리자는 published만 조회 가능
+  const { data: { user } } = await supabase.auth.getUser();
+  let isAdmin = false;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    isAdmin = profile?.role === "admin";
+  }
+
   const status = searchParams.get("status");
   const published = searchParams.get("published");
-  const limit = parseInt(searchParams.get("limit") ?? "20", 10);
+  const limit = parseLimit(searchParams.get("limit"), 20);
 
   let jobQuery = supabase
     .from("shorts_jobs")
@@ -18,8 +31,12 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (status) jobQuery = jobQuery.eq("status", status);
-  if (published === "true") jobQuery = jobQuery.eq("status", "published");
+  if (!isAdmin) {
+    jobQuery = jobQuery.eq("status", "published");
+  } else {
+    if (status) jobQuery = jobQuery.eq("status", status);
+    if (published === "true") jobQuery = jobQuery.eq("status", "published");
+  }
 
   const { data: jobs } = await jobQuery;
   if (!jobs || jobs.length === 0) return NextResponse.json([]);

@@ -11,6 +11,7 @@
 | AI | Google Gemini 2.5 Flash | - |
 | 아이콘 | Lucide React | 1.7+ |
 | 유틸 | clsx + tailwind-merge, date-fns | - |
+| 검증 | Zod (런타임 스키마 검증) | 4.x |
 | 이미지 처리 | sharp | 0.34+ |
 | 갤러리 | yet-another-react-lightbox | 3.30+ |
 | 언어 | TypeScript | 5.x |
@@ -87,6 +88,8 @@ src/
 │   ├── groups/
 │   │   └── DiscussionList.tsx
 │   │
+│   ├── LogoutButton.tsx         # 로그아웃 버튼 (클라이언트 컴포넌트)
+│   │
 │   └── ui/                      # 공용 UI
 │       ├── Card.tsx
 │       ├── Container.tsx
@@ -98,10 +101,11 @@ src/
 │   │   ├── client.ts            # 브라우저 Supabase 클라이언트
 │   │   └── server.ts            # 서버 Supabase 클라이언트
 │   ├── gallery.ts               # 갤러리 데이터
-│   ├── admin-auth.ts             # API admin 인증 헬퍼
+│   ├── admin-auth.ts            # API admin 인증 헬퍼
 │   ├── gemini.ts                # Gemini AI 호출 (폴백 체인)
 │   ├── notices.ts               # 공지/주보 데이터
 │   ├── utils.ts                 # cn(), formatDate()
+│   ├── validation.ts            # Zod 스키마 + 파일/입력 검증 유틸
 │   └── youtube.ts               # YouTube Data API v3
 │
 ├── types/
@@ -183,6 +187,31 @@ middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*)
 
 - 세션: 쿠키 기반 (Supabase SSR)
 - 역할: `profiles.role` (`member` | `admin`)
+- 로그아웃: `LogoutButton` 컴포넌트 (프로필 페이지에 배치)
+
+---
+
+## 보안
+
+### 입력 검증
+- 모든 API POST 요청: `src/lib/validation.ts`의 Zod 스키마로 런타임 검증
+- 파일 업로드: 확장자 화이트리스트 + 크기 제한 (`validateFile()`)
+  - 이미지: jpg/jpeg/png/gif/webp, 10MB
+  - PDF: pdf, 20MB
+  - 한 번에 최대 30파일
+- 쿼리 파라미터: `parseLimit()` (상한 100)
+- 폼 입력: 클라이언트 `maxLength` + Zod 검증
+
+### 보안 헤더 (`next.config.ts`)
+- CSP: self + 허용 외부 출처 (YouTube, Supabase, Gemini)
+- X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy
+
+### 에러 처리
+- API 에러 응답에서 내부 정보(스택, 외부 API 메시지) 제거
+- 상세 에러는 `console.error`로 서버 로그에만 기록
+
+### 시크릿 비교
+- `/api/revalidate`: `crypto.timingSafeEqual`로 타이밍 공격 방어
 
 ---
 

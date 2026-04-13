@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
+import { LogoutButton } from "@/components/LogoutButton";
 import type { Metadata } from "next";
 import type { Profile } from "@/types/supabase";
 
@@ -49,6 +50,9 @@ export default async function ProfilePage() {
                   : "-"}
               </p>
             </div>
+          </div>
+          <div className="mt-8">
+            <LogoutButton />
           </div>
         </div>
       </Container>

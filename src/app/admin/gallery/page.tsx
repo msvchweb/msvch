@@ -4,6 +4,14 @@ import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { Upload, Trash2, Plus, Eye, EyeOff } from "lucide-react";
+import {
+  validateFile,
+  safeExtension,
+  ALLOWED_IMAGE_EXTENSIONS,
+  MAX_IMAGE_SIZE,
+  MAX_UPLOAD_FILES,
+  GalleryAlbumSchema,
+} from "@/lib/validation";
 import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
 
 const CATEGORIES = ["예배", "교회학교", "교회행사", "봉사센터", "새가족"] as const;
@@ -65,14 +73,24 @@ export default function AdminGalleryPage() {
 
   async function createAlbum(e: React.FormEvent) {
     e.preventDefault();
+    const check = GalleryAlbumSchema.safeParse({
+      title,
+      category,
+      date: date || undefined,
+    });
+    if (!check.success) {
+      alert(check.error.issues[0].message);
+      return;
+    }
+
     const tags: string[] = [category];
     if (subCategory) tags.push(subCategory);
 
     const { error } = await supabase.from("gallery_albums").insert({
-      title,
-      category,
+      title: check.data.title,
+      category: check.data.category,
       tags,
-      date: date || null,
+      date: check.data.date || null,
       is_public: false,
     });
     if (!error) {
@@ -112,13 +130,26 @@ export default function AdminGalleryPage() {
   }
 
   async function uploadImages(albumId: string, files: FileList) {
+    if (files.length > MAX_UPLOAD_FILES) {
+      alert(`한 번에 최대 ${MAX_UPLOAD_FILES}장까지 업로드할 수 있습니다.`);
+      return;
+    }
+
+    for (let i = 0; i < files.length; i++) {
+      const check = validateFile(files[i], ALLOWED_IMAGE_EXTENSIONS, MAX_IMAGE_SIZE);
+      if (!check.ok) {
+        alert(`${files[i].name}: ${check.reason}`);
+        return;
+      }
+    }
+
     setUploading(true);
     const album = albums.find((a) => a.id === albumId);
     const existingCount = album?.images.length ?? 0;
 
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
-      const ext = file.name.split(".").pop();
+      const ext = safeExtension(file.name, ALLOWED_IMAGE_EXTENSIONS);
       const path = `${albumId}/${Date.now()}-${i}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
@@ -337,7 +368,7 @@ export default function AdminGalleryPage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept=".jpg,.jpeg,.png,.gif,.webp"
         multiple
         className="hidden"
         onChange={(e) => {

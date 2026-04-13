@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Eye, EyeOff, Trash2, Edit3, X } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { NoticeSchema } from "@/lib/validation";
 import type { Notice } from "@/types/notice";
 
 const CATEGORIES = ["일반", "긴급", "행사"] as const;
@@ -57,20 +58,38 @@ export default function AdminNoticesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const finalSlug = slug || generateSlug(title);
+    const check = NoticeSchema.safeParse({
+      title,
+      slug: slug || undefined,
+      category,
+      content,
+      date: date || undefined,
+    });
+    if (!check.success) {
+      alert(check.error.issues[0].message);
+      return;
+    }
+
+    const finalSlug = check.data.slug || generateSlug(title);
 
     if (editing) {
       await supabase
         .from("notices")
-        .update({ title, slug: finalSlug, category, content, date: date || null })
+        .update({
+          title: check.data.title,
+          slug: finalSlug,
+          category: check.data.category,
+          content: check.data.content,
+          date: check.data.date || null,
+        })
         .eq("id", editing.id);
     } else {
       await supabase.from("notices").insert({
-        title,
+        title: check.data.title,
         slug: finalSlug,
-        category,
-        content,
-        date: date || null,
+        category: check.data.category,
+        content: check.data.content,
+        date: check.data.date || null,
         is_public: false,
       });
     }
@@ -145,7 +164,7 @@ export default function AdminNoticesPage() {
             <label className="mb-1 block text-sm font-medium text-gray-700">내용</label>
             <textarea
               value={content} onChange={(e) => setContent(e.target.value)}
-              rows={8} required
+              rows={8} required maxLength={50000}
               className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm"
             />
           </div>
