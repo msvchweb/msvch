@@ -21,14 +21,14 @@ const centers: CenterItem[] = [
     title: "사랑의 반찬나눔",
     description: "홀몸 어르신과 이웃에게 정성스러운 반찬을 만들어 나눕니다",
     icon: UtensilsCrossed,
-    schedule: "매주 금요일",
+    schedule: "",
   },
   {
     slug: "beauty",
     title: "사랑의 이미용봉사",
     description: "지역 주민들과 어르신들을 대상으로 무료 미용봉사를 진행합니다",
     icon: Scissors,
-    schedule: "매월 셋째 주 토요일",
+    schedule: "매월 둘째 주 월요일",
   },
   {
     slug: "culture",
@@ -42,7 +42,7 @@ const centers: CenterItem[] = [
     title: "탁구교실",
     description: "교인과 지역 주민이 함께하는 건강한 운동과 교제",
     icon: TableProperties,
-    schedule: "매주 토요일 오후 2:00",
+    schedule: "",
   },
 ];
 
