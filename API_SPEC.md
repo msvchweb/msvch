@@ -222,6 +222,39 @@ GET /api/calendar?days=30           → 이번 달
 - **외부 API**: Google Calendar API v3 (공개 캘린더, API 키 인증)
 - **에러**: API 키 미설정 또는 Google API 오류 시 빈 배열 `[]` 반환
 
+### POST `/api/calendar`
+
+Google Calendar에 이벤트를 생성한다.
+
+- **인증**: admin 역할 필수 (`requireAdmin()`)
+- **외부 API**: Google Calendar API v3 (Service Account JWT 인증)
+- **요청 본문** (Zod 검증: `CalendarEventSchema`):
+
+```ts
+{
+  title: string;         // max 200
+  description?: string;  // max 5000
+  location?: string;     // max 200
+  startDate: string;     // YYYY-MM-DD
+  endDate: string;       // YYYY-MM-DD
+  startTime?: string;    // HH:mm (없으면 종일)
+  endTime?: string;      // HH:mm (없으면 종일)
+}
+```
+
+- **응답 (201)**: `CalendarEvent`
+- **에러**: `400`, `401`, `403`, `500`
+
+---
+
+### DELETE `/api/calendar/[id]`
+
+Google Calendar에서 이벤트를 삭제한다.
+
+- **인증**: admin 역할 필수 (`requireAdmin()`)
+- **응답 (200)**: `{ ok: true }`
+- **에러**: `401`, `403`, `500`
+
 ---
 
 ## 입력 검증
@@ -269,6 +302,9 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `callGeminiWithFallback(prompt)` | `src/lib/gemini.ts` | 범용 Gemini 호출 (폴백+재시도) |
 | `requireAdmin()` | `src/lib/admin-auth.ts` | API 라우트 admin 인증 헬퍼 |
 | `getUpcomingEvents(max, days)` | `src/lib/google-calendar.ts` | Google Calendar 다가오는 이벤트 |
+| `getAllEvents(max)` | `src/lib/google-calendar.ts` | 관리자용 이벤트 목록 (과거 30일 포함) |
+| `createCalendarEvent(input)` | `src/lib/google-calendar.ts` | 이벤트 생성 (Service Account) |
+| `deleteCalendarEvent(id)` | `src/lib/google-calendar.ts` | 이벤트 삭제 (Service Account) |
 | `validateFile(file, exts, maxSize)` | `src/lib/validation.ts` | 파일 업로드 검증 (타입 + 크기) |
 | `safeExtension(filename, allowed)` | `src/lib/validation.ts` | 안전한 확장자 추출 |
 | `parseLimit(raw, fallback)` | `src/lib/validation.ts` | limit 파라미터 파싱 (상한 100) |
@@ -291,5 +327,5 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | Google Gemini | AI 설교 요약 + 쇼츠 하이라이트 | `GEMINI_API_KEY` |
 | Next.js ISR | 캐시 무효화 | `REVALIDATE_SECRET` |
 | Google Maps Embed | 찾아오시는 길 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` |
-| Google Calendar API v3 | 교회 일정 조회 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY` |
+| Google Calendar API v3 | 교회 일정 조회/생성/삭제 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY` |
 | GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |

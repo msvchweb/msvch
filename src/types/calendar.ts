@@ -12,3 +12,14 @@ export interface CalendarEvent {
   /** Google Calendar에서 보기 링크 */
   htmlLink: string;
 }
+
+/** 이벤트 생성 요청 */
+export interface CalendarEventInput {
+  title: string;
+  description?: string;
+  location?: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  startTime?: string; // HH:mm (없으면 종일)
+  endTime?: string; // HH:mm (없으면 종일)
+}

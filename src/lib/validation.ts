@@ -137,3 +137,14 @@ export const WeeklySchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
   date: z.string().optional(),
 });
+
+/** 캘린더 이벤트 생성 */
+export const CalendarEventSchema = z.object({
+  title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
+  description: z.string().max(5000).optional(),
+  location: z.string().max(200).optional(),
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식: YYYY-MM-DD"),
+  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식: YYYY-MM-DD"),
+  startTime: z.string().regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm").optional(),
+  endTime: z.string().regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm").optional(),
+});

@@ -57,11 +57,12 @@ src/
 │   │   ├── gallery/
 │   │   ├── notices/
 │   │   ├── sermons/
+│   │   ├── calendar/             # 교회일정 관리 (Google Calendar 생성/삭제)
 │   │   ├── shorts/              # 쇼츠 관리 (생성/검수/승인)
 │   │   └── weeklies/
 │   │
 │   └── api/                     # API 라우트
-│       ├── calendar/            # 교회 일정 (Google Calendar, 모바일 호환)
+│       ├── calendar/            # 교회 일정 CRUD (Google Calendar, 모바일 호환)
 │       ├── gallery/             # 갤러리 목록 (태그 필터, 모바일 호환)
 │       ├── og/                  # OG 이미지 생성 (Edge)
 │       ├── revalidate/          # ISR 캐시 무효화
@@ -146,7 +147,7 @@ src/
 
 ### Admin 사이드바
 - `admin/layout.tsx` — 좌측 사이드바
-- 6개 메뉴: 대시보드, 공지사항, 주보, 갤러리, 설교 요약, 쇼츠
+- 7개 메뉴: 대시보드, 공지사항, 주보, 갤러리, 교회일정, 설교 요약, 쇼츠
 
 ---
 
@@ -260,5 +261,5 @@ middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*)
 - **플랫폼**: Vercel (GitHub 자동 배포)
 - **빌드**: `npm run build` → Next.js static + dynamic
 - **CI/CD**: GitHub Actions (쇼츠 생성 파이프라인)
-- **환경변수 (Vercel)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`
+- **환경변수 (Vercel)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`
 - **GitHub Secrets**: `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
