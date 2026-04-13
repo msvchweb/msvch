@@ -7,9 +7,14 @@ const API_KEY = process.env.GOOGLE_CALENDAR_API_KEY ?? "";
 // Service Account 환경변수 (이벤트 생성/삭제용)
 const SA_CLIENT_EMAIL =
   process.env.GOOGLE_SA_CLIENT_EMAIL ?? "";
-const SA_PRIVATE_KEY = (
-  process.env.GOOGLE_SA_PRIVATE_KEY ?? ""
-).replace(/\\n/g, "\n");
+const SA_PRIVATE_KEY_RAW = process.env.GOOGLE_SA_PRIVATE_KEY ?? "";
+// .env.local: 리터럴 백슬래시+n (charCode 92,110)
+// Vercel: 실제 줄바꿈 (charCode 10)이거나 동일한 리터럴일 수 있음
+// 리터럴 \n(2문자)을 실제 줄바꿈(1문자)으로 치환
+const LITERAL_BACKSLASH_N = String.fromCharCode(92, 110);
+const SA_PRIVATE_KEY = SA_PRIVATE_KEY_RAW.includes(LITERAL_BACKSLASH_N)
+  ? SA_PRIVATE_KEY_RAW.split(LITERAL_BACKSLASH_N).join("\n")
+  : SA_PRIVATE_KEY_RAW;
 
 // ──────────────────────────────────────────────
 //  Google Calendar API 원본 타입 (내부용)
