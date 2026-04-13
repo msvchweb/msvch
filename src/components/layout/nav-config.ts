@@ -16,6 +16,7 @@ export const navItems: NavItem[] = [
       { label: "인사말", href: "/greetings" },
       { label: "공지사항", href: "/notice", badgeKey: "notices" },
       { label: "예배안내", href: "/worship" },
+      { label: "교회일정", href: "/calendar" },
       { label: "섬기는 이들", href: "/staff" },
       { label: "찾아오시는 길", href: "/map" },
       { label: "주보", href: "/weekly", badgeKey: "weeklies" },

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   BookOpen,
+  Calendar,
   Church,
   MapPin,
   GraduationCap,
@@ -47,6 +48,7 @@ const menuSections: MenuSection[] = [
     title: "소식",
     items: [
       { label: "갤러리", href: "/gallery", icon: ImageIcon, description: "사진 모음", badgeKey: "gallery" },
+      { label: "교회일정", href: "/calendar", icon: Calendar, description: "다가오는 행사" },
     ],
   },
   {

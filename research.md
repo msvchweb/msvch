@@ -948,3 +948,636 @@ async function handleLogout() {
 | localStorage 사용 | 비민감 데이터, try-catch 처리 |
 | React 컴포넌트 렌더링 | dangerouslySetInnerHTML 전무, 자동 이스케이프 |
 | RLS 정책 | 관리자만 CUD, 일반 사용자는 조회만 |
+
+---
+---
+
+# Google Calendar 연동 분석 보고서
+
+> 작성일: 2026-04-13
+> 목적: 교회 웹사이트에 Google Calendar를 연동하여 일정 관리 기능을 구현하기 위한 조사
+> 범위: 웹 전용 (모바일 앱은 별도)
+
+---
+
+## 1. 현재 일정 관련 현황
+
+### 예배안내 페이지 (`src/app/(public)/worship/page.tsx`)
+
+현재 **모든 예배 시간이 하드코딩**되어 있다:
+
+```typescript
+const mainWorship: WorshipInfo[] = [
+  { name: "주일예배 1부", time: "오전 8:00", day: "매주 일요일", location: "본당", accent: "..." },
+  { name: "주일예배 2부", time: "오전 10:00", day: "매주 일요일", location: "본당", accent: "..." },
+  { name: "주일예배 3부", time: "오후 12:00", day: "매주 일요일", location: "본당", accent: "..." },
+  { name: "수요기도회",   time: "오후 7:30",  day: "매주 수요일", location: "본당", accent: "..." },
+  { name: "금요기도회",   time: "오후 8:00",  day: "매주 금요일", location: "본당", accent: "..." },
+  { name: "새벽기도",     time: "오전 5:30",  day: "월~토",      location: "본당", accent: "..." },
+];
+```
+
+- 교회학교 4개 (영유치부, 아동부, 청소년부, 청년부)
+- 특별 모임 3개 (셀예배, 토요전도, 비전문화학교)
+- **DB 연동 없음**, 날짜 로직 없음, 정적 텍스트만 렌더링
+
+### 홈페이지 예배 시간 카드 (`src/components/home/WorshipTimeCard.tsx`)
+
+- 4개 예배만 요약 표시 (주일예배, 수요기도, 금요기도, 새벽기도)
+- 역시 **하드코딩**된 배열
+- `/worship` 페이지로 링크
+
+### 공지사항 (`notices` 테이블)
+
+- `category` 필드: `'일반'`, `'긴급'`, `'행사'`
+- `'행사'` 카테고리가 이벤트 역할을 하지만, **시작/종료 시간 없음**, 날짜 1개만 존재
+- 현재 캘린더 기능과 연결되지 않음
+
+### 핵심 발견
+
+| 항목 | 현재 상태 |
+|------|----------|
+| 정기 예배 시간 | 하드코딩 (코드 수정해야 변경 가능) |
+| 교회 행사/이벤트 | notices 테이블 `category='행사'`로 관리, 시간 없음 |
+| 캘린더 뷰 | 없음 |
+| 일정 관리 도구 | 없음 (Supabase + 코드 직접 수정) |
+
+---
+
+## 2. Google Calendar 연동 방식 비교
+
+### 방식 A: Google Calendar API v3 (권장)
+
+공개 캘린더의 이벤트를 API로 읽어와서 커스텀 UI로 렌더링.
+
+**장점**:
+- 완전한 UI 커스터마이징 (교회 디자인 시스템과 통합)
+- 모바일 반응형 완벽 지원
+- 한국어 날짜 포맷 자유롭게 제어
+- SSR + ISR 캐싱으로 빠른 로딩
+- SEO 친화적 (이벤트 텍스트가 DOM에 존재)
+- 향후 모바일 앱에서 동일 API 엔드포인트 재사용
+
+**단점**:
+- API 키 필요 (무료)
+- 코드 작성 필요
+
+### 방식 B: iframe 임베드
+
+```html
+<iframe src="https://calendar.google.com/calendar/embed?src=CALENDAR_ID&ctz=Asia/Seoul&hl=ko&mode=AGENDA" />
+```
+
+**장점**: 코드 제로, 즉시 사용 가능
+
+**단점**:
+- CSS 커스터마이징 불가 (구글 기본 디자인)
+- 모바일 반응형 매우 열악
+- 교회 사이트 디자인과 이질적
+- SEO 불가 (iframe 내부는 검색엔진에 보이지 않음)
+- 이벤트 데이터 접근 불가 (필터링, 가공 불가)
+- 일부 광고 차단기에 의해 차단될 수 있음
+
+### 결론: **방식 A (API)** 채택
+
+교회 사이트의 따뜻한 디자인 시스템(church-gold, primary-600 등)에 맞는 커스텀 UI를 만들고, ISR 캐싱으로 빠르게 제공하며, 모바일 앱에서도 같은 API를 재사용한다.
+
+---
+
+## 3. Google Calendar API v3 상세
+
+### 인증 방식
+
+공개 캘린더 + API 키만으로 읽기 가능. **OAuth 불필요**.
+
+```
+GET https://www.googleapis.com/calendar/v3/calendars/{calendarId}/events?key={API_KEY}
+```
+
+### 주요 쿼리 파라미터
+
+| 파라미터 | 설명 | 예시 |
+|---------|------|------|
+| `key` | API 키 (필수) | `AIzaSy...` |
+| `timeMin` | 이벤트 검색 시작점 (RFC3339) | `2026-04-13T00:00:00+09:00` |
+| `timeMax` | 이벤트 검색 종료점 | `2026-05-13T23:59:59+09:00` |
+| `singleEvents` | `true`: 반복 이벤트를 개별 인스턴스로 전개 | `true` |
+| `orderBy` | `startTime` (singleEvents=true 필수) | `startTime` |
+| `maxResults` | 최대 결과 수 (기본 250) | `30` |
+| `timeZone` | 응답 시간대 | `Asia/Seoul` |
+| `q` | 자유 텍스트 검색 | `부활절` |
+
+### 응답 구조
+
+```json
+{
+  "items": [
+    {
+      "id": "abc123",
+      "summary": "부활절 특별예배",
+      "description": "부활절을 맞아 특별 예배를 드립니다.",
+      "location": "본당",
+      "start": {
+        "dateTime": "2026-04-19T11:00:00+09:00",
+        "timeZone": "Asia/Seoul"
+      },
+      "end": {
+        "dateTime": "2026-04-19T12:30:00+09:00",
+        "timeZone": "Asia/Seoul"
+      },
+      "htmlLink": "https://www.google.com/calendar/event?eid=..."
+    }
+  ]
+}
+```
+
+- **종일 이벤트**: `start.date` (`"2026-04-19"`) 사용, `start.dateTime` 없음
+- **시간 지정 이벤트**: `start.dateTime` (ISO 8601 + 오프셋) 사용
+
+### 쿼터 및 비용
+
+- **일일 쿼터**: 1,000,000 쿼리/일 (무료)
+- **속도 제한**: ~10 req/sec/사용자
+- 교회 사이트 규모에서는 ISR 캐싱 적용 시 하루 수백 쿼리 미만으로 충분
+- **비용: $0**
+
+### 사전 설정 필요 사항
+
+1. Google Cloud Console에서 프로젝트 생성 (또는 기존 프로젝트 사용)
+2. Google Calendar API 활성화
+3. API 키 생성 → Google Calendar API만 허용 + HTTP 리퍼러 제한 (msvch.vercel.app)
+4. 교회 Google 계정의 캘린더를 **공개**로 설정
+5. 캘린더 ID 확인 (캘린더 설정 → "캘린더 통합" → "캘린더 ID")
+
+---
+
+## 4. 기존 코드베이스 패턴 분석
+
+### 외부 API 호출 패턴 (`src/lib/youtube.ts` 참고)
+
+```typescript
+const API_KEY = process.env.YOUTUBE_API_KEY ?? "";
+const UPLOADS_PLAYLIST_ID = "UUcJc6fm6McCxvpizoe3T4YQ";
+
+export async function getSermonVideos(maxResults = 15): Promise<SermonVideo[]> {
+  if (!API_KEY) { console.error("YOUTUBE_API_KEY is not set"); return []; }
+  const url = `https://www.googleapis.com/youtube/v3/playlistItems?...`;
+  const res = await fetch(url, { next: { revalidate: 1800 } });
+  // ... 파싱 + 반환
+}
+```
+
+**동일 패턴 적용 포인트**:
+- `process.env`에서 키 읽기 + 빈 값 방어
+- `fetch`의 `next.revalidate` 옵션으로 ISR 캐싱
+- API 응답을 내부 타입(`SermonVideo`)으로 변환
+- 에러 시 빈 배열 반환 (throw 하지 않음)
+
+### API 라우트 패턴 (`src/app/api/sermons/route.ts`)
+
+```typescript
+export async function GET() {
+  const videos = await getSermonVideos(15);
+  return NextResponse.json(videos);
+}
+```
+
+- 라이브러리 함수 호출 → JSON 응답
+- 캐싱은 라이브러리 레벨에서 처리
+
+### 캐싱 전략 참고
+
+| 데이터 | ISR TTL | 위치 |
+|-------|---------|------|
+| YouTube 설교 | 1800s (30분) | fetch 옵션 |
+| 갤러리 앨범 | 3600s (1시간) | route export |
+| 새 콘텐츠 날짜 | 600s (10분) | route export |
+| **캘린더 이벤트 (제안)** | **600s (10분)** | fetch 옵션 또는 route export |
+
+### CSP 수정 필요
+
+현재 `next.config.ts`의 `connect-src`:
+```
+connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com
+```
+
+추가 필요:
+```
+https://www.googleapis.com
+```
+
+(YouTube API도 `www.googleapis.com`을 사용하는데, 현재 서버 사이드에서만 호출하므로 CSP에 없었다. 캘린더도 서버 사이드 호출이면 CSP 변경 불필요. 클라이언트에서 직접 호출한다면 추가 필요.)
+
+---
+
+## 5. 제안 아키텍처
+
+### 데이터 흐름
+
+```
+Google Calendar (공개)
+    │
+    │  API v3 (API 키)
+    ▼
+src/lib/google-calendar.ts ── getUpcomingEvents() ── CalendarEvent[]
+    │                                                     │
+    │  ISR 캐싱 (600s)                                     │
+    ▼                                                     ▼
+src/app/api/calendar/route.ts          src/app/(public)/calendar/page.tsx
+    │                                      (서버 컴포넌트, 직접 호출)
+    │  (모바일 앱용)                          │
+    ▼                                      ▼
+JSON 응답                              커스텀 UI 렌더링
+```
+
+### 신규 파일 목록
+
+```
+src/
+├── lib/
+│   └── google-calendar.ts         ← Google Calendar API 래퍼
+├── types/
+│   └── calendar.ts                ← CalendarEvent 타입
+├── app/
+│   ├── (public)/
+│   │   └── calendar/
+│   │       └── page.tsx           ← 캘린더 페이지 (메인 뷰)
+│   └── api/
+│       └── calendar/
+│           └── route.ts           ← API 엔드포인트 (모바일 앱용)
+└── components/
+    └── calendar/
+        ├── EventList.tsx          ← 이벤트 목록 컴포넌트
+        └── UpcomingEvents.tsx     ← 홈페이지/사이드바용 위젯
+```
+
+### 기존 파일 수정
+
+```
+next.config.ts                      ← CSP connect-src 추가 (클라이언트 호출 시)
+src/components/layout/nav-config.ts  ← "교회일정" 메뉴 항목 추가
+src/app/(public)/menu/MenuContent.tsx ← 더보기 메뉴에 "교회일정" 추가
+src/app/page.tsx                     ← 홈에 다가오는 일정 위젯 추가 (선택)
+```
+
+---
+
+## 6. 타입 설계
+
+### `src/types/calendar.ts`
+
+```typescript
+/** Google Calendar API 이벤트를 앱 내부 타입으로 변환한 결과 */
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start: string;        // ISO 8601 (시간 지정 이벤트) 또는 YYYY-MM-DD (종일 이벤트)
+  end: string;          // 동일
+  isAllDay: boolean;    // start.date 존재 여부로 결정
+  htmlLink: string;     // Google Calendar에서 보기 링크
+}
+```
+
+---
+
+## 7. API 래퍼 설계
+
+### `src/lib/google-calendar.ts`
+
+```typescript
+import type { CalendarEvent } from "@/types/calendar";
+
+const CALENDAR_ID = process.env.GOOGLE_CALENDAR_ID ?? "";
+const API_KEY = process.env.GOOGLE_CALENDAR_API_KEY ?? "";
+
+/** Google Calendar API 원본 응답 타입 (내부용) */
+interface GCalEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  location?: string;
+  start: { dateTime?: string; date?: string; timeZone?: string };
+  end: { dateTime?: string; date?: string; timeZone?: string };
+  htmlLink: string;
+}
+
+interface GCalResponse {
+  items: GCalEvent[];
+  summary: string;
+  timeZone: string;
+}
+
+function toCalendarEvent(e: GCalEvent): CalendarEvent {
+  const isAllDay = !e.start.dateTime;
+  return {
+    id: e.id,
+    title: e.summary,
+    description: e.description ?? null,
+    location: e.location ?? null,
+    start: e.start.dateTime ?? e.start.date ?? "",
+    end: e.end.dateTime ?? e.end.date ?? "",
+    isAllDay,
+    htmlLink: e.htmlLink,
+  };
+}
+
+/**
+ * 다가오는 이벤트를 가져온다.
+ * @param maxResults 최대 결과 수 (기본 20)
+ * @param daysAhead 오늘부터 며칠 후까지 (기본 60)
+ */
+export async function getUpcomingEvents(
+  maxResults = 20,
+  daysAhead = 60,
+): Promise<CalendarEvent[]> {
+  if (!CALENDAR_ID || !API_KEY) {
+    console.error("GOOGLE_CALENDAR_ID or GOOGLE_CALENDAR_API_KEY is not set");
+    return [];
+  }
+
+  const now = new Date();
+  const future = new Date(now.getTime() + daysAhead * 24 * 60 * 60 * 1000);
+
+  const url = new URL(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`
+  );
+  url.searchParams.set("key", API_KEY);
+  url.searchParams.set("timeMin", now.toISOString());
+  url.searchParams.set("timeMax", future.toISOString());
+  url.searchParams.set("singleEvents", "true");
+  url.searchParams.set("orderBy", "startTime");
+  url.searchParams.set("maxResults", String(maxResults));
+  url.searchParams.set("timeZone", "Asia/Seoul");
+
+  try {
+    const res = await fetch(url.toString(), {
+      next: { revalidate: 600 },
+    });
+    if (!res.ok) {
+      console.error("Google Calendar API error:", res.status);
+      return [];
+    }
+    const data: GCalResponse = await res.json();
+    return (data.items ?? []).map(toCalendarEvent);
+  } catch (err) {
+    console.error("Google Calendar fetch failed:", err);
+    return [];
+  }
+}
+```
+
+**패턴 일관성**: youtube.ts와 동일한 구조 (환경변수 → 빈 값 방어 → fetch + ISR → 타입 변환 → 에러 시 빈 배열)
+
+---
+
+## 8. 날짜/시간 포맷팅
+
+### 한국어 이벤트 시간 표시
+
+```typescript
+/** 이벤트 시간을 한국어로 포맷 */
+export function formatEventDateTime(start: string, isAllDay: boolean): string {
+  if (isAllDay) {
+    // "2026-04-19" → "4월 19일"
+    const [, m, d] = start.split("-").map(Number);
+    return `${m}월 ${d}일`;
+  }
+  // "2026-04-19T11:00:00+09:00" → "4월 19일 (일) 오전 11:00"
+  const dt = new Date(start);
+  return dt.toLocaleDateString("ko-KR", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Seoul",
+  });
+}
+
+/** 이벤트 날짜 범위 ("4월 19일 오전 11:00 ~ 오후 12:30") */
+export function formatEventRange(
+  start: string,
+  end: string,
+  isAllDay: boolean,
+): string {
+  if (isAllDay) {
+    if (start === end) return formatEventDateTime(start, true);
+    return `${formatEventDateTime(start, true)} ~ ${formatEventDateTime(end, true)}`;
+  }
+  const s = new Date(start);
+  const e = new Date(end);
+  const dateStr = s.toLocaleDateString("ko-KR", {
+    month: "long",
+    day: "numeric",
+    weekday: "short",
+    timeZone: "Asia/Seoul",
+  });
+  const startTime = s.toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Seoul",
+  });
+  const endTime = e.toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Seoul",
+  });
+  return `${dateStr} ${startTime} ~ ${endTime}`;
+}
+```
+
+---
+
+## 9. 페이지/컴포넌트 설계
+
+### 캘린더 페이지 (`/calendar`)
+
+```
+┌──────────────────────────────────────────────────┐
+│ 교회 일정                                         │
+│ 명성비전교회 주요 일정을 확인하세요                   │
+├──────────────────────────────────────────────────┤
+│                                                  │
+│  ┌─ 4월 19일 (일) ──────────────────────────────┐ │
+│  │ 🟡 부활절 특별예배                             │ │
+│  │    오전 11:00 ~ 오후 12:30                    │ │
+│  │    📍 본당                                    │ │
+│  │    부활절을 맞아 특별 예배를 드립니다...         │ │
+│  │                          [Google Calendar →]  │ │
+│  └──────────────────────────────────────────────┘ │
+│                                                  │
+│  ┌─ 4월 26일 (일) ──────────────────────────────┐ │
+│  │    교회학교 학부모 간담회                       │ │
+│  │    오후 1:00 ~ 오후 2:00                      │ │
+│  │    📍 교육관 3층                               │ │
+│  └──────────────────────────────────────────────┘ │
+│                                                  │
+│  ... (향후 60일 이내 이벤트)                       │
+│                                                  │
+│  일정이 없습니다. (이벤트 0개일 때)                  │
+│                                                  │
+└──────────────────────────────────────────────────┘
+```
+
+- ISR 서버 컴포넌트 (`revalidate = 600`)
+- `getUpcomingEvents()`로 다가오는 이벤트 목록 렌더링
+- 각 이벤트 카드에 Google Calendar 링크 포함
+- 이벤트 0개: "예정된 일정이 없습니다" 안내
+
+### 홈페이지 위젯 (선택)
+
+```
+┌─ 다가오는 일정 ──────────────────────┐
+│ 🟡 부활절 특별예배    4/19 오전 11:00 │
+│    교회학교 간담회     4/26 오후 1:00  │
+│    ...                               │
+│              [전체 일정 보기 →]        │
+└──────────────────────────────────────┘
+```
+
+- 홈페이지(`page.tsx`)에 최대 3개 이벤트만 표시
+- "전체 일정 보기" → `/calendar` 링크
+
+---
+
+## 10. 네비게이션 변경
+
+### nav-config.ts
+
+"교회소개" 하위에 "교회일정" 추가:
+```typescript
+{
+  label: "교회소개",
+  href: "/greetings",
+  children: [
+    { label: "공지사항", href: "/notice", badgeKey: "notices" as const },
+    { label: "예배안내", href: "/worship" },
+    { label: "교회일정", href: "/calendar" },      // ← 신규
+    { label: "찾아오시는 길", href: "/map" },
+    // ...
+  ],
+}
+```
+
+### 더보기 메뉴 (`MenuContent.tsx`)
+
+"소식" 섹션에 "교회일정" 추가.
+
+---
+
+## 11. 환경변수
+
+```env
+# .env.local
+GOOGLE_CALENDAR_ID=교회계정@gmail.com        # 또는 ...@group.calendar.google.com
+GOOGLE_CALENDAR_API_KEY=AIzaSy...            # Google Cloud Console에서 생성
+```
+
+Vercel 환경변수 + GitHub Actions secrets에도 동일 추가.
+
+**기존 Google 관련 키와의 관계**:
+- `YOUTUBE_API_KEY` — YouTube Data API v3 전용
+- `NEXT_PUBLIC_GOOGLE_MAPS_KEY` — Maps Embed API 전용 (public)
+- `GOOGLE_CALENDAR_API_KEY` — Calendar API v3 전용 (server-only)
+
+같은 Google Cloud 프로젝트의 API 키를 공유할 수도 있지만, **API별로 분리된 키**를 권장한다 (키 제한 설정이 각기 다르므로).
+
+---
+
+## 12. API 엔드포인트 설계 (모바일 앱 호환)
+
+### GET `/api/calendar`
+
+모바일 앱에서 동일 데이터를 사용할 수 있도록 API 라우트 제공.
+
+```typescript
+// src/app/api/calendar/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { getUpcomingEvents } from "@/lib/google-calendar";
+import { parseLimit } from "@/lib/validation";
+
+export const revalidate = 600;
+
+export async function GET(req: NextRequest) {
+  const { searchParams } = req.nextUrl;
+  const limit = parseLimit(searchParams.get("limit"), 20);
+  const daysAhead = Math.min(
+    parseInt(searchParams.get("days") ?? "60", 10) || 60,
+    365,
+  );
+
+  const events = await getUpcomingEvents(limit, daysAhead);
+  return NextResponse.json(events);
+}
+```
+
+**사용 예시**:
+```
+GET /api/calendar                          → 향후 60일, 최대 20개
+GET /api/calendar?limit=5&days=7           → 이번 주, 최대 5개
+GET /api/calendar?days=30                  → 이번 달
+```
+
+---
+
+## 13. 비용
+
+| 항목 | 비용 |
+|------|------|
+| Google Calendar API | $0 (1M 쿼리/일 무료) |
+| Google Cloud 프로젝트 | $0 |
+| API 키 | $0 |
+| 추가 npm 의존성 | 없음 (raw fetch 사용) |
+| **합계** | **$0** |
+
+---
+
+## 14. 구현 순서 (제안)
+
+```
+Step 1:  Google Cloud Console 설정 (API 활성화, 키 생성)
+Step 2:  교회 Google 캘린더 공개 설정 + 캘린더 ID 확인
+Step 3:  환경변수 추가 (.env.local, Vercel)
+Step 4:  src/types/calendar.ts 타입 정의
+Step 5:  src/lib/google-calendar.ts API 래퍼
+Step 6:  src/app/api/calendar/route.ts API 엔드포인트
+Step 7:  src/app/(public)/calendar/page.tsx 캘린더 페이지
+Step 8:  src/components/calendar/EventList.tsx 이벤트 목록
+Step 9:  nav-config.ts + MenuContent.tsx 메뉴 추가
+Step 10: (선택) 홈페이지에 다가오는 일정 위젯 추가
+Step 11: CSP 업데이트 (필요 시)
+Step 12: Vercel 배포 + 실제 캘린더 데이터로 테스트
+```
+
+**Step 1, 2, 3은 수동 작업** (Google Cloud Console + 교회 계정 설정).
+Step 4~11은 코드 구현.
+
+---
+
+## 15. 위험 & 대응
+
+| 위험 | 대응 |
+|------|------|
+| 캘린더 비공개 설정 | 공개 캘린더 필수 — 설정 미스 시 API가 403 반환 → 빈 목록 표시 |
+| API 키 누출 | 서버 사이드에서만 호출, `NEXT_PUBLIC_` 접두사 사용하지 않음 |
+| Google API 장애 | 에러 시 빈 배열 반환 + ISR 캐싱으로 10분간 이전 데이터 유지 |
+| 이벤트 없는 기간 | "예정된 일정이 없습니다" 안내 문구 표시 |
+| 반복 이벤트 폭발 | `singleEvents=true` + `maxResults=30` + `timeMax=60일`로 제한 |
+| 시간대 혼동 | 모든 API 호출에 `timeZone=Asia/Seoul` 명시 |
+
+---
+
+## 16. 기존 코드 재사용 매핑
+
+| 기존 자산 | 위치 | 캘린더 용도 |
+|-----------|------|-----------|
+| `parseLimit()` | lib/validation.ts | API 라우트 limit 파라미터 |
+| `formatDate()` | lib/utils.ts | 종일 이벤트 날짜 표시 (참고) |
+| `formatDateKorean()` | lib/utils.ts | 한국어 날짜 표시 (참고) |
+| youtube.ts fetch 패턴 | lib/youtube.ts | API 래퍼 구조 그대로 복제 |
+| `Container`, `PageHeader` | components/ui/ | 캘린더 페이지 레이아웃 |
+| `Card` | components/ui/Card.tsx | 이벤트 카드 래퍼 |
+| ISR 패턴 | api/sermons/route.ts | API 라우트 캐싱 |
+| 디자인 토큰 | globals.css | church-gold(이벤트 강조), primary-600(링크) |

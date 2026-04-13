@@ -189,6 +189,41 @@ GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인�
 
 ---
 
+### GET `/api/calendar`
+
+교회 Google Calendar에서 다가오는 이벤트를 조회한다.
+
+- **인증**: 불필요
+- **캐시**: ISR 10분 (`revalidate: 600`)
+- **쿼리 파라미터**:
+  - `limit` — 최대 결과 수 (기본 20, 상한 100, `parseLimit()`)
+  - `days` — 오늘부터 며칠 후까지 (기본 60, 상한 365)
+- **응답**: `CalendarEvent[]`
+
+```ts
+interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start: string;     // ISO 8601 또는 YYYY-MM-DD (종일)
+  end: string;
+  isAllDay: boolean;
+  htmlLink: string;
+}
+```
+
+```
+GET /api/calendar                   → 향후 60일, 최대 20개
+GET /api/calendar?limit=5&days=7    → 이번 주, 최대 5개
+GET /api/calendar?days=30           → 이번 달
+```
+
+- **외부 API**: Google Calendar API v3 (공개 캘린더, API 키 인증)
+- **에러**: API 키 미설정 또는 Google API 오류 시 빈 배열 `[]` 반환
+
+---
+
 ## 입력 검증
 
 모든 API 라우트의 입력 검증은 `src/lib/validation.ts`에 정의된 Zod 스키마로 수행.
@@ -202,6 +237,7 @@ GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인�
 | POST `/api/shorts/[id]/reject` | `ShortsRejectSchema` | note 500자 |
 | GET `/api/gallery` | `parseLimit()` | limit 상한 100 |
 | GET `/api/shorts` | `parseLimit()` | limit 상한 100 |
+| GET `/api/calendar` | `parseLimit()` | limit 상한 100, days 상한 365 |
 
 ---
 
@@ -232,6 +268,7 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `summarizeSermonFromVideo(sermon)` | `src/lib/gemini.ts` | Gemini 설교 요약 |
 | `callGeminiWithFallback(prompt)` | `src/lib/gemini.ts` | 범용 Gemini 호출 (폴백+재시도) |
 | `requireAdmin()` | `src/lib/admin-auth.ts` | API 라우트 admin 인증 헬퍼 |
+| `getUpcomingEvents(max, days)` | `src/lib/google-calendar.ts` | Google Calendar 다가오는 이벤트 |
 | `validateFile(file, exts, maxSize)` | `src/lib/validation.ts` | 파일 업로드 검증 (타입 + 크기) |
 | `safeExtension(filename, allowed)` | `src/lib/validation.ts` | 안전한 확장자 추출 |
 | `parseLimit(raw, fallback)` | `src/lib/validation.ts` | limit 파라미터 파싱 (상한 100) |
@@ -254,4 +291,5 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | Google Gemini | AI 설교 요약 + 쇼츠 하이라이트 | `GEMINI_API_KEY` |
 | Next.js ISR | 캐시 무효화 | `REVALIDATE_SECRET` |
 | Google Maps Embed | 찾아오시는 길 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` |
+| Google Calendar API v3 | 교회 일정 조회 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY` |
 | GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |

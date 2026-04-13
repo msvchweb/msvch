@@ -32,6 +32,7 @@ src/
 │   │
 │   ├── (public)/                # 공개 페이지 (인증 불필요)
 │   │   ├── churchschool/        # 교회학교 (영유치부/아동부/청소년부/청년부)
+│   │   ├── calendar/            # 교회 일정 (Google Calendar 연동)
 │   │   ├── gallery/             # 비전갤러리 (2단계 카테고리 필터)
 │   │   ├── greetings/           # 인사말
 │   │   ├── map/                 # 찾아오시는 길
@@ -60,6 +61,7 @@ src/
 │   │   └── weeklies/
 │   │
 │   └── api/                     # API 라우트
+│       ├── calendar/            # 교회 일정 (Google Calendar, 모바일 호환)
 │       ├── gallery/             # 갤러리 목록 (태그 필터, 모바일 호환)
 │       ├── og/                  # OG 이미지 생성 (Edge)
 │       ├── revalidate/          # ISR 캐시 무효화
@@ -79,6 +81,7 @@ src/
 │   │   ├── HeroSection.tsx
 │   │   ├── QuickLinks.tsx
 │   │   ├── WorshipTimeCard.tsx
+│   │   ├── UpcomingEvents.tsx     # 다가오는 일정 위젯
 │   │   ├── RecentNotice.tsx
 │   │   └── LatestSermon.tsx
 │   │
@@ -103,12 +106,14 @@ src/
 │   ├── gallery.ts               # 갤러리 데이터
 │   ├── admin-auth.ts            # API admin 인증 헬퍼
 │   ├── gemini.ts                # Gemini AI 호출 (폴백 체인)
+│   ├── google-calendar.ts       # Google Calendar API v3
 │   ├── notices.ts               # 공지/주보 데이터
 │   ├── utils.ts                 # cn(), formatDate()
 │   ├── validation.ts            # Zod 스키마 + 파일/입력 검증 유틸
 │   └── youtube.ts               # YouTube Data API v3
 │
 ├── types/
+│   ├── calendar.ts              # CalendarEvent
 │   ├── gallery.ts
 │   ├── notice.ts
 │   ├── shorts.ts                # ShortsJob, ShortsClip, ShortsSettings
@@ -148,6 +153,7 @@ src/
 ## 데이터 흐름
 
 ```
+Google Calendar API ──→ google-calendar.ts ──→ CalendarEvent[]
 YouTube RSS ──→ youtube.ts ──→ SermonVideo[]
                                     │
 Gemini API ←── gemini.ts ←──────────┘ (설교 요약)
@@ -254,5 +260,5 @@ middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*)
 - **플랫폼**: Vercel (GitHub 자동 배포)
 - **빌드**: `npm run build` → Next.js static + dynamic
 - **CI/CD**: GitHub Actions (쇼츠 생성 파이프라인)
-- **환경변수 (Vercel)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`
+- **환경변수 (Vercel)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`
 - **GitHub Secrets**: `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
