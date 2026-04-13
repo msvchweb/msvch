@@ -246,12 +246,23 @@ export default async function CalendarPage() {
   const nextMonth = currentMonth === 11 ? 0 : currentMonth + 1;
   const nextYear = currentMonth === 11 ? currentYear + 1 : currentYear;
 
+  // 달력에 표시되는 2개월 범위: 이번 달 1일 ~ 다음 달 마지막 일
+  const rangeStart = `${currentYear}-${String(currentMonth + 1).padStart(2, "0")}-01`;
+  const lastDayOfNextMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+  const rangeEnd = `${nextYear}-${String(nextMonth + 1).padStart(2, "0")}-${String(lastDayOfNextMonth).padStart(2, "0")}`;
+
+  // 2개월 범위 내의 이벤트만 필터
+  const rangeEvents = events.filter((e) => {
+    const key = eventDateKey(e);
+    return key >= rangeStart && key <= rangeEnd;
+  });
+
   // 이벤트가 있는 날짜 Set
-  const eventDates = new Set(events.map(eventDateKey));
+  const eventDates = new Set(rangeEvents.map(eventDateKey));
 
   // 이벤트 날짜별 그룹핑
   const grouped = new Map<string, CalendarEvent[]>();
-  for (const event of events) {
+  for (const event of rangeEvents) {
     const key = eventDateKey(event);
     const list = grouped.get(key) ?? [];
     list.push(event);
