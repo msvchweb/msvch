@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Footer } from "@/components/layout/Footer";
 import { NavigationShell } from "@/components/layout/NavigationShell";
+import { ChatBot } from "@/components/chat/ChatBot";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -36,6 +37,7 @@ export default function RootLayout({
         <NavigationShell />
         <main className="flex-1 pb-14 lg:pb-0">{children}</main>
         <Footer />
+        <ChatBot />
       </body>
     </html>
   );
