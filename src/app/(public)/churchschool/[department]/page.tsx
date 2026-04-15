@@ -20,6 +20,7 @@ interface DepartmentInfo {
   location: string;
   motto: string;
   verse: string;
+  vision?: string;
   goals: string[];
   organization: OrgMember[];
   prayers: string[];
@@ -58,22 +59,24 @@ const departments: Record<string, DepartmentInfo> = {
   },
   elementary: {
     title: "아동부",
-    description: "말씀으로 자라나는 어린이 제자",
+    description: "복음의 씨앗을 심고, 열매맺는 어린이",
     target: "초등학교 1학년~6학년",
     time: "주일 낮 10시",
     location: "교육관 2층",
-    motto: "복음의 열매와 사랑이 넘치는 아동부",
-    verse: "내 계명은 곧 내가 너희를 사랑한 것 같이 너희도 서로 사랑하라 하는 이것이니라 (요한복음 15:12)",
+    motto: "복음의 씨앗을 심고, 열매맺는 어린이",
+    verse: "그러므로 믿음은 들음에서 나며 들음은 그리스도의 말씀으로 말미암았느니라. (로마서 10:17)",
+    vision: "아동부는 예수 그리스도의 복음을 분명히 알고, 말씀과 기도로 자라나, 가정과 학교, 교회에서 복음의 열매를 맺는 어린이를 세우는 것을 비전으로 한다.",
     goals: [
-      "아이들이 믿음 안에서 자라나서 다른 친구들에게도 하나님을 전하기.",
-      "말씀에 순종하며 하나님 사랑과 이웃사랑에 힘쓰기.",
-      "서로가 믿음의 동역자가 되어 기도하고 아껴주기.",
+      "믿음의 열매 — 복음을 아는 어린이",
+      "삶의 열매 — 복음을 사는 어린이",
+      "나눔의 열매 — 복음을 전하는 어린이",
     ],
     organization: [
       { role: "지도교역자", name: "임한나 전도사" },
       { role: "부장", name: "정세비 권사" },
-      { role: "총무·서기", name: "이지석" },
-      { role: "교사", name: "이영미, 강지수, 배상훈, 임예나, 최지안, 심현우, 전희수" },
+      { role: "총무", name: "이지석 청년" },
+      { role: "회계", name: "이영미 집사" },
+      { role: "교사", name: "강지수, 배상훈, 임예나, 최지안, 심현우, 전희수" },
     ],
     prayers: [
       "아이들이 가진 달란트를 잘 발견하여 하나님께 쓰임 받을 수 있는 제자 되기.",
@@ -244,6 +247,14 @@ export default async function DepartmentPage({
               {dept.verse}
             </blockquote>
           </div>
+
+          {/* 교육 비전 */}
+          {dept.vision && (
+            <div className="rounded-xl border border-gray-200 bg-white p-6">
+              <h3 className="font-bold text-gray-900">교육 비전</h3>
+              <p className="mt-2 text-sm leading-relaxed text-gray-700">{dept.vision}</p>
+            </div>
+          )}
 
           {/* 교육목표 */}
           <div className="rounded-xl border border-gray-200 bg-white p-6">
