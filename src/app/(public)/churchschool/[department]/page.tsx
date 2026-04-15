@@ -79,9 +79,9 @@ const departments: Record<string, DepartmentInfo> = {
       { role: "교사", name: "강지수, 배상훈, 임예나, 최지안, 심현우, 전희수" },
     ],
     prayers: [
-      "아이들이 가진 달란트를 잘 발견하여 하나님께 쓰임 받을 수 있는 제자 되기.",
-      "아이들이 가는 곳마다 기쁨이 넘쳐나고 복의 근원이 되는 친구들이 되기를.",
-      "아이들을 통하여 가정과 학교와 삶이 변화되길.",
+      "아이들이 예수 그리스도의 복음을 분명히 알고, 말씀을 통해 믿음이 자라나도록 기도합니다.",
+      "말씀과 기도로 성장하여, 삶의 자리에서 복음을 살아내는 어린이가 되도록 기도합니다.",
+      "받은 은혜를 나누며, 친구들과 이웃에게 예수님을 전하는 어린이가 되도록 기도합니다.",
     ],
     galleryTag: "아동부",
     instagram: { url: "https://www.instagram.com/msvch_children?igsh=MXJmbDdzeTkzdWw3eQ==", handle: "@msvch_children" },

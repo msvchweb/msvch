@@ -40,6 +40,22 @@ interface RssItem {
   logNo: string;
 }
 
+/** <![CDATA[...]]> 제거 */
+function stripCdata(text: string): string {
+  return text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1").trim();
+}
+
+/** 네이버 RSS 날짜 파싱 — RFC 822 / 비표준 형식 모두 처리 */
+function parseDate(raw: string): Date {
+  const cleaned = stripCdata(raw).trim();
+  const d = new Date(cleaned);
+  if (!isNaN(d.getTime())) return d;
+  // "2026.04.15" 형식 처리
+  const dotMatch = cleaned.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+  if (dotMatch) return new Date(`${dotMatch[1]}-${dotMatch[2]}-${dotMatch[3]}`);
+  return new Date(); // 파싱 실패 시 현재 시각 폴백
+}
+
 function extractLogNo(url: string): string | null {
   const match = url.match(/\/(\d+)(?:\?|$)/);
   return match ? match[1] : null;
@@ -55,19 +71,20 @@ async function fetchRss(): Promise<RssItem[]> {
 
   return items
     .map((item) => {
-      const rawLink =
+      const rawLink = stripCdata(
         item.querySelector("link")?.text?.trim() ??
         item.querySelector("guid")?.text?.trim() ??
-        "";
+        ""
+      );
       const link = rawLink.startsWith("http")
         ? rawLink
         : (item.rawText.match(/https?:\/\/blog\.naver\.com\/[^\s<]+/)?.[0] ?? "");
 
       return {
-        title: item.querySelector("title")?.text?.trim() ?? "",
+        title: stripCdata(item.querySelector("title")?.text?.trim() ?? ""),
         link,
-        pubDate: item.querySelector("pubDate")?.text?.trim() ?? "",
-        category: item.querySelector("category")?.text?.trim() ?? "",
+        pubDate: stripCdata(item.querySelector("pubDate")?.text?.trim() ?? ""),
+        category: stripCdata(item.querySelector("category")?.text?.trim() ?? ""),
         logNo: extractLogNo(link) ?? "",
       };
     })
@@ -108,7 +125,7 @@ async function fetchPostContent(logNo: string): Promise<string> {
 
 async function syncNotice(item: RssItem, content: string) {
   const slug = `naver-${item.logNo}`;
-  const date = new Date(item.pubDate).toISOString().split("T")[0];
+  const date = parseDate(item.pubDate).toISOString().split("T")[0];
 
   const { data: existing } = await supabase
     .from("notices")
@@ -152,7 +169,7 @@ async function syncSchoolPost(item: RssItem, content: string) {
     slug,
     content,
     naver_url: item.link,
-    published_at: new Date(item.pubDate).toISOString(),
+    published_at: parseDate(item.pubDate).toISOString(),
   });
   if (error) throw new Error(`churchschool_posts 삽입 실패: ${error.message}`);
   console.log(`  [교회학교] 추가됨: ${item.title}`);
