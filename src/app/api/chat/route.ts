@@ -69,14 +69,16 @@ async function fetchRecentNotices(): Promise<string> {
       .select("title, content, date, category")
       .eq("is_public", true)
       .order("date", { ascending: false })
-      .limit(5);
+      .limit(10);
 
     if (!data || data.length === 0) return "";
 
-    const lines = data.map(
-      (n) => `- [${n.date}] (${n.category}) ${n.title}: ${(n.content as string)?.slice(0, 100) ?? ""}${(n.content as string)?.length > 100 ? "..." : ""}`
-    );
-    return "\n[최근 공지사항]\n" + lines.join("\n");
+    const lines = data.map((n) => {
+      const body = (n.content as string) ?? "";
+      const preview = body.length > 1000 ? body.slice(0, 1000) + "..." : body;
+      return `- [${n.date}] ${n.title}\n  ${preview}`;
+    });
+    return "\n[최근 공지사항]\n" + lines.join("\n\n");
   } catch {
     return "";
   }
