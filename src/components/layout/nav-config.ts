@@ -40,6 +40,7 @@ export const navItems: NavItem[] = [
       { label: "아동부", href: "/churchschool/elementary" },
       { label: "청소년부", href: "/churchschool/teen" },
       { label: "청년부", href: "/churchschool/youth" },
+      { label: "교회학교 소식", href: "/churchschool/news" },
     ],
   },
   {

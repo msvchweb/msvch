@@ -25,12 +25,7 @@ const HEADERS = {
   Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
   "Accept-Language": "ko-KR,ko;q=0.9",
 };
-
-// 이미지 다운로드 시 Naver Referer 필요
-const IMAGE_HEADERS = {
-  ...HEADERS,
-  Referer: "https://blog.naver.com/",
-};
+const IMAGE_HEADERS = { ...HEADERS, Referer: "https://blog.naver.com/" };
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -40,6 +35,8 @@ if (!supabaseUrl || !serviceKey) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const supabase = createClient(supabaseUrl, serviceKey) as any;
 
+// ── 타입 ──────────────────────────────────────────────────
+
 interface RssItem {
   title: string;
   link: string;
@@ -48,9 +45,12 @@ interface RssItem {
   logNo: string;
 }
 
+type ContentBlock =
+  | { type: "text"; content: string }
+  | { type: "image"; src: string };
+
 interface ParsedPost {
-  text: string;
-  imageUrls: string[];
+  blocks: ContentBlock[];
 }
 
 // ── 유틸 ──────────────────────────────────────────────────
@@ -63,23 +63,23 @@ function parseDate(raw: string): Date {
   const cleaned = stripCdata(raw).trim();
   const d = new Date(cleaned);
   if (!isNaN(d.getTime())) return d;
-  const dotMatch = cleaned.match(/(\d{4})\.(\d{2})\.(\d{2})/);
-  if (dotMatch) return new Date(`${dotMatch[1]}-${dotMatch[2]}-${dotMatch[3]}`);
+  const m = cleaned.match(/(\d{4})\.(\d{2})\.(\d{2})/);
+  if (m) return new Date(`${m[1]}-${m[2]}-${m[3]}`);
   return new Date();
 }
 
 function extractLogNo(url: string): string | null {
-  const match = url.match(/\/(\d+)(?:\?|$)/);
-  return match ? match[1] : null;
+  return url.match(/\/(\d+)(?:\?|$)/)?.[1] ?? null;
+}
+
+function isNaverImageUrl(src: string): boolean {
+  return /pstatic\.net|blogfiles\.naver\.net/i.test(src);
 }
 
 function mimeToExt(mime: string): string {
   const map: Record<string, string> = {
-    "image/jpeg": "jpg",
-    "image/jpg": "jpg",
-    "image/png": "png",
-    "image/webp": "webp",
-    "image/gif": "gif",
+    "image/jpeg": "jpg", "image/jpg": "jpg",
+    "image/png": "png", "image/webp": "webp", "image/gif": "gif",
   };
   return map[mime.split(";")[0].trim()] ?? "jpg";
 }
@@ -89,8 +89,7 @@ function mimeToExt(mime: string): string {
 async function fetchRss(): Promise<RssItem[]> {
   const res = await fetch(RSS_URL, { headers: HEADERS });
   if (!res.ok) throw new Error(`RSS 요청 실패: ${res.status}`);
-  const xml = await res.text();
-  const root = parseHtml(xml);
+  const root = parseHtml(await res.text());
 
   return root
     .querySelectorAll("item")
@@ -114,124 +113,118 @@ async function fetchRss(): Promise<RssItem[]> {
     .filter((i) => i.logNo);
 }
 
-// ── 포스트 본문 + 이미지 URL 파싱 ────────────────────────
-
-function isNaverImageUrl(src: string): boolean {
-  return /pstatic\.net|blogfiles\.naver\.net/i.test(src);
-}
+// ── 포스트 파싱 (텍스트 + 이미지 순서 유지) ──────────────
 
 async function fetchPost(logNo: string): Promise<ParsedPost> {
   const url = `https://blog.naver.com/PostView.naver?blogId=${BLOG_ID}&logNo=${logNo}&redirect=Dlog&widgetTypeCall=true`;
   const res = await fetch(url, { headers: HEADERS });
   if (!res.ok) throw new Error(`포스트 요청 실패: ${res.status} (${logNo})`);
-  const html = await res.text();
-  const root = parseHtml(html);
+  const root = parseHtml(await res.text());
 
   const seContainer = root.querySelector(".se-main-container");
   if (seContainer) {
-    // 텍스트 추출
-    const lines: string[] = [];
+    const blocks: ContentBlock[] = [];
+    let imageCount = 0;
+
     for (const comp of seContainer.querySelectorAll(".se-component")) {
+      const isImageComp =
+        comp.classList.value.includes("se-image") ||
+        comp.querySelector(".se-image-resource") !== null;
+
+      if (isImageComp && imageCount < MAX_IMAGES_PER_POST) {
+        const img = comp.querySelector("img");
+        const src =
+          img?.getAttribute("data-lazy-src") ??
+          img?.getAttribute("src") ?? "";
+        if (src && isNaverImageUrl(src)) {
+          blocks.push({ type: "image", src });
+          imageCount++;
+        }
+        continue;
+      }
+
+      // 텍스트 컴포넌트
+      const lines: string[] = [];
       for (const p of comp.querySelectorAll(
         ".se-text-paragraph, .se-heading-text, p, h2, h3"
       )) {
         const t = p.text.trim();
         if (t) lines.push(t);
       }
-    }
-    const text =
-      lines.length > 0
-        ? lines.join("\n\n")
-        : seContainer.text.replace(/\s{3,}/g, "\n\n").trim();
-
-    // 이미지 URL 추출 (SE 이미지 컴포넌트)
-    const imageUrls: string[] = [];
-    for (const img of seContainer.querySelectorAll("img")) {
-      const src =
-        img.getAttribute("data-lazy-src") ??
-        img.getAttribute("src") ??
-        "";
-      if (src && isNaverImageUrl(src) && !imageUrls.includes(src)) {
-        imageUrls.push(src);
-        if (imageUrls.length >= MAX_IMAGES_PER_POST) break;
+      if (lines.length > 0) {
+        blocks.push({ type: "text", content: lines.join("\n") });
       }
     }
 
-    return { text, imageUrls };
+    if (blocks.length > 0) return { blocks };
+    // 폴백: 전체 텍스트
+    return { blocks: [{ type: "text", content: seContainer.text.replace(/\s{3,}/g, "\n\n").trim() }] };
   }
 
   // 구버전 에디터
   const legacyArea = root.querySelector("#postViewArea");
   if (legacyArea) {
-    const text = legacyArea.text.replace(/\s{3,}/g, "\n\n").trim();
-    const imageUrls: string[] = [];
-    for (const img of legacyArea.querySelectorAll("img")) {
-      const src = img.getAttribute("src") ?? "";
-      if (src && isNaverImageUrl(src) && !imageUrls.includes(src)) {
-        imageUrls.push(src);
-        if (imageUrls.length >= MAX_IMAGES_PER_POST) break;
+    const blocks: ContentBlock[] = [];
+    let imageCount = 0;
+
+    for (const node of legacyArea.childNodes) {
+      const el = node as ReturnType<typeof parseHtml>;
+      if (el.rawTagName === "img" && imageCount < MAX_IMAGES_PER_POST) {
+        const src = el.getAttribute?.("src") ?? "";
+        if (src && isNaverImageUrl(src)) {
+          blocks.push({ type: "image", src });
+          imageCount++;
+        }
+      } else {
+        const t = node.text?.trim();
+        if (t) blocks.push({ type: "text", content: t });
       }
     }
-    return { text, imageUrls };
+    if (blocks.length > 0) return { blocks };
+    return { blocks: [{ type: "text", content: legacyArea.text.replace(/\s{3,}/g, "\n\n").trim() }] };
   }
 
   throw new Error(`본문 컨테이너를 찾을 수 없습니다 (logNo: ${logNo})`);
 }
 
-// ── 이미지 다운로드 → Supabase Storage 업로드 ────────────
+// ── 이미지 업로드 ─────────────────────────────────────────
 
 async function uploadImages(
   logNo: string,
   imageUrls: string[]
-): Promise<string[]> {
-  if (imageUrls.length === 0) return [];
-
-  const publicUrls: string[] = [];
+): Promise<Map<string, string>> {
+  const urlMap = new Map<string, string>();
 
   for (let i = 0; i < imageUrls.length; i++) {
     const src = imageUrls[i];
     try {
       const res = await fetch(src, { headers: IMAGE_HEADERS });
-      if (!res.ok) {
-        console.warn(`    이미지 다운로드 실패 (${res.status}): ${src}`);
-        continue;
-      }
+      if (!res.ok) { console.warn(`    이미지 다운로드 실패 (${res.status}): ${src}`); continue; }
 
       const mime = res.headers.get("content-type") ?? "image/jpeg";
       const ext = mimeToExt(mime);
       const storagePath = `${logNo}/${i + 1}.${ext}`;
-      const buffer = Buffer.from(await res.arrayBuffer());
 
-      // 이미 존재하면 스킵
       const { data: existing } = await supabase.storage
         .from(STORAGE_BUCKET)
         .list(logNo, { search: `${i + 1}.${ext}` });
 
-      if (existing && existing.length > 0) {
-        const { data: urlData } = supabase.storage
-          .from(STORAGE_BUCKET)
-          .getPublicUrl(storagePath);
-        publicUrls.push(urlData.publicUrl);
+      if (existing?.length > 0) {
+        const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+        urlMap.set(src, data.publicUrl);
         console.log(`    이미지 ${i + 1} 이미 존재 (스킵)`);
         continue;
       }
 
-      const { error: uploadError } = await supabase.storage
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const { error } = await supabase.storage
         .from(STORAGE_BUCKET)
-        .upload(storagePath, buffer, {
-          contentType: mime.split(";")[0].trim(),
-          upsert: false,
-        });
+        .upload(storagePath, buffer, { contentType: mime.split(";")[0].trim(), upsert: false });
 
-      if (uploadError) {
-        console.warn(`    이미지 업로드 실패: ${uploadError.message}`);
-        continue;
-      }
+      if (error) { console.warn(`    업로드 실패: ${error.message}`); continue; }
 
-      const { data: urlData } = supabase.storage
-        .from(STORAGE_BUCKET)
-        .getPublicUrl(storagePath);
-      publicUrls.push(urlData.publicUrl);
+      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
+      urlMap.set(src, data.publicUrl);
       console.log(`    이미지 ${i + 1}/${imageUrls.length} 업로드 완료`);
 
       await new Promise((r) => setTimeout(r, 300));
@@ -240,58 +233,55 @@ async function uploadImages(
     }
   }
 
-  return publicUrls;
+  return urlMap;
+}
+
+/** blocks + urlMap으로 최종 content 문자열 생성 */
+function buildContent(blocks: ContentBlock[], urlMap: Map<string, string>): string {
+  return blocks
+    .map((block) => {
+      if (block.type === "text") return block.content;
+      const storageUrl = urlMap.get(block.src);
+      return storageUrl ? `[IMG:${storageUrl}]` : "";
+    })
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 // ── Supabase 저장 ─────────────────────────────────────────
 
-async function syncNotice(item: RssItem, text: string, images: string[]) {
+async function syncNotice(
+  item: RssItem,
+  content: string,
+  images: string[]
+) {
   const slug = `naver-${item.logNo}`;
   const date = parseDate(item.pubDate).toISOString().split("T")[0];
 
   const { data: existing } = await supabase
-    .from("notices")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-
-  if (existing) {
-    console.log(`  [공지] 이미 존재: ${item.title}`);
-    return;
-  }
+    .from("notices").select("id").eq("slug", slug).single();
+  if (existing) { console.log(`  [공지] 이미 존재: ${item.title}`); return; }
 
   const { error } = await supabase.from("notices").insert({
-    title: item.title,
-    slug,
-    category: "일반",
-    content: text,
-    images,
-    date,
-    is_public: true,
+    title: item.title, slug, category: "일반", content, images, date, is_public: true,
   });
   if (error) throw new Error(`notices 삽입 실패: ${error.message}`);
   console.log(`  [공지] 추가됨: ${item.title} (이미지 ${images.length}장)`);
 }
 
-async function syncSchoolPost(item: RssItem, text: string, images: string[]) {
+async function syncSchoolPost(
+  item: RssItem,
+  content: string,
+  images: string[]
+) {
   const slug = `naver-${item.logNo}`;
 
   const { data: existing } = await supabase
-    .from("churchschool_posts")
-    .select("id")
-    .eq("slug", slug)
-    .single();
-
-  if (existing) {
-    console.log(`  [교회학교] 이미 존재: ${item.title}`);
-    return;
-  }
+    .from("churchschool_posts").select("id").eq("slug", slug).single();
+  if (existing) { console.log(`  [교회학교] 이미 존재: ${item.title}`); return; }
 
   const { error } = await supabase.from("churchschool_posts").insert({
-    title: item.title,
-    slug,
-    content: text,
-    images,
+    title: item.title, slug, content, images,
     naver_url: item.link,
     published_at: parseDate(item.pubDate).toISOString(),
   });
@@ -307,24 +297,28 @@ async function main() {
   console.log(`  총 ${items.length}개 항목 발견`);
 
   const targets = items.filter(
-    (i) =>
-      i.category.includes(CATEGORY_NOTICE) ||
-      i.category.includes(CATEGORY_SCHOOL)
+    (i) => i.category.includes(CATEGORY_NOTICE) || i.category.includes(CATEGORY_SCHOOL)
   );
   console.log(`  대상 항목: ${targets.length}개`);
 
   for (const item of targets) {
     console.log(`\n처리 중: [${item.category}] ${item.title}`);
     try {
-      const { text, imageUrls } = await fetchPost(item.logNo);
-      console.log(`  텍스트 추출 완료, 이미지 URL ${imageUrls.length}개 발견`);
+      const { blocks } = await fetchPost(item.logNo);
 
-      const images = await uploadImages(item.logNo, imageUrls);
+      const imageUrls = blocks
+        .filter((b): b is Extract<ContentBlock, { type: "image" }> => b.type === "image")
+        .map((b) => b.src);
+      console.log(`  이미지 URL ${imageUrls.length}개 발견`);
+
+      const urlMap = await uploadImages(item.logNo, imageUrls);
+      const content = buildContent(blocks, urlMap);
+      const images = [...urlMap.values()];
 
       if (item.category.includes(CATEGORY_NOTICE)) {
-        await syncNotice(item, text, images);
+        await syncNotice(item, content, images);
       } else {
-        await syncSchoolPost(item, text, images);
+        await syncSchoolPost(item, content, images);
       }
 
       await new Promise((r) => setTimeout(r, 800));

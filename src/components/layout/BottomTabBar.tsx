@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Baby, BookOpen, GraduationCap, Users } from "lucide-react";
+import { Baby, BookOpen, GraduationCap, Users, Newspaper } from "lucide-react";
 import { tabItems, hiddenPrefixes, iconMap } from "./tab-config";
 import { useNewContent } from "@/lib/new-content-provider";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,7 @@ const departments = [
   { label: "아동부", href: "/churchschool/elementary", icon: BookOpen, color: "from-emerald-500 to-green-600" },
   { label: "청소년부", href: "/churchschool/teen", icon: GraduationCap, color: "from-blue-500 to-indigo-600" },
   { label: "청년부", href: "/churchschool/youth", icon: Users, color: "from-violet-500 to-purple-600" },
+  { label: "교회학교 소식", href: "/churchschool/news", icon: Newspaper, color: "from-amber-500 to-orange-600" },
 ];
 
 export function BottomTabBar() {
