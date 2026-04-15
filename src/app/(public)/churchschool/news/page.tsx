@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { createClient } from "@/lib/supabase/server";
@@ -17,6 +18,7 @@ interface Post {
   slug: string;
   title: string;
   content: string;
+  images: string[];
   naver_url: string;
   published_at: string;
 }
@@ -45,22 +47,33 @@ export default async function ChurchschoolNewsPage() {
                     href={post.naver_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="group flex items-start justify-between gap-4 py-5 transition hover:bg-gray-50 -mx-4 px-4 rounded-lg"
+                    className="group flex items-start gap-4 py-5 transition hover:bg-gray-50 -mx-4 px-4 rounded-lg"
                   >
+                    {post.images?.[0] && (
+                      <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-gray-100">
+                        <Image
+                          src={post.images[0]}
+                          alt={post.title}
+                          fill
+                          className="object-cover"
+                          sizes="80px"
+                        />
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
+                      <p className="font-medium text-gray-900 group-hover:text-primary-600 transition-colors line-clamp-2">
                         {post.title}
                       </p>
                       <p className="mt-1 line-clamp-2 text-sm text-gray-500">
-                        {post.content.slice(0, 120)}
+                        {post.content.slice(0, 100)}
                       </p>
+                      <time className="mt-1 block text-xs text-gray-400">
+                        {formatDistanceToNow(new Date(post.published_at), {
+                          addSuffix: true,
+                          locale: ko,
+                        })}
+                      </time>
                     </div>
-                    <time className="shrink-0 text-xs text-gray-400 mt-0.5">
-                      {formatDistanceToNow(new Date(post.published_at), {
-                        addSuffix: true,
-                        locale: ko,
-                      })}
-                    </time>
                   </a>
                 </li>
               ))}

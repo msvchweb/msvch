@@ -4,6 +4,7 @@ export interface Notice {
   slug: string;
   category: "일반" | "긴급" | "행사";
   content: string;
+  images: string[];
   is_public: boolean;
   date: string | null;
   created_at: string;

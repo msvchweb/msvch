@@ -2,6 +2,7 @@ import { Container } from "@/components/ui/Container";
 import { getNoticeBySlug } from "@/lib/notices";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { Metadata } from "next";
@@ -49,6 +50,23 @@ export default async function NoticeDetailPage({
         <article className="prose max-w-none whitespace-pre-line text-gray-700">
           {notice.content}
         </article>
+
+        {notice.images && notice.images.length > 0 && (
+          <div className="mt-8 space-y-4">
+            {notice.images.map((url, i) => (
+              <div key={i} className="relative w-full overflow-hidden rounded-xl">
+                <Image
+                  src={url}
+                  alt={`${notice.title} 이미지 ${i + 1}`}
+                  width={800}
+                  height={600}
+                  className="h-auto w-full object-contain"
+                  sizes="(max-width: 768px) 100vw, 800px"
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </Container>
   );
