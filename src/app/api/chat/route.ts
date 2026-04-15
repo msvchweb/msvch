@@ -4,6 +4,13 @@ import { GeminiUnavailableError } from "@/lib/gemini";
 
 export const maxDuration = 30;
 
+// ─── 제한 설정 ────────────────────────────────────────────
+const RATE_LIMIT_PER_MINUTE = 10;   // IP당 분당 최대 요청
+const RATE_LIMIT_PER_DAY    = 100;  // IP당 일일 최대 요청
+const MAX_MESSAGE_LENGTH    = 500;  // 메시지 1건 최대 글자수
+const MAX_HISTORY_TURNS     = 20;   // 대화 히스토리 최대 턴 수
+// ─────────────────────────────────────────────────────────
+
 interface ChatMessage {
   role: "user" | "model";
   content: string;
@@ -20,6 +27,111 @@ interface GeminiResponse {
       parts: { text: string }[];
     };
   }[];
+}
+
+function getClientIp(request: NextRequest): string {
+  return (
+    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
+    request.headers.get("x-real-ip") ??
+    "unknown"
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _supabase: any = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function getSupabase(): any {
+  if (!_supabase) {
+    _supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+  }
+  return _supabase;
+}
+
+/**
+ * IP 기반 rate limit 체크.
+ * - 분 단위 윈도우와 일 단위 윈도우를 각각 확인.
+ * - 초과 시 { allowed: false, retryAfter } 반환.
+ */
+async function checkRateLimit(
+  ip: string
+): Promise<{ allowed: boolean; retryAfter?: number }> {
+  const supabase = getSupabase();
+  const now = new Date();
+
+  // 분 윈도우 (현재 분의 시작)
+  const minuteWindow = new Date(now);
+  minuteWindow.setSeconds(0, 0);
+
+  // 일 윈도우 (오늘 00:00 KST → UTC -9h)
+  const dayWindow = new Date(now);
+  dayWindow.setUTCHours(dayWindow.getUTCHours() - ((dayWindow.getUTCHours() + 9) % 24), 0, 0, 0);
+
+  // 분당 카운트 upsert
+  const { data: minuteRow, error: minuteErr } = await supabase
+    .from("chat_rate_limit")
+    .upsert(
+      { ip, window_start: minuteWindow.toISOString(), request_count: 1 },
+      { onConflict: "ip,window_start", ignoreDuplicates: false }
+    )
+    .select("request_count")
+    .single();
+
+  if (minuteErr) {
+    // upsert가 기존 행을 반환하지 않으면 수동 increment
+    const { data: existing } = await supabase
+      .from("chat_rate_limit")
+      .select("request_count")
+      .eq("ip", ip)
+      .eq("window_start", minuteWindow.toISOString())
+      .single();
+
+    if (existing) {
+      const newCount = existing.request_count + 1;
+      await supabase
+        .from("chat_rate_limit")
+        .update({ request_count: newCount })
+        .eq("ip", ip)
+        .eq("window_start", minuteWindow.toISOString());
+
+      if (newCount > RATE_LIMIT_PER_MINUTE) {
+        const retryAfter = 60 - now.getSeconds();
+        return { allowed: false, retryAfter };
+      }
+    }
+  } else if (minuteRow && minuteRow.request_count > RATE_LIMIT_PER_MINUTE) {
+    const retryAfter = 60 - now.getSeconds();
+    return { allowed: false, retryAfter };
+  }
+
+  // 일일 카운트 (해당 일의 모든 윈도우 합산)
+  const { data: dayRows } = await supabase
+    .from("chat_rate_limit")
+    .select("request_count")
+    .eq("ip", ip)
+    .gte("window_start", dayWindow.toISOString());
+
+  const dayTotal = (dayRows ?? []).reduce(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (sum: number, r: any) => sum + (r.request_count as number),
+    0
+  );
+
+  if (dayTotal > RATE_LIMIT_PER_DAY) {
+    return { allowed: false, retryAfter: 86400 };
+  }
+
+  // 오래된 레코드 정리 (2일 이상 된 것)
+  const cutoff = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+  supabase
+    .from("chat_rate_limit")
+    .delete()
+    .lt("window_start", cutoff.toISOString())
+    .then(() => {/* fire-and-forget */});
+
+  return { allowed: true };
 }
 
 const STATIC_KNOWLEDGE = `
@@ -60,11 +172,7 @@ const STATIC_KNOWLEDGE = `
 
 async function fetchRecentNotices(): Promise<string> {
   try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    const { data } = await supabase
+    const { data } = await getSupabase()
       .from("notices")
       .select("title, content, date, category")
       .eq("is_public", true)
@@ -73,8 +181,8 @@ async function fetchRecentNotices(): Promise<string> {
 
     if (!data || data.length === 0) return "";
 
-    const lines = data.map((n) => {
-      const body = (n.content as string) ?? "";
+    const lines = data.map((n: { date: string; title: string; content: string }) => {
+      const body = n.content ?? "";
       const preview = body.length > 1000 ? body.slice(0, 1000) + "..." : body;
       return `- [${n.date}] ${n.title}\n  ${preview}`;
     });
@@ -147,19 +255,55 @@ async function callGeminiChat(
 }
 
 export async function POST(request: NextRequest) {
-  let body: { messages: ChatMessage[] };
+  const ip = getClientIp(request);
 
+  // ── Rate limit 체크 ──────────────────────────────────────
+  const { allowed, retryAfter } = await checkRateLimit(ip);
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+      {
+        status: 429,
+        headers: retryAfter ? { "Retry-After": String(retryAfter) } : {},
+      }
+    );
+  }
+
+  // ── 요청 파싱 ────────────────────────────────────────────
+  let body: { messages: ChatMessage[] };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
 
-  const { messages } = body;
+  let { messages } = body;
   if (!Array.isArray(messages) || messages.length === 0) {
     return NextResponse.json({ error: "메시지가 없습니다." }, { status: 400 });
   }
 
+  // ── 입력 검증 ────────────────────────────────────────────
+  // 마지막 사용자 메시지 길이 제한
+  const lastUserMsg = messages.findLast((m) => m.role === "user");
+  if (lastUserMsg && lastUserMsg.content.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json(
+      { error: `메시지는 ${MAX_MESSAGE_LENGTH}자 이내로 입력해주세요.` },
+      { status: 400 }
+    );
+  }
+
+  // 히스토리 길이 제한 (최근 N턴만 유지)
+  if (messages.length > MAX_HISTORY_TURNS) {
+    messages = messages.slice(-MAX_HISTORY_TURNS);
+  }
+
+  // role 값 검증
+  const validRoles = new Set(["user", "model"]);
+  if (messages.some((m) => !validRoles.has(m.role) || typeof m.content !== "string")) {
+    return NextResponse.json({ error: "잘못된 메시지 형식입니다." }, { status: 400 });
+  }
+
+  // ── Gemini 호출 ──────────────────────────────────────────
   const notices = await fetchRecentNotices();
   const systemPrompt = buildSystemPrompt(notices);
 
