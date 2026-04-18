@@ -293,7 +293,7 @@ export function ChatBot() {
       {/* 플로팅 버튼 */}
       <button
         onClick={() => setIsOpen((v) => !v)}
-        className="fixed bottom-[72px] right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition hover:scale-105 active:scale-95 lg:bottom-6"
+        className={`fixed bottom-[72px] right-4 z-50 h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition hover:scale-105 active:scale-95 lg:bottom-6 ${isOpen ? "hidden lg:flex" : "flex"}`}
         style={{ background: "var(--color-primary-600, #3b5bdb)" }}
         aria-label={isOpen ? "채팅 닫기" : "채팅 열기"}
       >

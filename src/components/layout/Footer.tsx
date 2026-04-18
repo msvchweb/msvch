@@ -33,7 +33,7 @@ export function Footer() {
               </p>
               <p className="flex items-center gap-2.5">
                 <Mail size={15} className="shrink-0 text-church-gold" />
-                info@msvch.org
+                msvch01@naver.com
               </p>
             </div>
             <a
