@@ -34,7 +34,7 @@ yarn-error.log*
 .env*
 
 # claude code local settings (contains tokens)
-.claude/settings.local.json
+.claude/
 
 /.temp/
 
