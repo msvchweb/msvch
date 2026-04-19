@@ -27,4 +27,4 @@
 - [x] 5-2. API_SPEC.md 업데이트
 - [x] 5-3. ARCHIT.md 업데이트
 - [x] 5-4. DB_SCHEMA.md 업데이트
-- [ ] 5-5. Git 커밋 및 푸시
+- [x] 5-5. Git 커밋 및 푸시

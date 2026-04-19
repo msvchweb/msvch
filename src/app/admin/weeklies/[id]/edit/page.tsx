@@ -72,10 +72,7 @@ export default function AdminWeeklyEditPage({
 
   async function handleSubmit(data: WeeklyContentInput, publish: boolean) {
     const parsed = WeeklyContentSchema.safeParse(data);
-    if (!parsed.success) {
-      alert(parsed.error.issues[0].message);
-      return;
-    }
+    if (!parsed.success) return;
 
     setSubmitting(true);
     const payload = {

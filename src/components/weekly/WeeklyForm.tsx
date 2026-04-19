@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import type {
   DawnReading,
@@ -28,23 +28,31 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 
 function Field({
   label,
+  required,
+  error,
   children,
 }: {
   label: string;
+  required?: boolean;
+  error?: string;
   children: React.ReactNode;
 }) {
   return (
     <div>
       <label className="mb-1 block text-xs font-medium text-gray-600">
         {label}
+        {required && <span className="ml-0.5 text-red-500">*</span>}
       </label>
       {children}
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
   );
 }
 
 const inputCls =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400";
+const inputErrCls =
+  "w-full rounded-lg border border-red-400 bg-red-50 px-3 py-2 text-sm focus:border-red-400 focus:outline-none focus:ring-1 focus:ring-red-400";
 const textareaCls =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-y";
 
@@ -57,6 +65,18 @@ export function WeeklyForm({
   weeklyId,
 }: Props) {
   const [form, setForm] = useState<WeeklyContentInput>(initial);
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
+  const titleRef = useRef<HTMLInputElement>(null);
+  const dateRef = useRef<HTMLInputElement>(null);
+
+  function clearError(key: string) {
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+  }
 
   function set<K extends keyof WeeklyContentInput>(
     key: K,
@@ -123,6 +143,18 @@ export function WeeklyForm({
   }
 
   async function handleSubmit(publish: boolean) {
+    if (publish) {
+      const errors: Partial<Record<string, string>> = {};
+      if (!form.title.trim()) errors.title = "제목을 입력해주세요";
+      if (!form.date) errors.date = "날짜를 선택해주세요";
+      if (Object.keys(errors).length > 0) {
+        setFieldErrors(errors);
+        if (errors.title) titleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        else if (errors.date) dateRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
+    setFieldErrors({});
     await onSubmit(form, publish);
   }
 
@@ -132,20 +164,22 @@ export function WeeklyForm({
       <section className="rounded-xl border border-gray-200 bg-white p-6">
         <SectionTitle>1. 기본 정보</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-          <Field label="제목">
+          <Field label="제목" required error={fieldErrors.title}>
             <input
-              className={inputCls}
+              ref={titleRef}
+              className={fieldErrors.title ? inputErrCls : inputCls}
               value={form.title}
-              onChange={(e) => set("title", e.target.value)}
+              onChange={(e) => { set("title", e.target.value); clearError("title"); }}
               placeholder="2026년 4월 셋째주 주보"
             />
           </Field>
-          <Field label="날짜">
+          <Field label="날짜" required error={fieldErrors.date}>
             <input
+              ref={dateRef}
               type="date"
-              className={inputCls}
+              className={fieldErrors.date ? inputErrCls : inputCls}
               value={form.date ?? ""}
-              onChange={(e) => set("date", e.target.value || undefined)}
+              onChange={(e) => { set("date", e.target.value || undefined); clearError("date"); }}
             />
           </Field>
           <Field label="권">
