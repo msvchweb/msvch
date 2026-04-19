@@ -29,8 +29,20 @@ export async function getWeeklies(): Promise<Weekly[]> {
   const { data } = await supabase
     .from("weeklies")
     .select("*")
+    .eq("is_published", true)
     .order("date", { ascending: false })
     .limit(20);
 
   return (data ?? []) as Weekly[];
+}
+
+export async function getWeeklyById(id: string): Promise<Weekly | null> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("weeklies")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  return (data as Weekly) ?? null;
 }

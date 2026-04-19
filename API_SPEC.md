@@ -189,6 +189,43 @@ GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인�
 
 ---
 
+### POST `/api/weeklies/generate-pdf`
+
+주보 데이터를 기반으로 PDF를 자동 생성하고 Supabase Storage에 업로드한다.
+
+- **인증**: admin 역할 필수
+- **런타임**: `nodejs`
+- **최대 실행 시간**: 60초 (`maxDuration = 60`)
+- **요청 본문**:
+
+```ts
+{ weeklyId: string }
+```
+
+- **응답 (200)**:
+
+```ts
+{ pdfUrl: string }
+```
+
+- **에러 응답**:
+  - `400` — `weeklyId` 누락
+  - `401` — 미인증
+  - `403` — 비admin
+  - `404` — 해당 주보 없음
+  - `500` — PDF 생성 실패 또는 Storage 업로드 실패
+
+- **내부 동작**:
+  1. `weeklyId`로 `weeklies` 테이블 조회
+  2. `buildWeeklyHtml(weekly)` 호출 → A4 HTML 문자열 생성
+  3. Puppeteer + `@sparticuz/chromium` → `page.pdf()` 호출
+  4. 생성된 PDF Buffer → Supabase Storage `weeklies/{id}-generated.pdf` 업로드
+  5. `weeklies` 테이블 `pdf_url` 컬럼 업데이트
+
+- **환경변수**: `CHROME_EXECUTABLE_PATH` (개발 환경, 로컬 Chrome 경로)
+
+---
+
 ### GET `/api/calendar`
 
 교회 Google Calendar에서 다가오는 이벤트를 조회한다.
@@ -264,6 +301,7 @@ Google Calendar에서 이벤트를 삭제한다.
 
 | 엔드포인트 | Zod 스키마 | 비고 |
 |-----------|-----------|------|
+| POST `/api/weeklies/generate-pdf` | 없음 (body: `{ weeklyId }`) | admin 전용, Puppeteer PDF 생성 |
 | POST `/api/revalidate` | `RevalidateSchema` | paths 최대 20개, 타이밍-세이프 시크릿 비교 |
 | POST `/api/sermon-summary` | `SermonSummarySchema` | 모든 필드 길이 제한 |
 | POST `/api/shorts/trigger` | `ShortsTriggerSchema` | videoId 50자, title 300자 |
@@ -294,7 +332,8 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 |------|------|------|
 | `getNotices()` | `src/lib/notices.ts` | 공개 공지사항 목록 (날짜 역순) |
 | `getNoticeBySlug(slug)` | `src/lib/notices.ts` | 단건 공지 조회 |
-| `getWeeklies()` | `src/lib/notices.ts` | 주보 목록 (최근 20개) |
+| `getWeeklies()` | `src/lib/notices.ts` | 발행된 주보 목록 (`is_published=true`, 최근 20개) |
+| `getWeeklyById(id)` | `src/lib/notices.ts` | 주보 단건 조회 (관리자 편집용) |
 | `getGalleryAlbums(options?)` | `src/lib/gallery.ts` | 공개 앨범 + 이미지 (태그 필터 지원) |
 | `getSermonVideos(max)` | `src/lib/youtube.ts` | YouTube RSS 설교 목록 |
 | `getLatestSermon()` | `src/lib/youtube.ts` | 최신 설교 1건 |
@@ -329,3 +368,4 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | Google Maps Embed | 찾아오시는 길 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` |
 | Google Calendar API v3 | 교회 일정 조회/생성/삭제 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY` |
 | GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |
+| Puppeteer + @sparticuz/chromium | 주보 PDF 자동 생성 | `CHROME_EXECUTABLE_PATH` (개발 환경만, 선택) |

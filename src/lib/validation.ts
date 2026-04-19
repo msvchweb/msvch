@@ -132,11 +132,64 @@ export const GalleryAlbumSchema = z.object({
   date: z.string().optional(),
 });
 
-/** 주보 */
+/** 주보 기본 */
 export const WeeklySchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
   date: z.string().optional(),
 });
+
+const SpecialPraisePartSchema = z.object({
+  song: z.string().max(200).default(""),
+  choir: z.string().max(100).default(""),
+});
+
+/** 주보 콘텐츠 (폼 입력 전체) */
+export const WeeklyContentSchema = z.object({
+  title: z.string().min(1, "제목을 입력하세요").max(200),
+  date: z.string().optional(),
+  volume: z.number().int().positive().nullable().default(null),
+  issue: z.number().int().positive().nullable().default(null),
+  hymn_number: z.string().max(10).default(""),
+  scripture: z.string().max(100).default(""),
+  special_praise: z.object({
+    part1: SpecialPraisePartSchema,
+    part2: SpecialPraisePartSchema,
+  }).default({ part1: { song: "", choir: "" }, part2: { song: "", choir: "" } }),
+  sermon_title: z.string().max(200).default(""),
+  sermon_pastor: z.string().max(50).default(""),
+  closing_hymn: z.string().max(10).default(""),
+  weekly_verse: z.string().max(500).default(""),
+  afternoon_service: z.object({
+    scripture: z.string().max(100).default(""),
+    title: z.string().max(200).default(""),
+    pastor: z.string().max(50).default(""),
+  }).default({ scripture: "", title: "", pastor: "" }),
+  wednesday_service: z.object({
+    scripture: z.string().max(100).default(""),
+    title: z.string().max(200).default(""),
+  }).default({ scripture: "", title: "" }),
+  dawn_readings: z.array(z.object({
+    date: z.string().max(20),
+    passage: z.string().max(100),
+  })).default([]),
+  offering_members: z.object({
+    p1: z.string().max(50).default(""),
+    p2: z.string().max(50).default(""),
+    p3: z.string().max(50).default(""),
+  }).default({ p1: "", p2: "", p3: "" }),
+  prayer_items: z.array(z.object({ text: z.string().max(500) })).default([]),
+  announcements: z.array(z.object({ text: z.string().max(500) })).default([]),
+  servants_text: z.string().max(2000).default(""),
+  offering_list_text: z.string().max(5000).default(""),
+  is_published: z.boolean().default(false),
+  publish_channels: z.object({
+    website: z.boolean().default(false),
+    alimtalk: z.boolean().default(false),
+    instagram: z.boolean().default(false),
+  }).default({ website: false, alimtalk: false, instagram: false }),
+});
+
+export type WeeklyContentInput = z.infer<typeof WeeklyContentSchema>;
 
 /** 캘린더 이벤트 생성 */
 export const CalendarEventSchema = z.object({

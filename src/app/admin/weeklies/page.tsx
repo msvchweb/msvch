@@ -1,29 +1,28 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Trash2, Upload, FileText, X } from "lucide-react";
+import { Plus, Trash2, Upload, FileText, Pencil, CheckCircle, Clock } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import {
   validateFile,
   safeExtension,
   ALLOWED_PDF_EXTENSIONS,
   MAX_PDF_SIZE,
-  WeeklySchema,
 } from "@/lib/validation";
 import type { Weekly } from "@/types/notice";
 
 export default function AdminWeekliesPage() {
   const [weeklies, setWeeklies] = useState<Weekly[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [title, setTitle] = useState("");
-  const [date, setDate] = useState("");
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-  useEffect(() => { loadWeeklies(); }, []);
+  useEffect(() => {
+    loadWeeklies();
+  }, []);
 
   async function loadWeeklies() {
     const { data } = await supabase
@@ -32,23 +31,6 @@ export default function AdminWeekliesPage() {
       .order("date", { ascending: false });
     setWeeklies((data ?? []) as Weekly[]);
     setLoading(false);
-  }
-
-  async function createWeekly(e: React.FormEvent) {
-    e.preventDefault();
-    const check = WeeklySchema.safeParse({ title, date: date || undefined });
-    if (!check.success) {
-      alert(check.error.issues[0].message);
-      return;
-    }
-    const { error } = await supabase.from("weeklies").insert({
-      title: check.data.title,
-      date: check.data.date || null,
-    });
-    if (!error) {
-      setTitle(""); setDate(""); setShowForm(false);
-      loadWeeklies();
-    }
   }
 
   async function uploadPdf(weeklyId: string, file: File) {
@@ -62,7 +44,6 @@ export default function AdminWeekliesPage() {
     const ext = safeExtension(file.name, ALLOWED_PDF_EXTENSIONS);
     const path = `${weeklyId}.${ext}`;
 
-    // Remove old file if exists
     await supabase.storage.from("weeklies").remove([path]);
 
     const { error: uploadError } = await supabase.storage
@@ -88,75 +69,79 @@ export default function AdminWeekliesPage() {
     if (!confirm("이 주보를 삭제하시겠습니까?")) return;
 
     if (w.pdf_url) {
-      const path = new URL(w.pdf_url).pathname.split("/weeklies/")[1];
-      if (path) await supabase.storage.from("weeklies").remove([path]);
+      const urlPath = new URL(w.pdf_url).pathname;
+      const segment = urlPath.split("/weeklies/")[1];
+      if (segment) await supabase.storage.from("weeklies").remove([segment]);
     }
 
     await supabase.from("weeklies").delete().eq("id", w.id);
     loadWeeklies();
   }
 
-  if (loading) return <div className="py-12 text-center text-gray-400">로딩 중...</div>;
+  if (loading) {
+    return (
+      <div className="py-12 text-center text-gray-400">로딩 중...</div>
+    );
+  }
 
   return (
     <div>
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900">주보 관리</h1>
-        <button
-          onClick={() => setShowForm(!showForm)}
+        <Link
+          href="/admin/weeklies/new"
           className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
         >
-          {showForm ? <X size={16} /> : <Plus size={16} />}
-          {showForm ? "취소" : "새 주보"}
-        </button>
+          <Plus size={16} />
+          새 주보 작성
+        </Link>
       </div>
-
-      {showForm && (
-        <form onSubmit={createWeekly} className="mb-8 rounded-xl border border-gray-200 bg-white p-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">제목</label>
-              <input
-                value={title} onChange={(e) => setTitle(e.target.value)} required
-                placeholder="2026년 4월 둘째주 주보"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">날짜</label>
-              <input
-                type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-          <button type="submit" className="mt-4 rounded-lg bg-primary-600 px-6 py-2 text-sm font-medium text-white hover:bg-primary-700">
-            주보 생성
-          </button>
-        </form>
-      )}
 
       <div className="space-y-3">
         {weeklies.map((w) => (
-          <div key={w.id} className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-4">
+          <div
+            key={w.id}
+            className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-4"
+          >
             <div className="flex items-center gap-3">
               <FileText className="text-primary-500" size={20} />
               <div>
-                <p className="font-medium text-gray-900">{w.title}</p>
+                <div className="flex items-center gap-2">
+                  <p className="font-medium text-gray-900">{w.title}</p>
+                  {w.is_published ? (
+                    <span className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">
+                      <CheckCircle size={10} /> 발행됨
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                      <Clock size={10} /> 임시저장
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-gray-400">
                   {w.date ? formatDate(w.date) : "-"}
-                  {w.pdf_url && " · PDF 첨부됨"}
+                  {w.volume && w.issue
+                    ? ` · ${w.volume}권 ${w.issue}호`
+                    : ""}
+                  {w.pdf_url ? " · PDF 있음" : ""}
                 </p>
               </div>
             </div>
+
             <div className="flex items-center gap-2">
+              <Link
+                href={`/admin/weeklies/${w.id}/edit`}
+                className="flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-100"
+              >
+                <Pencil size={14} /> 수정
+              </Link>
               <button
                 onClick={() => {
                   fileInputRef.current?.setAttribute("data-weekly-id", w.id);
                   fileInputRef.current?.click();
                 }}
                 disabled={uploading}
-                className="flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-100 disabled:opacity-50"
+                className="flex items-center gap-1 rounded-lg bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-50"
               >
                 <Upload size={14} />
                 {uploading ? "업로드 중..." : "PDF 업로드"}

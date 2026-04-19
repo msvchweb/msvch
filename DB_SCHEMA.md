@@ -140,19 +140,40 @@ interface Notice {
 
 ### `weeklies`
 
-주보 (주간 게시물, PDF).
+주보 (주간 게시물). 폼 기반 콘텐츠 입력 + PDF 자동 생성 지원.
 
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | `id` | `uuid` PK | 자동 생성 |
 | `title` | `text NOT NULL` | 제목 |
 | `date` | `date` | 날짜 (nullable) |
-| `pdf_url` | `text` | PDF 파일 URL (nullable) |
+| `pdf_url` | `text` | PDF URL — 직접 업로드 또는 자동 생성 (nullable) |
 | `created_at` | `timestamptz DEFAULT now()` | 생성일 |
+| `volume` | `integer` | 권 (예: 47) |
+| `issue` | `integer` | 호 (예: 16) |
+| `hymn_number` | `text` | 찬송 번호 |
+| `scripture` | `text` | 주일 성경봉독 본문 |
+| `special_praise` | `jsonb` | 특별찬양 `{part1:{song,choir}, part2:{song,choir}}` |
+| `sermon_title` | `text` | 말씀 제목 |
+| `sermon_pastor` | `text` | 설교자 이름 |
+| `closing_hymn` | `text` | 결단 찬송 번호 |
+| `weekly_verse` | `text` | 입술말씀 (구절 + 본문) |
+| `afternoon_service` | `jsonb` | 오후 찬양예배 `{scripture, title, pastor}` |
+| `wednesday_service` | `jsonb` | 수요예배 `{scripture, title}` |
+| `dawn_readings` | `jsonb` | 새벽예배 신앙일기 `[{date, passage}]` (6개) |
+| `offering_members` | `jsonb` | 헌금위원 `{p1, p2, p3}` |
+| `prayer_items` | `jsonb` | 기도제목 배열 `[{text}]` |
+| `announcements` | `jsonb` | 공지사항 배열 `[{text}]` |
+| `servants_text` | `text` | 섬기는 분들 (자유 텍스트) |
+| `offering_list_text` | `text` | 향기로운 예물 (자유 텍스트) |
+| `is_published` | `boolean DEFAULT false` | 공개 발행 여부 |
+| `publish_channels` | `jsonb` | 발행 채널 `{website, alimtalk, instagram}` |
 
-**RLS 정책**: 공지와 동일 (공개 읽기, admin 쓰기)
+**RLS 정책**: `is_published=true` 레코드는 공개 읽기, admin만 CUD
 
-**TypeScript 타입**:
+**마이그레이션**: `010_weeklies_content.sql` — 기존 테이블에 컬럼 추가 (하위 호환)
+
+**TypeScript 타입** (`src/types/notice.ts`):
 ```ts
 interface Weekly {
   id: string;
@@ -160,6 +181,25 @@ interface Weekly {
   date: string | null;
   pdf_url: string | null;
   created_at: string;
+  volume: number | null;
+  issue: number | null;
+  hymn_number: string | null;
+  scripture: string | null;
+  special_praise: SpecialPraiseField;
+  sermon_title: string | null;
+  sermon_pastor: string | null;
+  closing_hymn: string | null;
+  weekly_verse: string | null;
+  afternoon_service: AfternoonService;
+  wednesday_service: WednesdayService;
+  dawn_readings: DawnReading[];
+  offering_members: OfferingMembers;
+  prayer_items: PrayerItem[];
+  announcements: Announcement[];
+  servants_text: string | null;
+  offering_list_text: string | null;
+  is_published: boolean;
+  publish_channels: PublishChannels;
 }
 ```
 
@@ -365,3 +405,4 @@ interface ShortsClip {
 | `supabase/migrations/003_notices_weeklies.sql` | notices, weeklies + storage |
 | `supabase/migrations/004_gallery_tags.sql` | gallery_albums에 tags 컬럼 + GIN 인덱스 |
 | `supabase/migrations/005_shorts.sql` | shorts_jobs, shorts_clips, shorts_settings + storage |
+| `supabase/migrations/010_weeklies_content.sql` | weeklies 테이블에 콘텐츠 필드 추가 (volume, issue, sermon_title 등 20개 컬럼) |

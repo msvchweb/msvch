@@ -14,6 +14,7 @@
 | 검증 | Zod (런타임 스키마 검증) | 4.x |
 | 이미지 처리 | sharp | 0.34+ |
 | 갤러리 | yet-another-react-lightbox | 3.30+ |
+| PDF 생성 | puppeteer-core + @sparticuz/chromium | - |
 | 언어 | TypeScript | 5.x |
 
 ---
@@ -68,7 +69,9 @@ src/
 │       ├── revalidate/          # ISR 캐시 무효화
 │       ├── sermon-summary/      # Gemini 설교 요약
 │       ├── sermons/             # 설교 목록
-│       └── shorts/              # 쇼츠 CRUD + 트리거 (모바일 호환)
+│       ├── shorts/              # 쇼츠 CRUD + 트리거 (모바일 호환)
+│       └── weeklies/
+│           └── generate-pdf/    # Puppeteer PDF 생성 → Supabase Storage 업로드
 │
 ├── components/
 │   ├── layout/                  # 레이아웃 컴포넌트
@@ -92,6 +95,10 @@ src/
 │   ├── groups/
 │   │   └── DiscussionList.tsx
 │   │
+│   ├── weekly/
+│   │   ├── WeeklyForm.tsx       # 주보 입력 폼 (10개 섹션, 클라이언트 컴포넌트)
+│   │   └── WeeklyInlineView.tsx # 공개 페이지 인라인 뷰 (설교/기도제목/공지)
+│   │
 │   ├── LogoutButton.tsx         # 로그아웃 버튼 (클라이언트 컴포넌트)
 │   │
 │   └── ui/                      # 공용 UI
@@ -111,6 +118,7 @@ src/
 │   ├── notices.ts               # 공지/주보 데이터
 │   ├── utils.ts                 # cn(), formatDate()
 │   ├── validation.ts            # Zod 스키마 + 파일/입력 검증 유틸
+│   ├── weekly-html-template.ts  # 주보 HTML 빌더 (앞/뒷면, A4 인쇄용)
 │   └── youtube.ts               # YouTube Data API v3
 │
 ├── types/
@@ -167,6 +175,21 @@ Supabase DB ←── notices.ts (저장) ──→ Notice[]
 Supabase Storage ← gallery 버킷 (이미지)
                  ← weeklies 버킷 (PDF)
                  ← shorts 버킷 (mp4, 임시)
+
+Admin UI (WeeklyForm) ──→ Supabase DB (weeklies)
+    │
+    └── POST /api/weeklies/generate-pdf
+            │
+            ▼
+        buildWeeklyHtml() ──→ HTML 문자열 (앞면 + 뒷면)
+            │
+            ▼
+        Puppeteer (puppeteer-core + @sparticuz/chromium)
+            │  page.setContent(html) → page.pdf({ format: 'A4' })
+            ▼
+        PDF Buffer ──→ Supabase Storage (weeklies/{id}-generated.pdf)
+            │
+            └── weeklies.pdf_url 업데이트
 
 GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
     │               ├── yt-dlp (다운로드 + 자막)
@@ -262,4 +285,5 @@ middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*)
 - **빌드**: `npm run build` → Next.js static + dynamic
 - **CI/CD**: GitHub Actions (쇼츠 생성 파이프라인)
 - **환경변수 (Vercel)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`
+- **환경변수 (로컬 개발 only)**: `CHROME_EXECUTABLE_PATH` — 로컬 Chrome 경로 (Puppeteer PDF 생성용, Vercel에서는 @sparticuz/chromium 자동 사용)
 - **GitHub Secrets**: `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`

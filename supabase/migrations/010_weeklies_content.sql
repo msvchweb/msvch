@@ -1,0 +1,21 @@
+-- 주보 콘텐츠 필드 추가
+ALTER TABLE public.weeklies
+  ADD COLUMN IF NOT EXISTS volume               integer,
+  ADD COLUMN IF NOT EXISTS issue                integer,
+  ADD COLUMN IF NOT EXISTS hymn_number          text,
+  ADD COLUMN IF NOT EXISTS scripture            text,
+  ADD COLUMN IF NOT EXISTS special_praise       jsonb DEFAULT '{"part1":{"song":"","choir":""},"part2":{"song":"","choir":""}}',
+  ADD COLUMN IF NOT EXISTS sermon_title         text,
+  ADD COLUMN IF NOT EXISTS sermon_pastor        text,
+  ADD COLUMN IF NOT EXISTS closing_hymn         text,
+  ADD COLUMN IF NOT EXISTS weekly_verse         text,
+  ADD COLUMN IF NOT EXISTS afternoon_service    jsonb DEFAULT '{"scripture":"","title":"","pastor":""}',
+  ADD COLUMN IF NOT EXISTS wednesday_service    jsonb DEFAULT '{"scripture":"","title":""}',
+  ADD COLUMN IF NOT EXISTS dawn_readings        jsonb DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS offering_members     jsonb DEFAULT '{"p1":"","p2":"","p3":""}',
+  ADD COLUMN IF NOT EXISTS prayer_items         jsonb DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS announcements        jsonb DEFAULT '[]',
+  ADD COLUMN IF NOT EXISTS servants_text        text,
+  ADD COLUMN IF NOT EXISTS offering_list_text   text,
+  ADD COLUMN IF NOT EXISTS is_published         boolean DEFAULT false,
+  ADD COLUMN IF NOT EXISTS publish_channels     jsonb DEFAULT '{"website":false,"alimtalk":false,"instagram":false}';
