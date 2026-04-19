@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { LayoutDashboard, FileText, ImageIcon, Newspaper, Sparkles, Video, Calendar } from "lucide-react";
+import { LayoutDashboard, FileText, ImageIcon, Newspaper, Sparkles, Video, Calendar, MessageSquare } from "lucide-react";
 
 const adminNav = [
   { label: "대시보드", href: "/admin", icon: LayoutDashboard },
@@ -9,6 +9,7 @@ const adminNav = [
   { label: "교회일정", href: "/admin/calendar", icon: Calendar },
   { label: "설교 요약", href: "/admin/sermons", icon: Sparkles },
   { label: "쇼츠", href: "/admin/shorts", icon: Video },
+  { label: "문의 내역", href: "/admin/inquiries", icon: MessageSquare },
 ];
 
 export default function AdminLayout({
