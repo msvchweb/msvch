@@ -56,6 +56,44 @@ const inputErrCls =
 const textareaCls =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-y";
 
+function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentInput {
+  return {
+    ...f,
+    hymn_number: f.hymn_number || "342",
+    scripture: f.scripture || "요한복음 16:31-33",
+    special_praise: {
+      part1: {
+        song: f.special_praise.part1.song || "주 예수 나의 산 소망",
+        choir: f.special_praise.part1.choir || "호산나 찬양대",
+      },
+      part2: {
+        song: f.special_praise.part2.song || "이 자리에 나옵니다",
+        choir: f.special_praise.part2.choir,
+      },
+    },
+    sermon_title: f.sermon_title || "세상에서 그리스도인으로 잘 사는 법",
+    sermon_pastor: f.sermon_pastor || "이장재",
+    closing_hymn: f.closing_hymn || "342",
+    weekly_verse: f.weekly_verse || "요한복음 16:33\n이것을 너희에게 이르는 것은 너희로 내 안에서 평안을 누리게 하려 함이라",
+    afternoon_service: {
+      scripture: f.afternoon_service.scripture || "요한복음 9:20-23",
+      title: f.afternoon_service.title || "올바른 진단법",
+      pastor: f.afternoon_service.pastor || "이장재",
+    },
+    wednesday_service: {
+      scripture: f.wednesday_service.scripture || "삼상 22:30-37",
+      title: f.wednesday_service.title || "세마 가라오수록",
+    },
+    offering_members: {
+      p1: f.offering_members.p1 || "김인경",
+      p2: f.offering_members.p2 || "김은순",
+      p3: f.offering_members.p3 || "박경진",
+    },
+    servants_text: f.servants_text || "담 당: 이연재\n사 회: 박기범\n온라인: 홍길동\n반 주: 김성숙\n찬양대: 호산나",
+    offering_list_text: f.offering_list_text || "감사헌금: 홍길동 외 다수\n십일조: ...\n잔액: 375,000원 / 누계: 147,234,483원",
+  };
+}
+
 export function WeeklyForm({
   initial,
   onSubmit,
@@ -155,7 +193,7 @@ export function WeeklyForm({
       }
     }
     setFieldErrors({});
-    await onSubmit(form, publish);
+    await onSubmit(applyPlaceholderDefaults(form), publish);
   }
 
   return (
