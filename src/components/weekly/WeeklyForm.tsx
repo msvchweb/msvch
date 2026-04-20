@@ -194,19 +194,18 @@ export function WeeklyForm({
   }
 
   async function handleSubmit(publish: boolean) {
+    const defaulted = applyPlaceholderDefaults(form);
     if (publish) {
       const errors: Partial<Record<string, string>> = {};
-      if (!form.title.trim()) errors.title = "제목을 입력해주세요";
-      if (!form.date) errors.date = "날짜를 선택해주세요";
+      if (!defaulted.date) errors.date = "날짜를 선택해주세요";
       if (Object.keys(errors).length > 0) {
         setFieldErrors(errors);
-        if (errors.title) titleRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
-        else if (errors.date) dateRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        dateRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
         return;
       }
     }
     setFieldErrors({});
-    await onSubmit(form, publish);
+    await onSubmit(defaulted, publish);
   }
 
   return (
