@@ -56,9 +56,18 @@ const inputErrCls =
 const textareaCls =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-y";
 
+function weekOfMonth(dateStr: string): string {
+  const d = new Date(dateStr + "T00:00:00");
+  const week = Math.ceil(d.getDate() / 7);
+  return ["첫째", "둘째", "셋째", "넷째", "다섯째"][week - 1] ?? `${week}째`;
+}
+
 export function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentInput {
   const titleFallback = f.date
-    ? `${f.date.replace(/-/g, ".")} 주일예배`
+    ? (() => {
+        const d = new Date(f.date + "T00:00:00");
+        return `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${weekOfMonth(f.date)}주 주보`;
+      })()
     : "주일예배";
   return {
     ...f,
