@@ -54,20 +54,20 @@ export function Footer() {
             </h3>
             <ul className="space-y-2 text-sm">
               <li className="flex justify-between">
-                <span>주일예배</span>
-                <span className="text-gray-300">8:00 / 10:00 / 12:00</span>
+                <span>새벽기도회</span>
+                <span className="text-gray-300">오전 6:00</span>
               </li>
               <li className="flex justify-between">
                 <span>수요예배</span>
                 <span className="text-gray-300">오후 7:30</span>
               </li>
               <li className="flex justify-between">
-                <span>금요예배</span>
-                <span className="text-gray-300">오후 7:30</span>
+                <span>금요기도회</span>
+                <span className="text-gray-300">오후 8:30</span>
               </li>
               <li className="flex justify-between">
-                <span>새벽예배</span>
-                <span className="text-gray-300">오전 6:00</span>
+                <span>주일예배</span>
+                <span className="text-gray-300">8:00 / 10:00 / 12:00</span>
               </li>
             </ul>
           </div>
