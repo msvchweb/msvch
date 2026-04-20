@@ -6,9 +6,17 @@ import { createClient } from "@/lib/supabase/client";
 import { WeeklyForm } from "@/components/weekly/WeeklyForm";
 import { WeeklyContentSchema, type WeeklyContentInput } from "@/lib/validation";
 
+function getUpcomingSunday(): string {
+  const today = new Date();
+  const daysUntilSunday = today.getDay() === 0 ? 0 : 7 - today.getDay();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() + daysUntilSunday);
+  return sunday.toISOString().split("T")[0];
+}
+
 const defaultForm: WeeklyContentInput = {
   title: "",
-  date: undefined,
+  date: getUpcomingSunday(),
   volume: null,
   issue: null,
   hymn_number: "",
