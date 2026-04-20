@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { WeeklyForm } from "@/components/weekly/WeeklyForm";
+import { WeeklyForm, applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
 import { WeeklyContentSchema, type WeeklyContentInput } from "@/lib/validation";
 import type { Weekly } from "@/types/notice";
 
@@ -71,7 +71,7 @@ export default function AdminWeeklyEditPage({
   }, [id, supabase]);
 
   async function handleSubmit(data: WeeklyContentInput, publish: boolean) {
-    const parsed = WeeklyContentSchema.safeParse(data);
+    const parsed = WeeklyContentSchema.safeParse(applyPlaceholderDefaults(data));
     if (!parsed.success) return;
 
     setSubmitting(true);

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { WeeklyForm } from "@/components/weekly/WeeklyForm";
+import { WeeklyForm, applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
 import { WeeklyContentSchema, type WeeklyContentInput } from "@/lib/validation";
 
 function getUpcomingSunday(): string {
@@ -47,7 +47,7 @@ export default function AdminWeeklyNewPage() {
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(data: WeeklyContentInput, publish: boolean) {
-    const parsed = WeeklyContentSchema.safeParse(data);
+    const parsed = WeeklyContentSchema.safeParse(applyPlaceholderDefaults(data));
     if (!parsed.success) return;
 
     setSubmitting(true);

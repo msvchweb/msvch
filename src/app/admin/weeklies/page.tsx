@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Trash2, Upload, FileText, Pencil, CheckCircle, Clock } from "lucide-react";
+import { Plus, Trash2, Upload, FileText, Pencil, CheckCircle, Clock, Eye } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import {
   validateFile,
@@ -135,6 +135,14 @@ export default function AdminWeekliesPage() {
               >
                 <Pencil size={14} /> 수정
               </Link>
+              <a
+                href={`/api/weeklies/${w.id}/preview`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-100"
+              >
+                <Eye size={14} /> 미리보기
+              </a>
               <button
                 onClick={() => {
                   fileInputRef.current?.setAttribute("data-weekly-id", w.id);

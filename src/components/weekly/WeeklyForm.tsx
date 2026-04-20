@@ -56,7 +56,7 @@ const inputErrCls =
 const textareaCls =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-y";
 
-function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentInput {
+export function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentInput {
   return {
     ...f,
     hymn_number: f.hymn_number || "342",
@@ -193,7 +193,7 @@ export function WeeklyForm({
       }
     }
     setFieldErrors({});
-    await onSubmit(applyPlaceholderDefaults(form), publish);
+    await onSubmit(form, publish);
   }
 
   return (
