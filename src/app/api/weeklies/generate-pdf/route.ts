@@ -7,10 +7,13 @@ export const maxDuration = 60;
 export const runtime = "nodejs";
 
 async function getChromiumExecutable(): Promise<string> {
-  // 프로덕션(Vercel)은 항상 @sparticuz/chromium 사용 — CHROME_EXECUTABLE_PATH 무시
+  // 프로덕션(Vercel): @sparticuz/chromium-min 으로 런타임에 바이너리 다운로드
   if (process.env.NODE_ENV === "production") {
-    const chromium = await import("@sparticuz/chromium");
-    return await chromium.default.executablePath();
+    const chromium = await import("@sparticuz/chromium-min");
+    const url =
+      process.env.CHROMIUM_DOWNLOAD_URL ??
+      "https://github.com/Sparticuz/chromium/releases/download/v147.0.0/chromium-v147.0.0-pack.tar";
+    return await chromium.default.executablePath(url);
   }
   // 로컬 개발: 명시적 경로 우선
   if (process.env.CHROME_EXECUTABLE_PATH) {
@@ -76,7 +79,7 @@ export async function POST(req: NextRequest) {
 
     let args: string[] = ["--no-sandbox", "--disable-setuid-sandbox"];
     if (process.env.NODE_ENV === "production") {
-      const chromium = await import("@sparticuz/chromium");
+      const chromium = await import("@sparticuz/chromium-min");
       args = chromium.default.args;
     }
 
