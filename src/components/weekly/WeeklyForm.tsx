@@ -57,8 +57,12 @@ const textareaCls =
   "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400 resize-y";
 
 export function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentInput {
+  const titleFallback = f.date
+    ? `${f.date.replace(/-/g, ".")} 주일예배`
+    : "주일예배";
   return {
     ...f,
+    title: f.title.trim() || titleFallback,
     hymn_number: f.hymn_number || "342",
     scripture: f.scripture || "요한복음 16:31-33",
     special_praise: {

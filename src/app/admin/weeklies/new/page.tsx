@@ -48,7 +48,10 @@ export default function AdminWeeklyNewPage() {
 
   async function handleSubmit(data: WeeklyContentInput, publish: boolean) {
     const parsed = WeeklyContentSchema.safeParse(applyPlaceholderDefaults(data));
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      alert("입력 오류: " + parsed.error.issues.map((e) => e.message).join(", "));
+      return;
+    }
 
     setSubmitting(true);
     const payload = {
