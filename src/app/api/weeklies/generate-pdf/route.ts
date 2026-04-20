@@ -91,8 +91,8 @@ export async function POST(req: NextRequest) {
 
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "domcontentloaded" });
-    // Google Fonts 등 외부 폰트가 로드될 때까지 대기
-    await page.evaluateHandle(() => document.fonts.ready);
+    // Google Fonts 등 외부 폰트가 로드될 때까지 대기 (evaluate로 Promise 해소까지 대기)
+    await page.evaluate(() => document.fonts.ready);
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
