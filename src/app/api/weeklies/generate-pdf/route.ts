@@ -7,14 +7,15 @@ export const maxDuration = 60;
 export const runtime = "nodejs";
 
 async function getChromiumExecutable(): Promise<string> {
-  if (process.env.CHROME_EXECUTABLE_PATH) {
-    return process.env.CHROME_EXECUTABLE_PATH;
-  }
+  // 프로덕션(Vercel)은 항상 @sparticuz/chromium 사용 — CHROME_EXECUTABLE_PATH 무시
   if (process.env.NODE_ENV === "production") {
     const chromium = await import("@sparticuz/chromium");
     return await chromium.default.executablePath();
   }
-  // Windows dev fallbacks
+  // 로컬 개발: 명시적 경로 우선
+  if (process.env.CHROME_EXECUTABLE_PATH) {
+    return process.env.CHROME_EXECUTABLE_PATH;
+  }
   const { existsSync } = await import("fs");
   const candidates = [
     "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
@@ -86,7 +87,9 @@ export async function POST(req: NextRequest) {
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "networkidle0" });
+    await page.setContent(html, { waitUntil: "domcontentloaded" });
+    // Google Fonts 등 외부 폰트가 로드될 때까지 대기
+    await page.evaluateHandle(() => document.fonts.ready);
     const pdf = await page.pdf({
       format: "A4",
       printBackground: true,
@@ -95,9 +98,10 @@ export async function POST(req: NextRequest) {
     await browser.close();
     pdfBuffer = Buffer.from(pdf);
   } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
     console.error("PDF generation error:", err);
     return NextResponse.json(
-      { error: "PDF generation failed" },
+      { error: "PDF generation failed", detail: message },
       { status: 500 },
     );
   }
