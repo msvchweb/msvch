@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { buildWeeklyHtml } from "@/lib/weekly-html-template";
-import type { Weekly } from "@/types/notice";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -59,10 +57,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "weeklyId required" }, { status: 400 });
   }
 
-  // 주보 데이터 조회
+  // 주보 존재 확인
   const { data: weekly, error: dbErr } = await supabase
     .from("weeklies")
-    .select("*")
+    .select("id")
     .eq("id", weeklyId)
     .single();
 
@@ -70,7 +68,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Weekly not found" }, { status: 404 });
   }
 
-  const html = buildWeeklyHtml(weekly as Weekly);
+  const bypassSecret = process.env.PRINT_BYPASS_SECRET;
+  if (!bypassSecret) {
+    return NextResponse.json(
+      { error: "PRINT_BYPASS_SECRET is not configured" },
+      { status: 500 },
+    );
+  }
+
+  const origin =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    req.nextUrl.origin ??
+    "http://localhost:3000";
+  const printUrl = `${origin}/weekly-print/${weeklyId}?token=${encodeURIComponent(
+    bypassSecret,
+  )}`;
 
   let pdfBuffer: Buffer;
   try {
@@ -90,8 +102,7 @@ export async function POST(req: NextRequest) {
     });
 
     const page = await browser.newPage();
-    await page.setContent(html, { waitUntil: "domcontentloaded" });
-    // Google Fonts 등 외부 폰트가 로드될 때까지 대기 (evaluate로 Promise 해소까지 대기)
+    await page.goto(printUrl, { waitUntil: "networkidle0", timeout: 30000 });
     await page.evaluate(() => document.fonts.ready);
     const pdf = await page.pdf({
       format: "A4",
