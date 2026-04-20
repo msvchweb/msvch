@@ -12,7 +12,7 @@ async function getChromiumExecutable(): Promise<string> {
     const chromium = await import("@sparticuz/chromium-min");
     const url =
       process.env.CHROMIUM_DOWNLOAD_URL ??
-      "https://github.com/Sparticuz/chromium/releases/download/v147.0.0/chromium-v147.0.0-pack.tar";
+      "https://github.com/Sparticuz/chromium/releases/download/v147.0.1/chromium-v147.0.1-pack.x64.tar";
     return await chromium.default.executablePath(url);
   }
   // 로컬 개발: 명시적 경로 우선
