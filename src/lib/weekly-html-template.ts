@@ -152,87 +152,124 @@ function buildFrontPage(w: Weekly): string {
 function buildBackPage(w: Weekly): string {
   const af = w.afternoon_service ?? { scripture: "", title: "", pastor: "" };
   const wed = w.wednesday_service ?? { scripture: "", title: "" };
+  const om = w.offering_members ?? { p1: "", p2: "", p3: "" };
   const dawn = w.dawn_readings ?? [];
   const prayers = w.prayer_items ?? [];
-  const notices = w.announcements ?? [];
 
-  const dawnRows = dawn
-    .map(
-      (d) =>
-        `<tr><td class="dawn-date">${esc(d.date)}</td><td class="dawn-passage">${esc(d.passage)}</td></tr>`,
-    )
+  // Dawn readings: 2 entries per row (4 columns)
+  const dawnRows: string[] = [];
+  for (let i = 0; i < dawn.length; i += 2) {
+    const a = dawn[i];
+    const b = dawn[i + 1];
+    dawnRows.push(`<tr>
+      <td class="dn-d">${esc(a.date)}</td>
+      <td class="dn-p">${esc(a.passage)}</td>
+      ${b ? `<td class="dn-d">${esc(b.date)}</td><td class="dn-p">${esc(b.passage)}</td>` : "<td></td><td></td>"}
+    </tr>`);
+  }
+
+  // Prayer items: split into 2 columns
+  const half = Math.ceil(prayers.length / 2);
+  const leftPrayers = prayers
+    .slice(0, half)
+    .map((p, i) => `<div class="pr-item"><b>${i + 1}.</b> ${nl2br(p.text)}</div>`)
     .join("");
-
-  const prayerHtml = prayers
-    .map((p, i) => `<div class="prayer-item"><span class="prayer-num">${i + 1}.</span> ${nl2br(p.text)}</div>`)
-    .join("");
-
-  const noticeHtml = notices
-    .map((n, i) => `<div class="notice-item"><span class="notice-num">${i + 1}.</span> ${nl2br(n.text)}</div>`)
+  const rightPrayers = prayers
+    .slice(half)
+    .map((p, i) => `<div class="pr-item"><b>${i + half + 1}.</b> ${nl2br(p.text)}</div>`)
     .join("");
 
   return `
 <div class="page back-page">
-  <div class="back-columns">
-    <!-- 좌측 -->
-    <div class="back-col-left">
-      <!-- 주일오후 찬양예배 -->
-      <div class="back-section">
-        <div class="back-section-title">주일오후 찬양예배</div>
-        <div class="back-section-sub">저녁 7시30분 / 인도: 이장재 목사</div>
+  <div class="back-grid">
+
+    <!-- ── 왼쪽 컬럼 ── -->
+    <div class="back-left">
+
+      <div class="b-section">
+        <div class="b-title">주일오후 찬양예배</div>
+        <div class="b-sub">오후 2시30분 / 인도: 이장재 목사</div>
         <table class="dot-table">
-          ${dot("성 경 봉 독", esc(af.scripture))}
+          <tr><td class="dot-left">기 도</td><td class="dot-cell"></td><td class="dot-right">다 함께</td></tr>
+          ${dot("성경봉독", af.scripture)}
           ${dot("말 씀", `"${esc(af.title)}"  ${esc(af.pastor)} 목사`)}
+          <tr><td class="dot-left">찬 송</td><td class="dot-cell"></td><td class="dot-right">다 함께</td></tr>
+          <tr><td class="dot-left">광 고</td><td class="dot-cell"></td><td class="dot-right">인도자</td></tr>
         </table>
       </div>
 
-      <!-- 수요예배 -->
-      <div class="back-section">
-        <div class="back-section-title">수요예배</div>
-        <div class="back-section-sub">저녁 7시30분 / 인도: 이장재 목사</div>
+      <div class="b-section">
+        <div class="b-title">수요예배</div>
+        <div class="b-sub">저녁 7시30분 / 인도: 이장재 목사</div>
         <table class="dot-table">
-          ${dot("성 경 봉 독", esc(wed.scripture))}
-          ${dot("말 씀", `"${esc(wed.title)}"`)}
+          ${dot("성경봉독", wed.scripture)}
+          ${dot("특 강", `"${esc(wed.title)}"`)}
+          <tr><td class="dot-left">찬 송</td><td class="dot-cell"></td><td class="dot-right">다 함께</td></tr>
+          <tr><td class="dot-left">광 고</td><td class="dot-cell"></td><td class="dot-right">인도자</td></tr>
         </table>
       </div>
 
-      <!-- 새벽예배 신앙일기 -->
+      <div class="b-section">
+        <div class="b-title">다음 주 기도 / 헌금위원</div>
+        <table class="oh-table">
+          <thead><tr><th>부서</th><th>헌금위원</th></tr></thead>
+          <tbody>
+            <tr><td class="oh-part">1부</td><td>${esc(om.p1)}</td></tr>
+            <tr><td class="oh-part">2부</td><td>${esc(om.p2)}</td></tr>
+            <tr><td class="oh-part">3부</td><td>${esc(om.p3)}</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       ${dawn.length > 0 ? `
-      <div class="back-section">
-        <div class="back-section-title">새벽예배（신앙일기）</div>
-        <table class="dawn-table">
-          ${dawnRows}
+      <div class="b-section">
+        <div class="b-title">새벽예배（신앙일기）</div>
+        <table class="dawn2">
+          ${dawnRows.join("")}
         </table>
       </div>` : ""}
 
-      <!-- 공지사항 -->
-      ${noticeHtml ? `
-      <div class="back-section">
-        <div class="back-section-title">교회 소식</div>
-        <div class="notice-list">${noticeHtml}</div>
+      ${prayers.length > 0 ? `
+      <div class="b-section">
+        <div class="b-title">교회공동체 기도제목</div>
+        <div class="pr-cols">
+          <div class="pr-col">${leftPrayers}</div>
+          <div class="pr-col">${rightPrayers}</div>
+        </div>
       </div>` : ""}
+
+      <div class="b-section">
+        <div class="b-title">예배모임 안내</div>
+        <table class="ws-table">
+          <tr><td>주일 1부</td><td>오전 8시</td><td>본 당</td><td></td><td></td><td></td></tr>
+          <tr><td>주일 2부</td><td>오전 10시</td><td>이 동 부</td><td>교육관 2층</td><td></td><td></td></tr>
+          <tr><td>주일 3부</td><td>낮 12시</td><td>본 당</td><td></td><td></td><td></td></tr>
+          <tr><td>주일오후 찬양</td><td>오후 2시30분</td><td>본 당</td><td>청년부</td><td>토요일</td><td>7시30분</td></tr>
+          <tr><td>금요기도회</td><td>저녁 8시30분</td><td>본 당</td><td></td><td></td><td></td></tr>
+          <tr><td>새벽기도회</td><td colspan="5">오전 6시 (월~금,토) / 주일 7시30분</td></tr>
+        </table>
+        <div class="ws-note">※ 석강 결석시 교역자에게 연락하여 주십시오.</div>
+      </div>
+
     </div>
 
-    <!-- 우측: 소그룹 목각 -->
-    <div class="back-col-right">
-      <div class="back-section-title">소그룹 목각</div>
-      <div class="small-group-text">${nl2br(w.servants_text ?? "")}</div>
+    <!-- ── 중간 컬럼: 소그룹 목장 ── -->
+    <div class="back-mid">
+      <div class="b-title">소그룹 목장</div>
+      ${w.sogroup_text
+        ? `<div class="sogroup-text">${nl2br(w.sogroup_text)}</div>`
+        : `<div class="sogroup-empty">（소그룹 목장 정보가 없습니다）</div>`}
     </div>
+
+    <!-- ── 오른쪽 컬럼: 향기로운 예물 ── -->
+    <div class="back-right">
+      <div class="b-title">향기로운 예물</div>
+      ${w.offering_list_text
+        ? `<div class="offering-text">${nl2br(w.offering_list_text)}</div>`
+        : ""}
+    </div>
+
   </div>
-
-  <!-- 교회공동체 기도제목 -->
-  ${prayerHtml ? `
-  <div class="prayer-section">
-    <div class="prayer-section-title">교회공동체 기도제목</div>
-    <div class="prayer-list">${prayerHtml}</div>
-  </div>` : ""}
-
-  <!-- 향기로운 예물 -->
-  ${w.offering_list_text ? `
-  <div class="offering-list-section">
-    <div class="offering-list-title">향기로운 예물</div>
-    <div class="offering-list-content">${nl2br(w.offering_list_text)}</div>
-  </div>` : ""}
 </div>`;
 }
 
@@ -420,94 +457,110 @@ const CSS = `
   .supporters-title { margin-top: 4mm; }
   .supporters-note { font-size: 6.5pt; color: #666; margin-bottom: 2mm; }
 
-  /* ── 뒷면 ── */
-  .back-page { }
-  .back-columns {
-    display: flex;
-    gap: 4mm;
-    margin-bottom: 3mm;
+  /* ── 뒷면 3단 그리드 ── */
+  .back-grid {
+    display: grid;
+    grid-template-columns: 72mm 76mm 1fr;
+    gap: 0 3.5mm;
+    height: calc(297mm - 14mm);
   }
-  .back-col-left { flex: 0 0 98mm; }
-  .back-col-right {
-    flex: 1;
-    border-left: 1px solid #ccc;
-    padding-left: 4mm;
+  .back-left {
+    border-right: 1px solid #ccc;
+    padding-right: 3mm;
+    overflow: hidden;
   }
-
-  .back-section { margin-bottom: 3mm; }
-  .back-section-title {
-    font-size: 9pt;
-    font-weight: 700;
-    border-bottom: 1.5px solid #333;
-    padding-bottom: 1mm;
-    margin-bottom: 1.5mm;
+  .back-mid {
+    border-right: 1px solid #ccc;
+    padding: 0 3mm;
+    overflow: hidden;
   }
-  .back-section-sub {
-    font-size: 7pt;
-    color: #555;
-    margin-bottom: 1.5mm;
+  .back-right {
+    padding-left: 0;
+    overflow: hidden;
   }
 
-  /* ── 새벽예배 ── */
-  .dawn-table { border-collapse: collapse; width: 100%; }
-  .dawn-table td { font-size: 7.5pt; padding: 0.6mm 1mm; border-bottom: 1px solid #eee; }
-  .dawn-date { font-weight: 500; white-space: nowrap; width: 18mm; }
-  .dawn-passage { }
-
-  /* ── 소그룹 ── */
-  .small-group-text {
-    font-size: 7pt;
-    line-height: 1.6;
-    white-space: pre-wrap;
-  }
-
-  /* ── 기도제목 ── */
-  .prayer-section {
-    border-top: 2px solid #333;
-    padding-top: 2mm;
-    margin-bottom: 3mm;
-  }
-  .prayer-section-title {
-    font-size: 9pt;
-    font-weight: 700;
-    margin-bottom: 2mm;
-  }
-  .prayer-list {
-    column-count: 2;
-    column-gap: 5mm;
-  }
-  .prayer-item {
-    font-size: 7.5pt;
-    line-height: 1.5;
-    margin-bottom: 1.5mm;
-    break-inside: avoid;
-  }
-  .prayer-num { font-weight: 700; }
-
-  /* ── 공지 ── */
-  .notice-list { }
-  .notice-item {
-    font-size: 7.5pt;
-    line-height: 1.5;
-    margin-bottom: 1.5mm;
-  }
-  .notice-num { font-weight: 700; }
-
-  /* ── 향기로운 예물 ── */
-  .offering-list-section {
-    border-top: 1px solid #ccc;
-    padding-top: 2mm;
-  }
-  .offering-list-title {
+  /* ── 뒷면 섹션 공통 ── */
+  .b-section { margin-bottom: 2.5mm; }
+  .b-title {
     font-size: 8.5pt;
     font-weight: 700;
+    border-bottom: 1.5px solid #333;
+    padding-bottom: 0.8mm;
     margin-bottom: 1.5mm;
   }
-  .offering-list-content {
+  .b-sub {
+    font-size: 6.5pt;
+    color: #555;
+    margin-bottom: 1mm;
+  }
+
+  /* ── 헌금위원 테이블 ── */
+  .oh-table {
+    border-collapse: collapse;
+    width: 100%;
     font-size: 7pt;
-    line-height: 1.6;
-    column-count: 2;
-    column-gap: 5mm;
+  }
+  .oh-table th {
+    font-size: 6.5pt;
+    font-weight: 600;
+    border-bottom: 1px solid #bbb;
+    padding: 0.5mm 1mm;
+    text-align: left;
+    color: #444;
+  }
+  .oh-table td { padding: 0.5mm 1mm; }
+  .oh-part { font-weight: 600; width: 8mm; color: #333; }
+
+  /* ── 새벽예배 2열 ── */
+  .dawn2 { border-collapse: collapse; width: 100%; }
+  .dawn2 td { font-size: 6.5pt; padding: 0.4mm 1mm; border-bottom: 1px solid #eee; }
+  .dn-d { font-weight: 500; white-space: nowrap; width: 18mm; color: #333; }
+  .dn-p { }
+
+  /* ── 기도제목 2열 ── */
+  .pr-cols { display: flex; gap: 3mm; }
+  .pr-col { flex: 1; }
+  .pr-item {
+    font-size: 6.5pt;
+    line-height: 1.45;
+    margin-bottom: 1mm;
+  }
+
+  /* ── 예배모임 안내 ── */
+  .ws-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 6.5pt;
+  }
+  .ws-table td {
+    padding: 0.5mm 1mm;
+    border: 1px solid #ddd;
+    white-space: nowrap;
+  }
+  .ws-note {
+    font-size: 6pt;
+    color: #666;
+    margin-top: 1mm;
+  }
+
+  /* ── 소그룹 목장 ── */
+  .sogroup-text {
+    font-size: 6pt;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-all;
+  }
+  .sogroup-empty {
+    font-size: 7pt;
+    color: #aaa;
+    margin-top: 2mm;
+  }
+
+  /* ── 향기로운 예물 ── */
+  .offering-text {
+    font-size: 6.5pt;
+    line-height: 1.55;
+    word-break: break-all;
   }
 `;
 

@@ -79,6 +79,7 @@ export interface Weekly {
   announcements: Announcement[];
   servants_text: string | null;
   offering_list_text: string | null;
+  sogroup_text?: string | null;
   is_published: boolean;
   publish_channels: PublishChannels;
 }
