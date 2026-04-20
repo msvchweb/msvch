@@ -2,6 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium"],
+  experimental: {
+    outputFileTracingIncludes: {
+      "/api/weeklies/generate-pdf": [
+        "./node_modules/@sparticuz/chromium/bin/**",
+      ],
+    },
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.ytimg.com" },
