@@ -9,7 +9,6 @@ interface Row {
   id: number;
   name: string;
   sub: string;
-  year: number | null;
   active: boolean;
 }
 
@@ -25,15 +24,15 @@ export default function AdminMasterMokjangPage() {
     async function load() {
       const { data } = await supabase
         .from("mokjang_entries")
-        .select("id, name, sub, year, active, updated_at")
+        .select("id, name, sub, active, updated_at")
         .order("id", { ascending: true });
       const list = (data ?? []) as MokjangEntryRow[];
       // fill 1..40 so admin edits the fixed 40-row grid
       const base: Row[] = Array.from({ length: 40 }, (_, i) => {
         const existing = list.find((r) => r.id === i + 1);
         return existing
-          ? { id: existing.id, name: existing.name, sub: existing.sub, year: existing.year, active: existing.active }
-          : { id: i + 1, name: "", sub: "", year: null, active: true };
+          ? { id: existing.id, name: existing.name, sub: existing.sub, active: existing.active }
+          : { id: i + 1, name: "", sub: "", active: true };
       });
       setRows(base);
       setLoading(false);
@@ -112,7 +111,6 @@ export default function AdminMasterMokjangPage() {
               <th className="px-3 py-2 text-left">번호</th>
               <th className="px-3 py-2 text-left">목자</th>
               <th className="px-3 py-2 text-left">부목자</th>
-              <th className="px-3 py-2 text-left">연도</th>
               <th className="px-3 py-2 text-left">활성</th>
             </tr>
           </thead>
@@ -132,16 +130,6 @@ export default function AdminMasterMokjangPage() {
                     className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
                     value={r.sub}
                     onChange={(e) => updateRow(r.id, { sub: e.target.value })}
-                  />
-                </td>
-                <td className="px-3 py-1.5 w-24">
-                  <input
-                    type="number"
-                    className="w-full rounded border border-gray-200 px-2 py-1 text-sm"
-                    value={r.year ?? ""}
-                    onChange={(e) =>
-                      updateRow(r.id, { year: e.target.value ? Number(e.target.value) : null })
-                    }
                   />
                 </td>
                 <td className="px-3 py-1.5 w-16 text-center">

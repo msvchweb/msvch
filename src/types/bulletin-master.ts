@@ -24,7 +24,6 @@ export interface MokjangEntryRow {
   id: number;
   name: string;
   sub: string;
-  year: number | null;
   active: boolean;
   updated_at: string;
 }

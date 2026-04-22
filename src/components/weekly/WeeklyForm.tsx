@@ -1,8 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
-  DawnReading,
   PrayerItem,
   Announcement,
   NewsItem,
@@ -10,14 +9,25 @@ import type {
   NewMemberRow,
   WorshipItemRow,
   WorshipSubRow,
-  GuideCommitteeRow,
-  OfferingCategoryRow,
 } from "@/types/notice";
 import type { WeeklyContentInput } from "@/lib/validation";
 import { FormTabs, type FormTab } from "./form/FormTabs";
 import { DynamicArrayField } from "./form/DynamicArrayField";
 import { Field, SectionTitle } from "./form/Field";
 import { inputCls, inputErrCls, textareaCls, weekOfMonth } from "./form/shared";
+import {
+  WORSHIP_ITEMS_TEMPLATE,
+  WORSHIP_SLOT_HINTS,
+  OFFERING_CATEGORIES,
+  NEXT_WEEK_PRAYER_PARTS,
+  GUIDE_COMMITTEE_PARTS,
+  DAWN_WEEKDAY_LABELS,
+  emptyOfferings,
+  emptyWorshipItems,
+  emptyGuideCommittee,
+  emptyNextWeekPrayer,
+  buildDawnReadings,
+} from "./form/constants";
 
 interface Props {
   initial: WeeklyContentInput;
@@ -26,6 +36,58 @@ interface Props {
   generatingPdf?: boolean;
   submitting?: boolean;
   weeklyId?: string;
+  /** 현재 폼 값을 부모(미리보기 등)에 노출. 상태 저장 용도가 아니라 파생 값 전달 용도 */
+  onFormChange?: (form: WeeklyContentInput) => void;
+}
+
+/** 고정 슬롯(예배순서/헌금/다음주기도/안내위원/새벽예배) 길이 정합성 보정 */
+function normalizeFixedSlots(f: WeeklyContentInput): WeeklyContentInput {
+  const next: WeeklyContentInput = { ...f };
+  let changed = false;
+  if (next.worship_items.length !== WORSHIP_ITEMS_TEMPLATE.length) {
+    // 기존 값이 있으면 길이 맞춰 prefill, 부족분은 템플릿 기본값
+    const base = emptyWorshipItems();
+    next.worship_items.slice(0, base.length).forEach((src, i) => {
+      base[i] = {
+        marker: base[i].marker, // marker/label 은 템플릿 고정
+        label: base[i].label,
+        content: src.content ?? base[i].content,
+        assignees: (src.assignees ?? base[i].assignees).slice(0, Math.max(base[i].assignees.length, 1)),
+        subRows: src.subRows.length > 0 ? src.subRows : base[i].subRows,
+        emphasize: base[i].emphasize,
+      };
+    });
+    next.worship_items = base;
+    changed = true;
+  }
+  if (next.offerings.length !== OFFERING_CATEGORIES.length) {
+    const base = emptyOfferings();
+    next.offerings.forEach((src) => {
+      const idx = OFFERING_CATEGORIES.findIndex((l) => l === src.label);
+      if (idx >= 0) base[idx].names = src.names ?? "";
+    });
+    next.offerings = base;
+    changed = true;
+  }
+  if (next.next_week_prayer.length !== NEXT_WEEK_PRAYER_PARTS.length) {
+    const base = emptyNextWeekPrayer();
+    next.next_week_prayer.slice(0, base.length).forEach((v, i) => (base[i] = v));
+    next.next_week_prayer = base;
+    changed = true;
+  }
+  if (next.guide_committee.length !== GUIDE_COMMITTEE_PARTS.length) {
+    const base = emptyGuideCommittee();
+    next.guide_committee.slice(0, base.length).forEach((src, i) => {
+      base[i] = { part: GUIDE_COMMITTEE_PARTS[i], indoor: src.indoor ?? "", outdoor: src.outdoor ?? "" };
+    });
+    next.guide_committee = base;
+    changed = true;
+  }
+  if (next.dawn_readings.length !== DAWN_WEEKDAY_LABELS.length) {
+    next.dawn_readings = buildDawnReadings(next.date, next.dawn_readings);
+    changed = true;
+  }
+  return changed ? next : f;
 }
 
 export function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentInput {
@@ -80,11 +142,26 @@ export function WeeklyForm({
   generatingPdf,
   submitting,
   weeklyId,
+  onFormChange,
 }: Props) {
-  const [form, setForm] = useState<WeeklyContentInput>(initial);
+  const [form, setForm] = useState<WeeklyContentInput>(() => normalizeFixedSlots(initial));
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
   const titleRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
+
+  // 날짜 변경 시 새벽예배 일자 자동 재생성 (본문은 유지)
+  const currentDate = form.date;
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      dawn_readings: buildDawnReadings(currentDate, prev.dawn_readings),
+    }));
+  }, [currentDate]);
+
+  // 파생 form 값을 부모(미리보기)로 전달
+  useEffect(() => {
+    onFormChange?.(form);
+  }, [form, onFormChange]);
 
   function clearError(key: string) {
     setFieldErrors((prev) => {
@@ -311,7 +388,7 @@ function BasicTab({
 }
 
 // ─────────────────────────────────────────────
-//  Tab 2: 주일예배
+//  Tab 2: 주일예배 (순서 고정 17행)
 // ─────────────────────────────────────────────
 
 function WorshipTab({ form, set }: TabProps) {
@@ -330,25 +407,23 @@ function WorshipTab({ form, set }: TabProps) {
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>예배 순서 (최대 24개)</SectionTitle>
-        <DynamicArrayField<WorshipItemRow>
-          label="순서"
-          items={form.worship_items}
-          max={24}
-          addLabel="순서 추가"
-          createEmpty={() => ({
-            marker: "",
-            label: "",
-            content: "",
-            assignees: [],
-            subRows: [],
-            emphasize: false,
-          })}
-          onChange={(next) => set("worship_items", next)}
-          renderRow={(it, i, update) => (
-            <WorshipItemRowEditor item={it} index={i} update={update} />
-          )}
-        />
+        <SectionTitle>예배 순서 (고정 {WORSHIP_ITEMS_TEMPLATE.length}행)</SectionTitle>
+        <p className="mb-3 text-xs text-gray-500">
+          순서·제목은 고정되어 있으며, <strong>내용과 담당자</strong>만 수정합니다.
+        </p>
+        <div className="space-y-2">
+          {form.worship_items.map((it, i) => (
+            <FixedWorshipRow
+              key={i}
+              index={i}
+              item={it}
+              onUpdate={(patch) => {
+                const next = form.worship_items.map((x, idx) => (idx === i ? { ...x, ...patch } : x));
+                set("worship_items", next);
+              }}
+            />
+          ))}
+        </div>
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
@@ -400,210 +475,109 @@ function WorshipTab({ form, set }: TabProps) {
               placeholder="요한복음 16:31-33"
             />
           </Field>
-          <Field label="설교 제목">
-            <input
-              className={inputCls}
-              value={form.sermon_title}
-              onChange={(e) => set("sermon_title", e.target.value)}
-            />
-          </Field>
-          <Field label="설교자">
-            <input
-              className={inputCls}
-              value={form.sermon_pastor}
-              onChange={(e) => set("sermon_pastor", e.target.value)}
-            />
-          </Field>
-          <Field label="결단 찬송">
-            <input
-              className={inputCls}
-              value={form.closing_hymn}
-              onChange={(e) => set("closing_hymn", e.target.value)}
-            />
-          </Field>
-          <Field label="입술말씀">
-            <textarea
-              className={textareaCls}
-              rows={2}
-              value={form.weekly_verse}
-              onChange={(e) => set("weekly_verse", e.target.value)}
-            />
-          </Field>
-          <Field label="특별찬양 1부 곡명">
-            <input
-              className={inputCls}
-              value={form.special_praise.part1.song}
-              onChange={(e) =>
-                set("special_praise", {
-                  ...form.special_praise,
-                  part1: { ...form.special_praise.part1, song: e.target.value },
-                })
-              }
-            />
-          </Field>
-          <Field label="특별찬양 1부 찬양대">
-            <input
-              className={inputCls}
-              value={form.special_praise.part1.choir}
-              onChange={(e) =>
-                set("special_praise", {
-                  ...form.special_praise,
-                  part1: { ...form.special_praise.part1, choir: e.target.value },
-                })
-              }
-            />
-          </Field>
-          <Field label="특별찬양 2부 곡명">
-            <input
-              className={inputCls}
-              value={form.special_praise.part2.song}
-              onChange={(e) =>
-                set("special_praise", {
-                  ...form.special_praise,
-                  part2: { ...form.special_praise.part2, song: e.target.value },
-                })
-              }
-            />
-          </Field>
-          <Field label="특별찬양 2부 찬양대">
-            <input
-              className={inputCls}
-              value={form.special_praise.part2.choir}
-              onChange={(e) =>
-                set("special_praise", {
-                  ...form.special_praise,
-                  part2: { ...form.special_praise.part2, choir: e.target.value },
-                })
-              }
-            />
-          </Field>
         </div>
       </section>
     </div>
   );
 }
 
-function WorshipItemRowEditor({
+function FixedWorshipRow({
+  index,
   item,
-  update,
+  onUpdate,
 }: {
-  item: WorshipItemRow;
   index: number;
-  update: (patch: Partial<WorshipItemRow>) => void;
+  item: WorshipItemRow;
+  onUpdate: (patch: Partial<WorshipItemRow>) => void;
 }) {
-  const assigneesText = item.assignees.join("\n");
+  const hint = WORSHIP_SLOT_HINTS[index] ?? {};
+  const assigneeLabels = hint.assigneeLabels;
+  const subRowLabels = hint.subRowLabels;
+
   return (
-    <div className="space-y-2">
-      <div className="grid gap-2 sm:grid-cols-[5rem_10rem_1fr]">
-        <Field label="※ 마커">
-          <input
-            className={inputCls}
-            value={item.marker}
-            onChange={(e) => update({ marker: e.target.value })}
-            placeholder="※ 또는 공백"
-          />
-        </Field>
-        <Field label="제목">
-          <input
-            className={inputCls}
-            value={item.label}
-            onChange={(e) => update({ label: e.target.value })}
-            placeholder="예배의 부름"
-          />
-        </Field>
-        <Field label="내용">
-          <input
-            className={inputCls}
-            value={item.content}
-            onChange={(e) => update({ content: e.target.value })}
-            placeholder="&quot;하나님은 영이시니...&quot;"
-          />
-        </Field>
+    <div className="rounded border border-gray-200 bg-gray-50 p-3">
+      <div className="mb-2 flex items-center gap-2">
+        <span className="inline-block w-6 text-center text-sm font-semibold text-gray-500">
+          {item.marker || "·"}
+        </span>
+        <span className="text-sm font-semibold text-gray-800">{item.label}</span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-        <Field label="담당자 (여러 줄 = 여러 명)" hint="예: 1부 문영애 권사\n2부 이기석 집사">
-          <textarea
-            className={textareaCls}
-            rows={2}
-            value={assigneesText}
-            onChange={(e) =>
-              update({
-                assignees: e.target.value
-                  .split("\n")
-                  .map((s) => s.trim())
-                  .filter((s) => s.length > 0)
-                  .slice(0, 5),
-              })
-            }
-            placeholder="다함께"
-          />
-        </Field>
-        <Field label="강조">
-          <label className="inline-flex h-9 items-center gap-2 px-2">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-gray-300"
-              checked={item.emphasize}
-              onChange={(e) => update({ emphasize: e.target.checked })}
-            />
-            <span className="text-xs text-gray-600">굵게</span>
-          </label>
-        </Field>
-      </div>
-      {/* subRows (찬양 1부/2부 처럼 nested) */}
-      <details className="mt-2 rounded border border-gray-200 p-2">
-        <summary className="cursor-pointer text-xs font-semibold text-gray-600">
-          세부 행 ({item.subRows.length}/4) — 찬양 항목처럼 병합 표시
-        </summary>
-        <div className="mt-2 space-y-2">
-          {item.subRows.map((sr, j) => (
-            <div key={j} className="grid gap-2 sm:grid-cols-[1fr_10rem_auto]">
+
+      {/* 내용 */}
+      <Field label="내용">
+        <input
+          className={inputCls}
+          value={item.content}
+          onChange={(e) => onUpdate({ content: e.target.value })}
+          placeholder="빈 칸으로 두면 주보에 공백으로 표시됩니다"
+        />
+      </Field>
+
+      {/* 담당자: 힌트가 있으면 슬롯별 개별 입력, 없으면 단일 입력 */}
+      {assigneeLabels && assigneeLabels.length > 0 ? (
+        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+          {assigneeLabels.map((lb, i) => (
+            <Field key={i} label={lb}>
               <input
                 className={inputCls}
-                value={sr.content}
+                value={item.assignees[i] ?? ""}
                 onChange={(e) => {
-                  const next = item.subRows.map((s, idx) =>
-                    idx === j ? { ...s, content: e.target.value } : s,
-                  );
-                  update({ subRows: next });
+                  const next = [...item.assignees];
+                  while (next.length <= i) next.push("");
+                  next[i] = e.target.value;
+                  onUpdate({ assignees: next });
                 }}
-                placeholder="1부 : 주 예수 나의 산 소망"
+                placeholder="이름"
               />
-              <input
-                className={inputCls}
-                value={sr.assignee}
-                onChange={(e) => {
-                  const next = item.subRows.map((s, idx) =>
-                    idx === j ? { ...s, assignee: e.target.value } : s,
-                  );
-                  update({ subRows: next });
-                }}
-                placeholder="호산나 찬양대"
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  update({ subRows: item.subRows.filter((_, idx) => idx !== j) })
-                }
-                className="rounded border border-red-200 px-2 text-xs text-red-500 hover:bg-red-50"
-              >
-                삭제
-              </button>
-            </div>
+            </Field>
           ))}
-          <button
-            type="button"
-            disabled={item.subRows.length >= 4}
-            onClick={() => {
-              const empty: WorshipSubRow = { content: "", assignee: "" };
-              update({ subRows: [...item.subRows, empty] });
-            }}
-            className="rounded border border-dashed border-gray-300 px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 disabled:opacity-40"
-          >
-            + 세부 행 추가
-          </button>
         </div>
-      </details>
+      ) : item.assignees.length === 0 ? null : (
+        <Field label="담당">
+          <input
+            className={inputCls}
+            value={item.assignees[0] ?? ""}
+            onChange={(e) => onUpdate({ assignees: [e.target.value] })}
+            placeholder={item.assignees[0] || "담당자"}
+          />
+        </Field>
+      )}
+
+      {/* subRows: 찬양(1부/2부) 등 */}
+      {subRowLabels && subRowLabels.length > 0 && (
+        <div className="mt-2 grid gap-2">
+          {subRowLabels.map((lb, j) => {
+            const sr: WorshipSubRow = item.subRows[j] ?? { content: "", assignee: "" };
+            return (
+              <div key={j} className="grid gap-2 sm:grid-cols-[8rem_1fr_1fr] items-center">
+                <span className="text-xs font-medium text-gray-600">{lb}</span>
+                <input
+                  className={inputCls}
+                  value={sr.content}
+                  onChange={(e) => {
+                    const next = [...item.subRows];
+                    while (next.length <= j) next.push({ content: "", assignee: "" });
+                    next[j] = { ...next[j], content: e.target.value };
+                    onUpdate({ subRows: next });
+                  }}
+                  placeholder={`${lb} 곡명`}
+                />
+                <input
+                  className={inputCls}
+                  value={sr.assignee}
+                  onChange={(e) => {
+                    const next = [...item.subRows];
+                    while (next.length <= j) next.push({ content: "", assignee: "" });
+                    next[j] = { ...next[j], assignee: e.target.value };
+                    onUpdate({ assignees: item.assignees, subRows: next });
+                  }}
+                  placeholder={`${lb} 찬양대`}
+                />
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -777,6 +751,10 @@ function FrontTab({ form, set }: TabProps) {
 // ─────────────────────────────────────────────
 
 function BackLeftTab({ form, set }: TabProps) {
+  const dawnDates = useMemo(
+    () => buildDawnReadings(form.date, form.dawn_readings),
+    [form.date, form.dawn_readings],
+  );
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-gray-200 bg-white p-6">
@@ -852,28 +830,25 @@ function BackLeftTab({ form, set }: TabProps) {
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>다음 주 기도 (1·2·3부, 최대 3개)</SectionTitle>
-        <DynamicArrayField<string>
-          label="다음주 기도"
-          items={form.next_week_prayer}
-          max={3}
-          addLabel="기도자 추가"
-          createEmpty={() => ""}
-          onChange={(next) => set("next_week_prayer", next)}
-          renderRow={(p, i, update) => (
-            <input
-              className={inputCls}
-              value={p}
-              onChange={(e) => {
-                const next = [...form.next_week_prayer];
-                next[i] = e.target.value;
-                set("next_week_prayer", next);
-                void update;
-              }}
-              placeholder={`${i + 1}부 기도자`}
-            />
-          )}
-        />
+        <SectionTitle>다음 주 기도 (1·2·3부 고정)</SectionTitle>
+        <p className="mb-3 text-xs text-gray-500">1부/2부/3부 이름만 입력합니다.</p>
+        <div className="grid gap-4 sm:grid-cols-3">
+          {NEXT_WEEK_PRAYER_PARTS.map((part, i) => (
+            <Field key={part} label={part}>
+              <input
+                className={inputCls}
+                value={form.next_week_prayer[i] ?? ""}
+                onChange={(e) => {
+                  const next = [...form.next_week_prayer];
+                  while (next.length <= i) next.push("");
+                  next[i] = e.target.value;
+                  set("next_week_prayer", next);
+                }}
+                placeholder="이름"
+              />
+            </Field>
+          ))}
+        </div>
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
@@ -897,104 +872,113 @@ function BackLeftTab({ form, set }: TabProps) {
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>안내위원 (1·2·3부)</SectionTitle>
-        <DynamicArrayField<GuideCommitteeRow>
-          label="안내위원"
-          items={form.guide_committee}
-          max={3}
-          addLabel="안내 추가"
-          createEmpty={() => ({ part: "", indoor: "", outdoor: "" })}
-          onChange={(next) => set("guide_committee", next)}
-          renderRow={(g, _i, update) => (
-            <div className="grid gap-2 sm:grid-cols-3">
-              <input
-                className={inputCls}
-                value={g.part}
-                onChange={(e) => update({ part: e.target.value })}
-                placeholder="1부"
-              />
-              <input
-                className={inputCls}
-                value={g.indoor}
-                onChange={(e) => update({ indoor: e.target.value })}
-                placeholder="실내 안내자"
-              />
-              <input
-                className={inputCls}
-                value={g.outdoor}
-                onChange={(e) => update({ outdoor: e.target.value })}
-                placeholder="실외 안내자"
-              />
-            </div>
-          )}
-        />
+        <SectionTitle>안내위원 (1·2·3부 × 실내/실외 고정)</SectionTitle>
+        <p className="mb-3 text-xs text-gray-500">각 부별로 실내/실외 안내자 이름만 입력합니다.</p>
+        <div className="space-y-3">
+          <div className="grid gap-2 sm:grid-cols-[4rem_1fr_1fr] items-center text-xs font-semibold text-gray-500">
+            <span></span>
+            <span>실내</span>
+            <span>실외</span>
+          </div>
+          {GUIDE_COMMITTEE_PARTS.map((part, i) => {
+            const row = form.guide_committee[i] ?? { part, indoor: "", outdoor: "" };
+            return (
+              <div key={part} className="grid gap-2 sm:grid-cols-[4rem_1fr_1fr] items-center">
+                <span className="text-sm font-semibold text-gray-700">{part}</span>
+                <input
+                  className={inputCls}
+                  value={row.indoor}
+                  onChange={(e) => {
+                    const next = [...form.guide_committee];
+                    while (next.length <= i) next.push({ part: GUIDE_COMMITTEE_PARTS[next.length], indoor: "", outdoor: "" });
+                    next[i] = { ...next[i], part, indoor: e.target.value };
+                    set("guide_committee", next);
+                  }}
+                  placeholder={`${part} 실내`}
+                />
+                <input
+                  className={inputCls}
+                  value={row.outdoor}
+                  onChange={(e) => {
+                    const next = [...form.guide_committee];
+                    while (next.length <= i) next.push({ part: GUIDE_COMMITTEE_PARTS[next.length], indoor: "", outdoor: "" });
+                    next[i] = { ...next[i], part, outdoor: e.target.value };
+                    set("guide_committee", next);
+                  }}
+                  placeholder={`${part} 실외`}
+                />
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>새벽예배 신앙일기 (최대 8줄)</SectionTitle>
-        <DynamicArrayField<DawnReading>
-          label="새벽 통독"
-          items={form.dawn_readings}
-          max={8}
-          addLabel="날짜 추가"
-          createEmpty={() => ({ date: "", passage: "" })}
-          onChange={(next) => set("dawn_readings", next)}
-          renderRow={(d, _i, update) => (
-            <div className="grid gap-2 sm:grid-cols-[12rem_1fr]">
-              <input
-                className={inputCls}
-                value={d.date}
-                onChange={(e) => update({ date: e.target.value })}
-                placeholder="4월 21일(화)"
-              />
-              <input
-                className={inputCls}
-                value={d.passage}
-                onChange={(e) => update({ passage: e.target.value })}
-                placeholder="왕상 9-11장"
-              />
-            </div>
-          )}
-        />
+        <SectionTitle>새벽예배 신앙일기 (월·화·수·목·금·토 자동)</SectionTitle>
+        <p className="mb-3 text-xs text-gray-500">
+          <strong>기본 정보의 주보 날짜</strong> 이후 요일로 자동 생성됩니다. 본문만 입력하세요.
+        </p>
+        <div className="space-y-2">
+          {DAWN_WEEKDAY_LABELS.map((label, i) => {
+            const d = dawnDates[i];
+            const row = form.dawn_readings[i] ?? { date: d.date, passage: "" };
+            return (
+              <div key={label} className="grid gap-2 sm:grid-cols-[12rem_1fr] items-center">
+                <span className="rounded bg-gray-50 px-3 py-2 text-sm text-gray-600">{d.date}</span>
+                <input
+                  className={inputCls}
+                  value={row.passage}
+                  onChange={(e) => {
+                    const next = [...form.dawn_readings];
+                    while (next.length <= i) next.push({ date: "", passage: "" });
+                    next[i] = { date: d.date, passage: e.target.value };
+                    set("dawn_readings", next);
+                  }}
+                  placeholder="왕상 7-8장"
+                />
+              </div>
+            );
+          })}
+        </div>
       </section>
     </div>
   );
 }
 
 // ─────────────────────────────────────────────
-//  Tab 5: 뒷면 우측 (헌금)
+//  Tab 5: 뒷면 우측 (헌금 고정 10 카테고리)
 // ─────────────────────────────────────────────
 
 function BackRightTab({ form, set }: TabProps) {
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>향기로운 예물 (카테고리별, 최대 11개)</SectionTitle>
-        <DynamicArrayField<OfferingCategoryRow>
-          label="헌금 카테고리"
-          items={form.offerings}
-          max={11}
-          addLabel="카테고리 추가"
-          createEmpty={() => ({ label: "", names: "" })}
-          onChange={(next) => set("offerings", next)}
-          renderRow={(o, _i, update) => (
-            <div className="grid gap-2 sm:grid-cols-[10rem_1fr]">
-              <input
-                className={inputCls}
-                value={o.label}
-                onChange={(e) => update({ label: e.target.value })}
-                placeholder="십 일 조"
-              />
-              <textarea
-                className={textareaCls}
-                rows={2}
-                value={o.names}
-                onChange={(e) => update({ names: e.target.value })}
-                placeholder={"김철수 이영희\n박민준 최수진"}
-              />
-            </div>
-          )}
-        />
+        <SectionTitle>향기로운 예물 (고정 {OFFERING_CATEGORIES.length}개 카테고리)</SectionTitle>
+        <p className="mb-3 text-xs text-gray-500">
+          카테고리는 고정되어 있으며, 각 칸에 <strong>이름만</strong> 입력합니다 (여러 명은 줄바꿈).
+        </p>
+        <div className="space-y-2">
+          {OFFERING_CATEGORIES.map((label, i) => {
+            const row = form.offerings[i] ?? { label, names: "" };
+            return (
+              <div key={label} className="grid gap-2 sm:grid-cols-[8rem_1fr] items-start">
+                <span className="pt-2 text-sm font-semibold text-gray-700">{label}</span>
+                <textarea
+                  className={textareaCls}
+                  rows={2}
+                  value={row.names}
+                  onChange={(e) => {
+                    const next = [...form.offerings];
+                    while (next.length <= i) next.push({ label: OFFERING_CATEGORIES[next.length], names: "" });
+                    next[i] = { label, names: e.target.value };
+                    set("offerings", next);
+                  }}
+                  placeholder={"김철수 이영희\n박민준 최수진"}
+                />
+              </div>
+            );
+          })}
+        </div>
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">

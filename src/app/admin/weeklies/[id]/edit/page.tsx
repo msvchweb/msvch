@@ -3,7 +3,8 @@
 import { useState, useEffect, use } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { WeeklyForm, applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
+import { applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
+import { WeeklyEditorWithPreview } from "@/components/weekly/WeeklyEditorWithPreview";
 import { WeeklyContentSchema, type WeeklyContentInput } from "@/lib/validation";
 import type { Weekly } from "@/types/notice";
 
@@ -154,7 +155,7 @@ export default function AdminWeeklyEditPage({
         <h1 className="text-2xl font-bold text-gray-900">주보 수정</h1>
         <p className="mt-1 text-sm text-gray-500">{weekly.title}</p>
       </div>
-      <WeeklyForm
+      <WeeklyEditorWithPreview
         initial={weeklyToFormData(weekly)}
         onSubmit={handleSubmit}
         onGeneratePdf={handleGeneratePdf}

@@ -250,7 +250,6 @@ export const MokjangEntrySchema = z.object({
   id: z.number().int().min(1).max(200),
   name: z.string().max(40).default(""),
   sub: z.string().max(40).default(""),
-  year: z.number().int().min(2000).max(2200).nullable().default(null),
   active: z.boolean().default(true),
 });
 export type MokjangEntryInput = z.infer<typeof MokjangEntrySchema>;

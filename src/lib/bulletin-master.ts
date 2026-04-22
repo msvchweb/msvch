@@ -34,7 +34,7 @@ export async function loadBulletinMaster(
       .maybeSingle(),
     supabase
       .from("mokjang_entries")
-      .select("id, name, sub, year, active, updated_at")
+      .select("id, name, sub, active, updated_at")
       .eq("active", true)
       .order("id", { ascending: true }),
     supabase

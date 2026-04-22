@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { WeeklyForm, applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
+import { applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
+import { WeeklyEditorWithPreview } from "@/components/weekly/WeeklyEditorWithPreview";
 import { WeeklyContentSchema, createEmptyWeeklyInput, type WeeklyContentInput } from "@/lib/validation";
 
 function getUpcomingSunday(): string {
@@ -55,7 +56,7 @@ export default function AdminWeeklyNewPage() {
           내용을 입력하고 발행하면 홈페이지에 즉시 반영됩니다.
         </p>
       </div>
-      <WeeklyForm
+      <WeeklyEditorWithPreview
         initial={defaultForm}
         onSubmit={handleSubmit}
         submitting={submitting}
