@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { WeeklyForm, applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
-import { WeeklyContentSchema, type WeeklyContentInput } from "@/lib/validation";
+import { WeeklyContentSchema, createEmptyWeeklyInput, type WeeklyContentInput } from "@/lib/validation";
 
 function getUpcomingSunday(): string {
   const today = new Date();
@@ -15,30 +15,8 @@ function getUpcomingSunday(): string {
 }
 
 const defaultForm: WeeklyContentInput = {
-  title: "",
+  ...createEmptyWeeklyInput(),
   date: getUpcomingSunday(),
-  volume: null,
-  issue: null,
-  hymn_number: "",
-  scripture: "",
-  special_praise: {
-    part1: { song: "", choir: "" },
-    part2: { song: "", choir: "" },
-  },
-  sermon_title: "",
-  sermon_pastor: "",
-  closing_hymn: "",
-  weekly_verse: "",
-  afternoon_service: { scripture: "", title: "", pastor: "" },
-  wednesday_service: { scripture: "", title: "" },
-  dawn_readings: [],
-  offering_members: { p1: "", p2: "", p3: "" },
-  prayer_items: [],
-  announcements: [],
-  servants_text: "",
-  offering_list_text: "",
-  is_published: false,
-  publish_channels: { website: false, alimtalk: false, instagram: false },
 };
 
 export default function AdminWeeklyNewPage() {

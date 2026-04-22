@@ -168,40 +168,103 @@ interface Notice {
 | `offering_list_text` | `text` | 향기로운 예물 (자유 텍스트) |
 | `is_published` | `boolean DEFAULT false` | 공개 발행 여부 |
 | `publish_channels` | `jsonb` | 발행 채널 `{website, alimtalk, instagram}` |
+| `news` | `jsonb` | 교회소식 배열 `[{title, items:string[]}]` (최대 9) |
+| `meetings` | `jsonb` | 모임 안내 `[{group, when, place}]` (최대 6) |
+| `north_korea_note` | `text` | 북한선교부 메모 |
+| `bible_reading` | `text` | 성경 통독 현황 메모 |
+| `new_members` | `jsonb` | 지난 주일 새가족 `[{no, regNo, name, inviter, dept}]` (최대 4) |
+| `meal_duty_note` | `text` | 식당 봉사 메모 |
+| `volunteer_note` | `text` | 봉사센터 소식 |
+| `worship_leader` | `text` | 1·2·3부 인도자 |
+| `worship_items` | `jsonb` | 예배 순서 배열 (최대 24). `{marker,label,content,assignees[],subRows[],emphasize}` |
+| `memorize_verse` | `jsonb` | 금주 암송말씀 `{ref, text}` |
+| `next_week_prayer` | `jsonb` | 다음 주 기도자 배열 (최대 3) |
+| `guide_committee` | `jsonb` | 안내위원 `[{part, indoor, outdoor}]` (최대 3) |
+| `offerings` | `jsonb` | 향기로운 예물 카테고리 `[{label, names}]` (최대 11) |
+| `week_total` | `text` | 지난주 헌금 총액 |
+| `cumulative_total` | `text` | 누계 |
 
 **RLS 정책**: `is_published=true` 레코드는 공개 읽기, admin만 CUD
 
-**마이그레이션**: `010_weeklies_content.sql` — 기존 테이블에 컬럼 추가 (하위 호환)
+**마이그레이션**:
+- `010_weeklies_content.sql` — 초기 콘텐츠 필드(20개) 추가
+- `011_weeklies_layout_fields.sql` — 신규 레이아웃 필드 15개 추가 (news, meetings, worship_items 등)
 
-**TypeScript 타입** (`src/types/notice.ts`):
-```ts
-interface Weekly {
-  id: string;
-  title: string;
-  date: string | null;
-  pdf_url: string | null;
-  created_at: string;
-  volume: number | null;
-  issue: number | null;
-  hymn_number: string | null;
-  scripture: string | null;
-  special_praise: SpecialPraiseField;
-  sermon_title: string | null;
-  sermon_pastor: string | null;
-  closing_hymn: string | null;
-  weekly_verse: string | null;
-  afternoon_service: AfternoonService;
-  wednesday_service: WednesdayService;
-  dawn_readings: DawnReading[];
-  offering_members: OfferingMembers;
-  prayer_items: PrayerItem[];
-  announcements: Announcement[];
-  servants_text: string | null;
-  offering_list_text: string | null;
-  is_published: boolean;
-  publish_channels: PublishChannels;
-}
-```
+**TypeScript 타입**: `src/types/notice.ts` `Weekly` 인터페이스 참조.
+
+---
+
+### `church_settings`
+
+교회 전역 설정(KV 스토어). 현재 키: `topic_of_year`.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `key` | `text` PK | 설정 키 (예: `topic_of_year`) |
+| `value` | `jsonb NOT NULL` | 값. `topic_of_year` 의 경우 `{text, year}` |
+| `updated_at` | `timestamptz DEFAULT now()` | 수정일 |
+
+**RLS 정책**: 모든 사용자 SELECT, admin 만 CUD
+**마이그레이션**: `012_bulletin_master_tables.sql`
+
+---
+
+### `mokjang_entries`
+
+소그룹 목장 (Live Reference — 주보 3페이지 목장 표).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `integer` PK | 목장 번호 (1~200) |
+| `name` | `text DEFAULT ''` | 목자 이름 |
+| `sub` | `text DEFAULT ''` | 부목자 이름 |
+| `year` | `integer` | 연도 (nullable) |
+| `active` | `boolean DEFAULT true` | 주보 노출 여부 |
+| `updated_at` | `timestamptz DEFAULT now()` | 수정일 |
+
+**RLS 정책**: 모든 사용자 SELECT, admin 만 CUD
+**마이그레이션**: `012_bulletin_master_tables.sql`
+
+---
+
+### `servants`
+
+섬기는 분들 (Live Reference — 주보 4페이지 좌측).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `seq` | `integer UNIQUE` | 표시 순서 |
+| `role` | `text NOT NULL` | 역할 (예: "담 임 목 사") |
+| `names` | `text DEFAULT ''` | 이름 (줄바꿈으로 여러 명 가능) |
+| `updated_at` | `timestamptz DEFAULT now()` | 수정일 |
+
+---
+
+### `support_sections`
+
+후원하는 분들 (Live Reference — 주보 4페이지 좌측).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `seq` | `integer UNIQUE` | 표시 순서 |
+| `heading` | `text NOT NULL` | 제목 (예: "<해외선교지>") |
+| `lines` | `jsonb DEFAULT '[]'` | 줄 배열 (최대 20) |
+| `updated_at` | `timestamptz DEFAULT now()` | 수정일 |
+
+---
+
+### `community_prayers`
+
+교회공동체 기도제목 (Live Reference — 주보 2페이지, 최대 7줄).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `seq` | `integer UNIQUE` | 표시 순서 |
+| `text` | `text NOT NULL` | 기도 제목 |
+| `updated_at` | `timestamptz DEFAULT now()` | 수정일 |
 
 ---
 

@@ -187,9 +187,140 @@ export const WeeklyContentSchema = z.object({
     alimtalk: z.boolean().default(false),
     instagram: z.boolean().default(false),
   }).default({ website: false, alimtalk: false, instagram: false }),
+  // ── migration 011 필드 — 레이아웃 고정을 위한 상한(max)은 컴포넌트의 slice 와 동일해야 함
+  news: z.array(z.object({
+    title: z.string().max(120).default(""),
+    items: z.array(z.string().max(500)).max(10).default([]),
+  })).max(9).default([]),
+  meetings: z.array(z.object({
+    group: z.string().max(40).default(""),
+    when: z.string().max(60).default(""),
+    place: z.string().max(80).default(""),
+  })).max(6).default([]),
+  north_korea_note: z.string().max(300).default(""),
+  bible_reading: z.string().max(300).default(""),
+  new_members: z.array(z.object({
+    no: z.string().max(10).default(""),
+    regNo: z.string().max(20).default(""),
+    name: z.string().max(40).default(""),
+    inviter: z.string().max(60).default(""),
+    dept: z.string().max(40).default(""),
+  })).max(4).default([]),
+  meal_duty_note: z.string().max(300).default(""),
+  volunteer_note: z.string().max(300).default(""),
+  worship_leader: z.string().max(120).default(""),
+  worship_items: z.array(z.object({
+    marker: z.string().max(4).default(""),
+    label: z.string().max(40).default(""),
+    content: z.string().max(300).default(""),
+    assignees: z.array(z.string().max(80)).max(5).default([]),
+    subRows: z.array(z.object({
+      content: z.string().max(200).default(""),
+      assignee: z.string().max(80).default(""),
+    })).max(4).default([]),
+    emphasize: z.boolean().default(false),
+  })).max(24).default([]),
+  memorize_verse: z.object({
+    ref: z.string().max(40).default(""),
+    text: z.string().max(500).default(""),
+  }).default({ ref: "", text: "" }),
+  next_week_prayer: z.array(z.string().max(80)).max(3).default([]),
+  guide_committee: z.array(z.object({
+    part: z.string().max(10).default(""),
+    indoor: z.string().max(80).default(""),
+    outdoor: z.string().max(80).default(""),
+  })).max(3).default([]),
+  offerings: z.array(z.object({
+    label: z.string().max(30).default(""),
+    names: z.string().max(500).default(""),
+  })).max(11).default([]),
+  week_total: z.string().max(40).default(""),
+  cumulative_total: z.string().max(40).default(""),
 });
 
+// ── 마스터 데이터 스키마 (admin/masters CRUD 에서 사용) ───────────────
+
+export const ChurchSettingTopicSchema = z.object({
+  text: z.string().min(1).max(80),
+  year: z.number().int().min(2000).max(2200),
+});
+export type ChurchSettingTopicInput = z.infer<typeof ChurchSettingTopicSchema>;
+
+export const MokjangEntrySchema = z.object({
+  id: z.number().int().min(1).max(200),
+  name: z.string().max(40).default(""),
+  sub: z.string().max(40).default(""),
+  year: z.number().int().min(2000).max(2200).nullable().default(null),
+  active: z.boolean().default(true),
+});
+export type MokjangEntryInput = z.infer<typeof MokjangEntrySchema>;
+
+export const ServantSchema = z.object({
+  seq: z.number().int().min(1).max(20),
+  role: z.string().min(1).max(40),
+  names: z.string().max(200).default(""),
+});
+export type ServantInput = z.infer<typeof ServantSchema>;
+
+export const SupportSectionSchema = z.object({
+  seq: z.number().int().min(1).max(10),
+  heading: z.string().min(1).max(40),
+  lines: z.array(z.string().max(200)).max(20).default([]),
+});
+export type SupportSectionInput = z.infer<typeof SupportSectionSchema>;
+
+export const CommunityPrayerSchema = z.object({
+  seq: z.number().int().min(1).max(20),
+  text: z.string().min(1).max(500),
+});
+export type CommunityPrayerInput = z.infer<typeof CommunityPrayerSchema>;
+
 export type WeeklyContentInput = z.infer<typeof WeeklyContentSchema>;
+
+/** 완전히 빈 WeeklyContentInput 을 생성. new 폼 / test-front mock 등에서 사용 */
+export function createEmptyWeeklyInput(): WeeklyContentInput {
+  return {
+    title: "",
+    date: undefined,
+    volume: null,
+    issue: null,
+    hymn_number: "",
+    scripture: "",
+    special_praise: {
+      part1: { song: "", choir: "" },
+      part2: { song: "", choir: "" },
+    },
+    sermon_title: "",
+    sermon_pastor: "",
+    closing_hymn: "",
+    weekly_verse: "",
+    afternoon_service: { scripture: "", title: "", pastor: "" },
+    wednesday_service: { scripture: "", title: "" },
+    dawn_readings: [],
+    offering_members: { p1: "", p2: "", p3: "" },
+    prayer_items: [],
+    announcements: [],
+    servants_text: "",
+    offering_list_text: "",
+    is_published: false,
+    publish_channels: { website: false, alimtalk: false, instagram: false },
+    news: [],
+    meetings: [],
+    north_korea_note: "",
+    bible_reading: "",
+    new_members: [],
+    meal_duty_note: "",
+    volunteer_note: "",
+    worship_leader: "",
+    worship_items: [],
+    memorize_verse: { ref: "", text: "" },
+    next_week_prayer: [],
+    guide_committee: [],
+    offerings: [],
+    week_total: "",
+    cumulative_total: "",
+  };
+}
 
 /** 캘린더 이벤트 생성 */
 export const CalendarEventSchema = z.object({

@@ -324,12 +324,31 @@ Google Calendar에서 이벤트를 삭제한다.
 
 ---
 
+## 주보 마스터 데이터 (REST 엔드포인트 없음)
+
+주보 5개 마스터 테이블(`church_settings`, `mokjang_entries`, `servants`,
+`support_sections`, `community_prayers`)은 **전용 REST API를 두지 않고**
+브라우저 Supabase 클라이언트(`@/lib/supabase/client`)에서 직접 CRUD한다.
+
+- **인증/권한**: Supabase RLS — public SELECT 허용, CUD는 `profiles.role='admin'` 체크
+- **관리 페이지**: `/admin/masters/{topic|mokjang|servants|supports|community-prayers}`
+- **공개 조회**: Server Component에서 `loadBulletinMaster(supabase)` (5개 테이블 병렬 SELECT)
+- **검증**: 저장 전 클라이언트에서 `src/lib/validation.ts`의 Zod 스키마로 `.safeParse()`
+
+이 설계 이유: (1) 관리자 전용 단순 CRUD이므로 RLS로 충분, (2) Weekly와 달리
+단일 리소스가 아니라 5개 독립 테이블이라 REST 라우트가 과함, (3) Live Reference 패턴으로
+즉시 반영이 필요.
+
+---
+
 ## 서버 사이드 데이터 함수
 
 API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수:
 
 | 함수 | 파일 | 설명 |
 |------|------|------|
+| `loadBulletinMaster(supabase)` | `src/lib/bulletin-master.ts` | 주보 마스터 5개 테이블 병렬 SELECT → `BulletinMasterData` |
+| `loadWeeklyWithMaster(supabase, id)` | `src/lib/bulletin-master.ts` | 주보 1건 + 마스터 동시 로드 |
 | `getNotices()` | `src/lib/notices.ts` | 공개 공지사항 목록 (날짜 역순) |
 | `getNoticeBySlug(slug)` | `src/lib/notices.ts` | 단건 공지 조회 |
 | `getWeeklies()` | `src/lib/notices.ts` | 발행된 주보 목록 (`is_published=true`, 최근 20개) |

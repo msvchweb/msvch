@@ -1,4 +1,5 @@
 import type { Weekly } from "@/types/notice";
+import type { BulletinMasterData } from "@/types/bulletin-master";
 
 export interface MokjangEntry {
   id: number;
@@ -15,12 +16,12 @@ export interface BulletinBackData {
   afternoonService: {
     time?: string;
     leader?: string;
-    contents: { label: string; value: string; subValue?: string }[];
+    contents: { label: string; value: string; subValue?: string; mergeNextValue?: boolean }[];
   };
   wednesdayService: {
     time?: string;
     leader?: string;
-    contents: { label: string; value: string; subValue?: string }[];
+    contents: { label: string; value: string; subValue?: string; mergeNextValue?: boolean }[];
   };
   nextWeekPrayer: string[];
   offeringCommittee: { part: string; names: string }[];
@@ -52,7 +53,7 @@ const DEFAULT_DATA: BulletinBackData = {
       { label: "성경봉독", value: "고전 9:20-23" },
       { label: "말씀", value: '"플랫폼 전도법"', subValue: "/ 이준영 전도사" },
       { label: "찬송", value: "502장" },
-      { label: "광고", value: "" },
+      { label: "광고", value: "", mergeNextValue: true },
       { label: "축도", value: "/ 인도자" },
     ],
   },
@@ -64,7 +65,7 @@ const DEFAULT_DATA: BulletinBackData = {
       { label: "말씀", value: '"세월 지나갈수록"' },
       { label: "특강", value: "/ 이양재 목사" },
       { label: "찬송", value: "384장" },
-      { label: "광고", value: "" },
+      { label: "광고", value: "", mergeNextValue: true },
       { label: "축도", value: "/ 인도자" },
     ],
   },
@@ -84,6 +85,7 @@ const DEFAULT_DATA: BulletinBackData = {
     { date: "4월 20일(월)", passage: "왕상 7- 8장" },
     { date: "4월 21일(화)", passage: "왕상 9-11장" },
     { date: "4월 22일(수)", passage: "왕상 12-14장" },
+    { date: "주의 말씀은 내 발에 등이요 내 길에 빛이니이다(시119:105)", passage: "" },
     { date: "4월 23일(목)", passage: "왕상 15-17장" },
     { date: "4월 24일(금)", passage: "왕상 18-20장" },
     { date: "4월 25일(토)", passage: "왕상 21-22장" },
@@ -98,30 +100,67 @@ const DEFAULT_DATA: BulletinBackData = {
     "담임목사님이 더욱 강건하고 은혜와 성령으로 충만하며 주어진 목회 사역을 잘 감당하게 하소서",
   ],
   serviceSchedule: [
-    { label: "주일 1부", time: "오전 8시", place: "본 당", rightLabel: "영 유 아 부", rightTime: "낮 12시", rightPlace: "교육관 1층" },
-    { label: "주일 2부", time: "오전 10시", place: "본 당", rightLabel: "유 년 부", rightTime: "오전 10시", rightPlace: "교육관 2층" },
-    { label: "주일 3부", time: "낮 12시", place: "본 당", rightLabel: "초 등 부", rightTime: "오전 10시", rightPlace: "교육관 3층" },
-    { label: "주일오후 찬양", time: "오후 2시30분", place: "본 당", rightLabel: "청 년 부", rightTime: "토요일 7시30분", rightPlace: "본 당" },
-    { label: "금요기도회", time: "저녁 8시30분", place: "본 당" },
-    { label: "새벽기도회", time: "오전 6시 (월~금,토) / 주일 7시30분", place: "" },
+    { label: "주일 1부", time: "오전 8시", place: "본 당", rightLabel: "영유치부", rightTime: "낮 12시", rightPlace: "본 관 1층" },
+    { label: "주일 2부", time: "오전 10시", place: "본 당", rightLabel: "아동부", rightTime: "오전 10시", rightPlace: "교육관 2층" },
+    { label: "주일 3부", time: "낮 12시", place: "본 당", rightLabel: "청소년부", rightTime: "낮 12시", rightPlace: "교육관 3층" },
+    { label: "주일 오후", time: "오후 2시30분", place: "본 당", rightLabel: "청년부", rightTime: "매월 첫째 주일\n오후 2시 30분", rightPlace: "본 당" },
+    { label: "금요기도회", time: "저녁 8시30분", place: "본 당", rightLabel: "수요예배", rightTime: "저녁 7시 30분", rightPlace: "본 당" },
+    { label: "새벽기도회", time: "오전 6시 (토·주일 없음)", place: "" },
   ],
-  mokjangList: Array.from({ length: 40 }, (_, i) => ({
-    id: i + 1,
-    name: `목자${i + 1}`,
-    sub: `부목자${i + 1}`,
-  })),
+  mokjangList: [
+    { id: 1,  name: "김철수", sub: "이영희" },
+    { id: 2,  name: "박민준", sub: "최수진" },
+    { id: 3,  name: "정재훈", sub: "강미란" },
+    { id: 4,  name: "조현우", sub: "윤지혜" },
+    { id: 5,  name: "장성호", sub: "임은정" },
+    { id: 6,  name: "한상민", sub: "오미경" },
+    { id: 7,  name: "서준혁", sub: "신예진" },
+    { id: 8,  name: "권태영", sub: "황수연" },
+    { id: 9,  name: "안동현", sub: "송지은" },
+    { id: 10, name: "류승현", sub: "전미선" },
+    { id: 11, name: "홍기범", sub: "고은주" },
+    { id: 12, name: "문성준", sub: "양혜경" },
+    { id: 13, name: "손민석", sub: "배정아" },
+    { id: 14, name: "백승우", sub: "허윤정" },
+    { id: 15, name: "남기홍", sub: "유소영" },
+    { id: 16, name: "김도현", sub: "이채원" },
+    { id: 17, name: "박준서", sub: "최다혜" },
+    { id: 18, name: "정민호", sub: "강보람" },
+    { id: 19, name: "조성진", sub: "윤아라" },
+    { id: 20, name: "장태준", sub: "임수빈" },
+    { id: 21, name: "한재원", sub: "오지현" },
+    { id: 22, name: "서동훈", sub: "신혜원" },
+    { id: 23, name: "권민재", sub: "황다은" },
+    { id: 24, name: "안성진", sub: "송하나" },
+    { id: 25, name: "류재호", sub: "전보미" },
+    { id: 26, name: "홍승민", sub: "고지수" },
+    { id: 27, name: "문태현", sub: "양은비" },
+    { id: 28, name: "손정우", sub: "배수아" },
+    { id: 29, name: "백민철", sub: "허소연" },
+    { id: 30, name: "남준호", sub: "유민정" },
+    { id: 31, name: "김영민", sub: "이정현" },
+    { id: 32, name: "박재혁", sub: "최영주" },
+    { id: 33, name: "정우진", sub: "강선희" },
+    { id: 34, name: "조민규", sub: "윤지원" },
+    { id: 35, name: "장현수", sub: "임나영" },
+    { id: 36, name: "한민우", sub: "오하늘" },
+    { id: 37, name: "서재원", sub: "신다영" },
+    { id: 38, name: "권성혁", sub: "황미연" },
+    { id: 39, name: "안재민", sub: "송은지" },
+    { id: 40, name: "류민성", sub: "전수현" },
+  ],
   offerings: [
-    { label: "십일조", names: "" },
-    { label: "감사헌금", names: "" },
-    { label: "생일감사", names: "" },
-    { label: "특별헌금", names: "" },
-    { label: "부활감사", names: "" },
-    { label: "장학헌금", names: "" },
-    { label: "구제헌금", names: "" },
-    { label: "선교헌금", names: "" },
-    { label: "일천번제", names: "" },
-    { label: "주정헌금", names: "" },
-    { label: "성전헌금", names: "" },
+    { label: "십 일 조", names: "김철수 이영희\n박민준 최수진" },
+    { label: "감사헌금", names: "정재훈 강미란\n조현우 윤지혜\n장성호 임은정\n한상민 오미경\n서준혁 신예진" },
+    { label: "생일감사", names: "권태영" },
+    { label: "특별헌금", names: "안동현 송지은" },
+    { label: "부활감사", names: "류승현" },
+    { label: "장학헌금", names: "홍기범 고은주" },
+    { label: "구제헌금", names: "문성준" },
+    { label: "선교헌금", names: "손민석 배정아" },
+    { label: "일천번제", names: "백승우" },
+    { label: "주정헌금", names: "남기홍 유소영\n김도현 이채원\n박준서 최다혜\n정민호 강보람" },
+    { label: "성전헌금", names: "조성진 윤아라\n장태준 임수빈" },
   ],
   weekTotal: "0원",
   cumulativeTotal: "0원",
@@ -129,7 +168,11 @@ const DEFAULT_DATA: BulletinBackData = {
     '* 온라인헌금 - 농협 355-0068-1115-73 명성비전교회 / 필수: "이름 헌금종류" 예) "박야곱십일조"',
 };
 
-export function weeklyToBackData(w: Weekly, overrides?: Partial<BulletinBackData>): BulletinBackData {
+export function weeklyToBackData(
+  w: Weekly,
+  master?: BulletinMasterData,
+  overrides?: Partial<BulletinBackData>,
+): BulletinBackData {
   const data: BulletinBackData = { ...DEFAULT_DATA };
 
   if (w.afternoon_service) {
@@ -150,11 +193,16 @@ export function weeklyToBackData(w: Weekly, overrides?: Partial<BulletinBackData
   }
 
   if (w.dawn_readings && w.dawn_readings.length > 0) {
-    data.dawnReadings = w.dawn_readings.map((d) => ({ date: d.date, passage: d.passage }));
+    // MAX 8 — pairRows 4행 고정. 초과 시 페이지 높이 붕괴
+    data.dawnReadings = w.dawn_readings.slice(0, 8).map((d) => ({ date: d.date, passage: d.passage }));
   }
 
-  if (w.prayer_items && w.prayer_items.length > 0) {
-    data.prayerItems = w.prayer_items.map((p) => p.text);
+  // ── 교회공동체 기도제목: 마스터(live reference) 우선, 없으면 주보 row 의 prayer_items 사용
+  if (master && master.communityPrayers.length > 0) {
+    // MAX 7 — 초과 시 페이지 높이 붕괴
+    data.prayerItems = master.communityPrayers.slice(0, 7);
+  } else if (w.prayer_items && w.prayer_items.length > 0) {
+    data.prayerItems = w.prayer_items.slice(0, 7).map((p) => p.text);
   }
 
   if (w.offering_members) {
@@ -166,200 +214,278 @@ export function weeklyToBackData(w: Weekly, overrides?: Partial<BulletinBackData
     ];
   }
 
+  // ── 안내위원: 매주 변경 — guide_committee 배열
+  if (w.guide_committee && w.guide_committee.length > 0) {
+    data.guideCommittee = w.guide_committee.slice(0, 3);
+  }
+
+  // ── 다음주기도: next_week_prayer 배열
+  if (w.next_week_prayer && w.next_week_prayer.length > 0) {
+    data.nextWeekPrayer = w.next_week_prayer.slice(0, 3);
+  }
+
+  // ── 목장: 마스터(live reference)
+  if (master && master.mokjang.length > 0) {
+    data.mokjangList = master.mokjang.slice(0, 40);
+  }
+
+  // ── 향기로운 예물: offerings
+  if (w.offerings && w.offerings.length > 0) {
+    data.offerings = w.offerings.slice(0, 11);
+  }
+  if (w.week_total) data.weekTotal = w.week_total;
+  if (w.cumulative_total) data.cumulativeTotal = w.cumulative_total;
+
   return { ...data, ...(overrides ?? {}) };
 }
 
 const TEXT_MAIN = "text-gray-800";
 
+/**
+ * 페이지 2: 뒷면 좌측 — 오후/수요예배 + 다음주기도 + 새벽예배 + 기도제목 + 예배모임안내
+ *
+ * ⚠️  LAYOUT LOCKED — A5 인쇄 규격 고정 (zoom 1.11 적용 시 148mm × 210mm)
+ * 아래 항목을 절대 수정하지 마세요:
+ *   - zoom / py / px / mb / gap / leading / text-* 등 모든 스타일 값
+ *   - 섹션 구조 및 순서
+ * DB 연동 시 weeklyToBackData() 매핑 함수만 수정하세요.
+ * 각 섹션 최대 항목 수는 slice 주석으로 표시됨 — 초과 데이터는 무시됩니다.
+ */
+export function BulletinBackLeft({ data }: { data: BulletinBackData }) {
+  return (
+    <div>
+      <div className="grid grid-cols-2 gap-4 mb-1" style={{ zoom: 0.9 }}>
+        <ServiceSection
+          title="주일오후 찬양예배"
+          time={data.afternoonService.time ?? ""}
+          leader={data.afternoonService.leader ?? ""}
+          contents={data.afternoonService.contents}
+          compact
+        />
+        <ServiceSection
+          title="수요예배"
+          time={data.wednesdayService.time ?? ""}
+          leader={data.wednesdayService.leader ?? ""}
+          contents={data.wednesdayService.contents}
+        />
+      </div>
+
+      <div className="border-t-2 border-b-2 border-gray-300 py-0.5 mb-1" style={{ zoom: 0.9 }}>
+        <div className="bg-gray-200 text-center text-xs font-bold py-0.5 mb-1">
+          다음 주 기도
+        </div>
+        <div className="grid grid-cols-3 text-center text-xs mb-1">
+          {/* MAX 3 — 고정 3열 구조 */}
+          {data.nextWeekPrayer.slice(0, 3).map((p, i) => (
+            <div key={i} className="py-px">
+              {p}
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 items-stretch" style={{ zoom: 0.95 }}>
+          <div className="flex flex-col">
+            <div className="bg-gray-200 text-center text-xs font-bold py-0.5 mb-1">
+              헌금위원
+            </div>
+            <table className="w-full h-full text-xs text-center border-collapse">
+              <tbody>
+                {/* MAX 3 — 1부/2부/3부 고정 */}
+                {data.offeringCommittee.slice(0, 3).map((row, i) => (
+                  <tr
+                    key={i}
+                    className={i < data.offeringCommittee.slice(0, 3).length - 1 ? "border-b border-gray-100" : ""}
+                  >
+                    <td className="py-px font-bold w-8">{row.part}</td>
+                    <td className="py-px">{row.names}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="flex flex-col">
+            <div className="bg-gray-200 text-center text-xs font-bold py-0.5 mb-1">
+              안내위원
+            </div>
+            <table className="w-full h-full text-xs text-center border-collapse">
+              <thead>
+                <tr className="border-b border-gray-300">
+                  <th className="py-px w-8"></th>
+                  <th className="py-px">실내안내</th>
+                  <th className="py-px">실외안내</th>
+                </tr>
+              </thead>
+              <tbody>
+                {/* MAX 3 — 1부/2부/3부 고정 */}
+                {data.guideCommittee.slice(0, 3).map((row, i) => (
+                  <tr
+                    key={i}
+                    className={i < data.guideCommittee.slice(0, 3).length - 1 ? "border-b border-gray-100" : ""}
+                  >
+                    <td className="py-px font-bold">{row.part}</td>
+                    <td className="py-px">{row.indoor}</td>
+                    <td className="py-px">{row.outdoor}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <section className="mb-1">
+        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-1">
+          새벽 예배(신앙일기)
+        </h3>
+        <table className="w-full text-xs border-collapse table-fixed">
+          <colgroup>
+            <col style={{ width: "25%" }} />
+            <col style={{ width: "25%" }} />
+            <col style={{ width: "25%" }} />
+            <col style={{ width: "25%" }} />
+          </colgroup>
+          <thead>
+            <tr className="border-b border-gray-300">
+              <th className="py-0 text-center">날짜</th>
+              <th className="py-0 text-center">본문</th>
+              <th className="py-0 text-center">날짜</th>
+              <th className="py-0 text-center">본문</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* MAX 8항목(4행) — 초과 시 섹션 높이 초과. weeklyToBackData에서 이미 제한됨 */}
+            {pairRows(data.dawnReadings.slice(0, 8)).map((pair, i) => (
+              <tr
+                key={i}
+                className={i < pairRows(data.dawnReadings.slice(0, 8)).length - 1 ? "border-b border-gray-100" : ""}
+              >
+                <td className="py-0">{pair[0]?.date ?? ""}</td>
+                <td className="py-0">{pair[0]?.passage ?? ""}</td>
+                {pair[1] && pair[1].passage === "" ? (
+                  <td className="py-0 overflow-hidden" colSpan={2}>
+                    <span style={{ display: "inline-block", whiteSpace: "nowrap", letterSpacing: "-0.07em", transform: "scaleX(0.88)", transformOrigin: "left" }}>
+                      {pair[1].date}
+                    </span>
+                  </td>
+                ) : (
+                  <>
+                    <td className="py-0">{pair[1]?.date ?? ""}</td>
+                    <td className="py-0">{pair[1]?.passage ?? ""}</td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      <section className="mb-1">
+        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-1">
+          교회공동체 기도제목
+        </h3>
+        <ol className="leading-tight" style={{ fontSize: "11px" }}>
+          {/* MAX 7 — 초과 시 섹션 높이 초과. weeklyToBackData에서 이미 제한됨 */}
+          {data.prayerItems.slice(0, 7).map((p, i) => (
+            <li key={i}>
+              {i + 1}. {p}
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="mb-1">
+        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-1">
+          예배모임 안내
+        </h3>
+        <table className="w-full text-xs border-collapse" style={{ zoom: 0.95 }}>
+          <tbody>
+            {/* MAX 6 — 초과 시 섹션 높이 초과 */}
+            {data.serviceSchedule.slice(0, 6).map((row, i) => (
+              <tr
+                key={i}
+                className={i < data.serviceSchedule.length - 1 ? "border-b border-gray-200" : ""}
+              >
+                <td className="py-0 px-1 font-bold w-20" style={{ textAlign: "justify", textAlignLast: "justify", textJustify: "inter-character" }}>{row.label}</td>
+                {!row.place ? (
+                  <td className="py-0 text-center w-24" colSpan={2} style={{ whiteSpace: "nowrap" }}>{row.time}</td>
+                ) : (
+                  <>
+                    <td className="py-0 text-center w-24" style={{ whiteSpace: "pre-line" }}>{row.time}</td>
+                    <td className="py-0 text-center w-16">{row.place}</td>
+                  </>
+                )}
+                {row.rightLabel !== undefined ? (
+                  <>
+                    <td className="py-0 px-1 font-bold w-16" style={{ textAlign: "justify", textAlignLast: "justify", textJustify: "inter-character" }}>{row.rightLabel}</td>
+                    <td className="py-0 text-center" style={{ whiteSpace: "pre-line" }}>{row.rightTime ?? ""}</td>
+                    <td className="py-0 text-center">{row.rightPlace ?? ""}</td>
+                  </>
+                ) : (
+                  <td className="py-0" colSpan={3}></td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
+}
+
+// ⚠️ LAYOUT LOCKED — 이 컴포넌트의 레이아웃·스타일·구조를 임의로 변경하지 말 것.
+// DB 연동 시 데이터만 교체하고 렌더링 코드는 건드리지 않는다.
+// slice 상한선은 레이아웃 고정을 위한 안전망이므로 제거하지 말 것.
+/** 페이지 3: 뒷면 우측 — 소그룹 목장 + 향기로운 예물 + 헌금 안내 */
+export function BulletinBackRight({ data }: { data: BulletinBackData }) {
+  return (
+    <div>
+      <section className="mb-4">
+        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-2">
+          2026년도 소그룹 목장
+        </h3>
+        <div className="grid grid-cols-4 gap-x-2 text-[10px]" style={{ zoom: 0.95 }}>
+          {[0, 1, 2, 3].map((col) => (
+            <div key={col}>
+              <MokjangHeader />
+              {data.mokjangList.slice(0, 40).slice(col * 10, col * 10 + 10).map((m) => (
+                <MokjangRow key={m.id} id={m.id} name={m.name} sub={m.sub} />
+              ))}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-2">
+          향기로운 예물
+        </h3>
+        <div className="space-y-0 text-[11px]" style={{ zoom: 1 }}>
+          {data.offerings.slice(0, 11).map((o, i) => (
+            <OfferingRow key={i} label={o.label} names={o.names} />
+          ))}
+        </div>
+      </section>
+
+      <div className="mt-4 border-2 border-gray-400 p-2 text-xs">
+        <div className="flex justify-between items-center mb-1">
+          <span className="font-bold">※ 새 성전을 위해 기도해 주시기 바랍니다.</span>
+          <span>
+            지난주 헌금 : {data.weekTotal} | 누계 : {data.cumulativeTotal}
+          </span>
+        </div>
+        {data.accountNote && (
+          <div className="text-[10px] text-right border-t pt-1">{data.accountNote}</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function BulletinBack({ data }: { data: BulletinBackData }) {
   return (
     <div className={`bulletin-back bg-white ${TEXT_MAIN} text-[11px] leading-tight`}>
       <div className="grid grid-cols-2 gap-6 p-4">
-        {/* 좌측 컬럼 */}
-        <div>
-          <div className="grid grid-cols-2 gap-4 mb-1">
-            <ServiceSection
-              title="주일오후 찬양예배"
-              time={data.afternoonService.time ?? ""}
-              leader={data.afternoonService.leader ?? ""}
-              contents={data.afternoonService.contents}
-            />
-            <ServiceSection
-              title="수요예배"
-              time={data.wednesdayService.time ?? ""}
-              leader={data.wednesdayService.leader ?? ""}
-              contents={data.wednesdayService.contents}
-            />
-          </div>
-
-          <div className="border-t-2 border-b-2 border-gray-300 py-1 mb-2">
-            <div className="bg-gray-200 text-center text-xs font-bold py-0.5 mb-1">
-              다음 주 기도
-            </div>
-            <div className="grid grid-cols-3 text-center text-xs mb-2">
-              {data.nextWeekPrayer.map((p, i) => (
-                <div key={i} className="py-0.5">
-                  {p}
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-3 items-stretch">
-              <div className="flex flex-col">
-                <div className="bg-gray-200 text-center text-xs font-bold py-0.5 mb-1">
-                  헌금위원
-                </div>
-                <table className="w-full h-full text-xs text-center border-collapse">
-                  <tbody>
-                    {data.offeringCommittee.map((row, i) => (
-                      <tr
-                        key={i}
-                        className={i < data.offeringCommittee.length - 1 ? "border-b border-gray-100" : ""}
-                      >
-                        <td className="py-0.5 font-bold w-8">{row.part}</td>
-                        <td className="py-0.5">{row.names}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="flex flex-col">
-                <div className="bg-gray-200 text-center text-xs font-bold py-0.5 mb-1">
-                  안내위원
-                </div>
-                <table className="w-full h-full text-xs text-center border-collapse">
-                  <thead>
-                    <tr className="border-b border-gray-300">
-                      <th className="py-0.5 w-8"></th>
-                      <th className="py-0.5">실내안내</th>
-                      <th className="py-0.5">실외안내</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.guideCommittee.map((row, i) => (
-                      <tr
-                        key={i}
-                        className={i < data.guideCommittee.length - 1 ? "border-b border-gray-100" : ""}
-                      >
-                        <td className="py-0.5 font-bold">{row.part}</td>
-                        <td className="py-0.5">{row.indoor}</td>
-                        <td className="py-0.5">{row.outdoor}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <section className="mb-2">
-            <h3 className="text-lg font-bold border-b-2 border-blue-800 mb-1">
-              새벽 예배(신앙일기)
-            </h3>
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-gray-300">
-                  <th className="py-0.5 text-left">날짜</th>
-                  <th className="py-0.5 text-left">본문</th>
-                  <th className="py-0.5 text-left">날짜</th>
-                  <th className="py-0.5 text-left">본문</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pairRows(data.dawnReadings).map((pair, i) => (
-                  <tr
-                    key={i}
-                    className={i < pairRows(data.dawnReadings).length - 1 ? "border-b border-gray-100" : ""}
-                  >
-                    <td className="py-0.5">{pair[0]?.date ?? ""}</td>
-                    <td className="py-0.5">{pair[0]?.passage ?? ""}</td>
-                    <td className="py-0.5">{pair[1]?.date ?? ""}</td>
-                    <td className="py-0.5">{pair[1]?.passage ?? ""}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-
-          <section className="mb-2">
-            <h3 className="text-lg font-bold border-b-2 border-blue-800 mb-1">
-              교회공동체 기도제목
-            </h3>
-            <ol className="text-xs leading-relaxed">
-              {data.prayerItems.map((p, i) => (
-                <li key={i}>
-                  {i + 1}. {p}
-                </li>
-              ))}
-            </ol>
-          </section>
-
-          <section className="mb-2">
-            <h3 className="text-lg font-bold border-b-2 border-blue-800 mb-1">
-              예배모임 안내
-            </h3>
-            <table className="w-full text-xs border-collapse">
-              <tbody>
-                {data.serviceSchedule.map((row, i) => (
-                  <tr
-                    key={i}
-                    className={i < data.serviceSchedule.length - 1 ? "border-b border-gray-200" : ""}
-                  >
-                    <td className="py-0.5 font-bold w-20">{row.label}</td>
-                    <td className="py-0.5 w-24">{row.time}</td>
-                    <td className="py-0.5 w-16">{row.place}</td>
-                    {row.rightLabel !== undefined ? (
-                      <>
-                        <td className="py-0.5 font-bold w-16">{row.rightLabel}</td>
-                        <td className="py-0.5">{row.rightTime ?? ""}</td>
-                        <td className="py-0.5">{row.rightPlace ?? ""}</td>
-                      </>
-                    ) : (
-                      <td className="py-0.5" colSpan={3}></td>
-                    )}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </section>
-        </div>
-
-        {/* 우측 컬럼 */}
-        <div>
-          <section className="mb-4">
-            <h3 className="text-xl font-bold border-b-2 border-blue-800 mb-2">
-              2026년도 소그룹 목장
-            </h3>
-            <div className="grid grid-cols-4 gap-x-2 text-[10px]">
-              <MokjangHeader />
-              {data.mokjangList.map((m) => (
-                <MokjangRow key={m.id} id={m.id} name={m.name} sub={m.sub} />
-              ))}
-            </div>
-          </section>
-
-          <section>
-            <h3 className="text-xl font-bold border-b-2 border-blue-800 mb-2">
-              향기로운 예물
-            </h3>
-            <div className="space-y-1.5 text-[11px]">
-              {data.offerings.map((o, i) => (
-                <OfferingRow key={i} label={o.label} names={o.names} />
-              ))}
-            </div>
-          </section>
-
-          <div className="mt-4 border-2 border-gray-400 p-2 text-xs">
-            <div className="flex justify-between items-center mb-1">
-              <span className="font-bold">※ 새 성전을 위해 기도해 주시기 바랍니다.</span>
-              <span>
-                지난주 헌금 : {data.weekTotal} | 누계 : {data.cumulativeTotal}
-              </span>
-            </div>
-            {data.accountNote && (
-              <div className="text-[10px] text-right border-t pt-1">{data.accountNote}</div>
-            )}
-          </div>
-        </div>
+        <BulletinBackLeft data={data} />
+        <BulletinBackRight data={data} />
       </div>
     </div>
   );
@@ -379,32 +505,58 @@ function ServiceSection({
   time,
   leader,
   contents,
+  compact = false,
 }: {
   title: string;
   time: string;
   leader: string;
-  contents: { label: string; value: string; subValue?: string }[];
+  contents: { label: string; value: string; subValue?: string; mergeNextValue?: boolean }[];
+  compact?: boolean;
 }) {
   return (
-    <div className="border border-gray-400 rounded">
-      <div className="bg-blue-50 px-2 py-0.5 font-bold text-sm border-b border-gray-400 flex justify-between">
-        <span>{title}</span>
+    <div className="mb-1">
+      <div className="border-b-2 border-blue-800 mb-1">
+        <span className="text-sm font-bold">{title}</span>
       </div>
-      <div className="px-2 py-1 text-xs flex justify-between border-b border-gray-200">
-        <span>{time}</span>
-        <span>인도 : {leader}</span>
-      </div>
-      <table className="w-full text-xs">
+      <div className="text-[10px] text-gray-600 mb-1">{time}&nbsp;/&nbsp;인도 : {leader}</div>
+      <table className="w-full text-xs border-collapse" style={compact ? { zoom: 0.95 } : undefined}>
         <tbody>
-          {contents.map((row, i) => (
-            <tr key={i} className="border-b border-gray-100 last:border-b-0">
-              <td className="px-2 py-0.5 font-semibold w-16 align-top">{row.label}</td>
-              <td className="px-2 py-0.5">{row.value}</td>
-              <td className="px-2 py-0.5 text-right text-gray-500">
-                {row.subValue ?? ""}
-              </td>
-            </tr>
-          ))}
+          {contents.flatMap((row, i) => {
+            const py = compact ? "py-0" : "py-0.5";
+            const labelStyle = { textAlign: "justify" as const, textAlignLast: "justify" as const, textJustify: "inter-character" as const };
+            if (i > 0 && contents[i - 1].mergeNextValue) {
+              return [
+                <tr key={i} className="border-b border-gray-100">
+                  <td className={`${py} font-semibold w-12`} style={labelStyle}>{row.label}</td>
+                </tr>,
+              ];
+            }
+            if (row.mergeNextValue) {
+              return [
+                <tr key={i} className="border-b border-gray-100">
+                  <td className={`${py} font-semibold w-12`} style={labelStyle}>{row.label}</td>
+                  <td className={`${py} pl-2`} rowSpan={2}>{contents[i + 1]?.value ?? ""}</td>
+                </tr>,
+              ];
+            }
+            if (row.subValue) {
+              return [
+                <tr key={`${i}-a`} className="border-b border-gray-100">
+                  <td rowSpan={2} className={`${py} font-semibold w-12 align-middle`} style={labelStyle}>{row.label}</td>
+                  <td className={`${py} pl-2`}>{row.value}</td>
+                </tr>,
+                <tr key={`${i}-b`} className="border-b border-gray-100">
+                  <td className={`${py} pl-2 text-gray-500`}>{row.subValue}</td>
+                </tr>,
+              ];
+            }
+            return [
+              <tr key={i} className="border-b border-gray-100">
+                <td className={`${py} font-semibold w-12`} style={labelStyle}>{row.label}</td>
+                <td className={`${py} pl-2`}>{row.value}</td>
+              </tr>,
+            ];
+          })}
         </tbody>
       </table>
     </div>
@@ -413,17 +565,10 @@ function ServiceSection({
 
 function MokjangHeader() {
   return (
-    <div className="contents font-bold">
-      {[0, 1, 2, 3].map((i) => (
-        <div
-          key={i}
-          className="grid grid-cols-[1.5rem_1fr_1fr] border-b border-black"
-        >
-          <div className="px-1 border-r border-gray-300">목장</div>
-          <div className="px-1 border-r border-gray-300">목자</div>
-          <div className="px-1">부목자</div>
-        </div>
-      ))}
+    <div className="grid grid-cols-[1.5rem_1fr_1fr] border-b border-black font-bold">
+      <div className="px-1 border-r border-gray-300 text-center" style={{ whiteSpace: "nowrap", letterSpacing: "-0.05em" }}>목장</div>
+      <div className="px-1 border-r border-gray-300 text-center" style={{ whiteSpace: "nowrap", letterSpacing: "-0.05em" }}>목자</div>
+      <div className="px-1 text-center" style={{ whiteSpace: "nowrap", letterSpacing: "-0.05em" }}>부목자</div>
     </div>
   );
 }
@@ -431,18 +576,18 @@ function MokjangHeader() {
 function MokjangRow({ id, name, sub }: { id: number; name: string; sub: string }) {
   return (
     <div className="grid grid-cols-[1.5rem_1fr_1fr] py-0.5 border-b border-gray-100">
-      <div className="px-1 border-r border-gray-200">{id}</div>
-      <div className="px-1 border-r border-gray-200">{name}</div>
-      <div className="px-1 text-gray-500">{sub}</div>
+      <div className="px-1 border-r border-gray-200 text-center">{id}</div>
+      <div className="px-1 border-r border-gray-200 text-center" style={{ whiteSpace: "nowrap", letterSpacing: "-0.05em" }}>{name}</div>
+      <div className="px-1 text-gray-500 text-center" style={{ whiteSpace: "nowrap", letterSpacing: "-0.05em" }}>{sub}</div>
     </div>
   );
 }
 
 function OfferingRow({ label, names }: { label: string; names: string }) {
   return (
-    <div className="flex border-b border-gray-200 pb-1">
+    <div className="flex border-b border-gray-200 py-0.5">
       <span className="w-16 font-bold text-blue-900 shrink-0">{label}</span>
-      <span className="leading-relaxed whitespace-pre-line">{names}</span>
+      <span className="leading-tight whitespace-pre-line">{names}</span>
     </div>
   );
 }

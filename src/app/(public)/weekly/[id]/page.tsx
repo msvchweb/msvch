@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Container } from "@/components/ui/Container";
 import Bulletin from "@/components/bulletin/Bulletin";
+import { loadBulletinMaster } from "@/lib/bulletin-master";
 import type { Weekly } from "@/types/notice";
 import type { Metadata } from "next";
 
@@ -30,12 +31,15 @@ export default async function WeeklyDetailPage({
 }) {
   const { id } = await params;
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("weeklies")
-    .select("*")
-    .eq("id", id)
-    .eq("is_published", true)
-    .single();
+  const [{ data }, master] = await Promise.all([
+    supabase
+      .from("weeklies")
+      .select("*")
+      .eq("id", id)
+      .eq("is_published", true)
+      .single(),
+    loadBulletinMaster(supabase),
+  ]);
 
   if (!data) notFound();
   const weekly = data as Weekly;
@@ -57,7 +61,7 @@ export default async function WeeklyDetailPage({
           </a>
         )}
       </div>
-      <Bulletin weekly={weekly} mode="web" />
+      <Bulletin weekly={weekly} mode="web" master={master} />
     </Container>
   );
 }

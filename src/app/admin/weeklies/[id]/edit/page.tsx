@@ -41,6 +41,21 @@ function weeklyToFormData(w: Weekly): WeeklyContentInput {
       alimtalk: false,
       instagram: false,
     },
+    news: w.news ?? [],
+    meetings: w.meetings ?? [],
+    north_korea_note: w.north_korea_note ?? "",
+    bible_reading: w.bible_reading ?? "",
+    new_members: w.new_members ?? [],
+    meal_duty_note: w.meal_duty_note ?? "",
+    volunteer_note: w.volunteer_note ?? "",
+    worship_leader: w.worship_leader ?? "",
+    worship_items: w.worship_items ?? [],
+    memorize_verse: w.memorize_verse ?? { ref: "", text: "" },
+    next_week_prayer: w.next_week_prayer ?? [],
+    guide_committee: w.guide_committee ?? [],
+    offerings: w.offerings ?? [],
+    week_total: w.week_total ?? "",
+    cumulative_total: w.cumulative_total ?? "",
   };
 }
 

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Bulletin from "@/components/bulletin/Bulletin";
+import { loadBulletinMaster } from "@/lib/bulletin-master";
 import type { Weekly } from "@/types/notice";
 
 async function loadWeekly(id: string, token: string | undefined) {
@@ -24,13 +25,12 @@ async function loadWeekly(id: string, token: string | undefined) {
     }
   }
 
-  const { data } = await supabase
-    .from("weeklies")
-    .select("*")
-    .eq("id", id)
-    .single();
+  const [{ data }, master] = await Promise.all([
+    supabase.from("weeklies").select("*").eq("id", id).single(),
+    loadBulletinMaster(supabase),
+  ]);
   if (!data) return { notFound: true as const };
-  return { weekly: data as Weekly };
+  return { weekly: data as Weekly, master };
 }
 
 export default async function WeeklyPrintPage({
@@ -74,7 +74,7 @@ export default async function WeeklyPrintPage({
           .bulletin-print .page { box-shadow: none; margin: 0; }
         }
       `}</style>
-      <Bulletin weekly={res.weekly} mode="print" />
+      <Bulletin weekly={res.weekly} mode="print" master={res.master} />
     </>
   );
 }

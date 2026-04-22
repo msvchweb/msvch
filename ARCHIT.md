@@ -58,8 +58,9 @@ src/
 │   │   ├── gallery/
 │   │   ├── notices/
 │   │   ├── sermons/
-│   │   ├── calendar/             # 교회일정 관리 (Google Calendar 생성/삭제)
+│   │   ├── calendar/            # 교회일정 관리 (Google Calendar 생성/삭제)
 │   │   ├── shorts/              # 쇼츠 관리 (생성/검수/승인)
+│   │   ├── masters/             # 주보 마스터 (올해표어/목장/섬기는이/후원/공동체기도)
 │   │   └── weeklies/
 │   │
 │   └── api/                     # API 라우트
@@ -96,8 +97,18 @@ src/
 │   │   └── DiscussionList.tsx
 │   │
 │   ├── weekly/
-│   │   ├── WeeklyForm.tsx       # 주보 입력 폼 (10개 섹션, 클라이언트 컴포넌트)
-│   │   └── WeeklyInlineView.tsx # 공개 페이지 인라인 뷰 (설교/기도제목/공지)
+│   │   ├── WeeklyForm.tsx       # 주보 입력 폼 (6탭 구조, 클라이언트 컴포넌트)
+│   │   ├── WeeklyInlineView.tsx # 공개 페이지 인라인 뷰 (설교/기도제목/공지)
+│   │   └── form/                # 주보 폼 공용 추상화
+│   │       ├── FormTabs.tsx         # 탭 컨테이너
+│   │       ├── DynamicArrayField.tsx # 제네릭 배열 편집기 (add/remove/move)
+│   │       ├── Field.tsx             # 라벨+도움말 래퍼
+│   │       └── shared.ts             # inputCls, weekOfMonth 등
+│   │
+│   ├── bulletin/                 # ⚠ LAYOUT LOCKED (원본 디자인 유지)
+│   │   ├── Bulletin.tsx         # 진입점 (print/web 모드 + master prop)
+│   │   ├── BulletinFront.tsx    # 앞면 레이아웃 + weeklyToFrontData(w, master?)
+│   │   └── BulletinBack.tsx     # 뒷면 레이아웃 + weeklyToBackData(w, master?)
 │   │
 │   ├── LogoutButton.tsx         # 로그아웃 버튼 (클라이언트 컴포넌트)
 │   │
@@ -111,6 +122,7 @@ src/
 │   ├── supabase/
 │   │   ├── client.ts            # 브라우저 Supabase 클라이언트
 │   │   └── server.ts            # 서버 Supabase 클라이언트
+│   ├── bulletin-master.ts       # 5개 마스터 테이블 병렬 로드 + parseTopicOfYear
 │   ├── gallery.ts               # 갤러리 데이터
 │   ├── admin-auth.ts            # API admin 인증 헬퍼
 │   ├── gemini.ts                # Gemini AI 호출 (폴백 체인)
@@ -122,6 +134,7 @@ src/
 │   └── youtube.ts               # YouTube Data API v3
 │
 ├── types/
+│   ├── bulletin-master.ts       # BulletinMasterData, 5개 row 타입
 │   ├── calendar.ts              # CalendarEvent
 │   ├── gallery.ts
 │   ├── notice.ts
@@ -176,7 +189,14 @@ Supabase Storage ← gallery 버킷 (이미지)
                  ← weeklies 버킷 (PDF)
                  ← shorts 버킷 (mp4, 임시)
 
-Admin UI (WeeklyForm) ──→ Supabase DB (weeklies)
+Admin UI (WeeklyForm, 6-tab form) ──→ Supabase DB (weeklies)
+Admin UI (/admin/masters/*) ────────→ Supabase DB (church_settings,
+                                          mokjang_entries, servants,
+                                          support_sections, community_prayers)
+    │
+    │  Public /weekly/[id] & /weekly-print/[id]:
+    │    loadBulletinMaster(supabase) → BulletinMasterData
+    │    └→ <Bulletin weekly={...} master={...} /> (Live Reference)
     │
     └── POST /api/weeklies/generate-pdf
             │
@@ -218,6 +238,62 @@ middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*)
 - 세션: 쿠키 기반 (Supabase SSR)
 - 역할: `profiles.role` (`member` | `admin`)
 - 로그아웃: `LogoutButton` 컴포넌트 (프로필 페이지에 배치)
+
+---
+
+## 주보 데이터 아키텍처
+
+주보(bulletin)는 **주간 가변 데이터**(`weeklies` 행)와 **상시 참조 마스터**(5개 테이블)의
+조합으로 렌더된다. 마스터는 **Live Reference** 방식으로 항상 최신 값을 읽어오며,
+과거 주보에도 동일한 최신 값이 반영된다(스냅샷 아님).
+
+### 레이어 구분
+
+| 구분 | 대상 | 이유 |
+|------|------|------|
+| 주 1회 변경 (`weeklies` 칼럼/JSONB) | 예배 항목, 오후/수요예배, 새벽말씀, 안내/감사위원, 헌금명세, 교회소식, 정기모임, 새가족, 비고, 주간/누계합계, 다음주 기도제목 | 매주 달라지는 가변 정보 |
+| 마스터 (5개 테이블) | 올해 표어(`church_settings`), 목장 현황(`mokjang_entries`), 섬기는 이(`servants`), 후원(`support_sections`), 교회공동체 기도제목(`community_prayers`) | 주 단위로 바뀌지 않고, 변경 시 과거 주보도 최신값 반영이 더 바람직 |
+
+### 로드 흐름
+
+```
+Server Component (/weekly/[id] or /weekly-print/[id])
+    ↓
+Promise.all([ weeklies SELECT, loadBulletinMaster(supabase) ])
+    ↓
+<Bulletin weekly={w} master={m} mode="web|print" />
+    ├── weeklyToFrontData(w, m) → BulletinFrontLeft + BulletinFrontRight
+    └── weeklyToBackData(w, m)  → BulletinBackLeft  + BulletinBackRight
+```
+
+- `src/lib/bulletin-master.ts::loadBulletinMaster()` — 5개 테이블 병렬 SELECT
+- `src/types/bulletin-master.ts` — `BulletinMasterData` 통합 타입
+- `src/components/bulletin/*` — **LAYOUT LOCKED**, 매핑 함수만 수정 가능
+
+### 폼 추상화
+
+`src/components/weekly/form/`:
+
+- `FormTabs` — 6탭 구조(①기본 ②주일예배 ③앞면(교회소식) ④뒷면좌측 ⑤뒷면우측 ⑥기타)
+- `DynamicArrayField<T>` — 제네릭 배열 편집기 (add/remove/move-up/move-down, max 상한)
+- `Field`, `SectionTitle` — 라벨/도움말/섹션 헤더
+
+마스터 CRUD(5개)는 `src/app/admin/masters/` 하위에 각각 별도 페이지로 분리:
+`topic`, `mokjang`(40행 고정), `servants`, `supports`, `community-prayers`(max 7).
+
+Reorder 시 UNIQUE(seq) 충돌을 피하기 위해 **shift-to-temp 패턴** 사용 — 먼저 seq+1000으로
+upsert 후 실제 seq로 재upsert.
+
+### 검증
+
+`src/lib/validation.ts`:
+
+- `WeeklyContentSchema` — `weeklies` 전 필드 (슬라이스 상한과 `.max(N)` 일치)
+- `ChurchSettingTopicSchema`, `MokjangEntrySchema`, `ServantSchema`,
+  `SupportSectionSchema`, `CommunityPrayerSchema` — 마스터별
+
+마이그레이션: `supabase/migrations/011_weeklies_layout_fields.sql`,
+`012_bulletin_master_tables.sql` (RLS: public SELECT, admin CUD).
 
 ---
 

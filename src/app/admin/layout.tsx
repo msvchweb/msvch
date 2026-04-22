@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { LayoutDashboard, FileText, ImageIcon, Newspaper, Sparkles, Video, Calendar, MessageSquare } from "lucide-react";
+import { LayoutDashboard, FileText, ImageIcon, Newspaper, Sparkles, Video, Calendar, MessageSquare, Database } from "lucide-react";
 
 const adminNav = [
   { label: "대시보드", href: "/admin", icon: LayoutDashboard },
   { label: "공지사항", href: "/admin/notices", icon: Newspaper },
   { label: "주보", href: "/admin/weeklies", icon: FileText },
+  { label: "주보 마스터", href: "/admin/masters", icon: Database },
   { label: "갤러리", href: "/admin/gallery", icon: ImageIcon },
   { label: "교회일정", href: "/admin/calendar", icon: Calendar },
   { label: "설교 요약", href: "/admin/sermons", icon: Sparkles },
