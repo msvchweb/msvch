@@ -225,16 +225,16 @@ const DEFAULT: FrontData = {
   worship: {
     leader: "1부 - 이준영 전도사    2·3부 : 이양재 목사",
     items: [
-      { marker: "※", label: "예배의 부름", content: '"하나님은 영이시니 예배하는 자가 영과 진리로 예배할지니라"(요4:24)', assignees: "인도자" },
-      { marker: "※", label: "영광의 찬송", content: "주기도문 찬양", assignees: "다함께" },
-      { marker: "※", label: "기    원", content: "", assignees: "인도자" },
-      { marker: "※", label: "감사와 참회의 기도", content: "", assignees: "다함께" },
-      { marker: "※", label: "신 앙 고 백", content: "사도신경", assignees: "다함께" },
-      { marker: "※", label: "성 시 교 독", content: "8번", assignees: "다함께" },
-      { label: "찬    송", content: "39장", assignees: "다함께" },
+      { marker: "※", label: "예배의 부름", content: '"하나님은 영이시니 예배하는 자가 영과 진리로 예배할지니라"(요4:24)', assignees: "인 도 자" },
+      { marker: "※", label: "영광의 찬송", content: "주기도문 찬양", assignees: "다 함 께" },
+      { marker: "※", label: "기    원", content: "", assignees: "인 도 자" },
+      { marker: "※", label: "감사와 참회의 기도", content: "", assignees: "다 함 께" },
+      { marker: "※", label: "신 앙 고 백", content: "사도신경", assignees: "다 함 께" },
+      { marker: "※", label: "성 시 교 독", content: "8번", assignees: "다 함 께" },
+      { label: "찬    송", content: "39장", assignees: "다 함 께" },
       { label: "고백과 감사의 기도", content: "대표기도", assignees: ["1부 문영애 권사", "2부 이기석 집사", "3부 강종수 장로"] },
-      { marker: "※", label: "봉헌 및 기도", content: "(* 헌금은 입구 헌금함에 드리시기 바랍니다)", assignees: "다함께" },
-      { marker: "※", label: "성 경 봉 독", content: "요 16:31 - 33", assignees: "다함께" },
+      { marker: "※", label: "봉헌 및 기도", content: "(* 헌금은 입구 헌금함에 드리시기 바랍니다)", assignees: "다 함 께" },
+      { marker: "※", label: "성 경 봉 독", content: "요 16:31 - 33", assignees: "다 함 께" },
       {
         label: "찬    양",
         subRows: [
@@ -243,10 +243,10 @@ const DEFAULT: FrontData = {
         ],
       },
       { label: "말    씀", content: '"세상에서 그리스도인으로 잘 사는 법"', assignees: "이양재 목사", emphasize: true },
-      { label: "결단의 찬송", content: "342장", assignees: "다함께" },
-      { label: "교 회 소 식", content: "", assignees: "인도자" },
-      { label: "성도의 교제", content: "", assignees: "다함께" },
-      { marker: "※", label: "송    영", content: "여기에 모인 우리", assignees: "다함께" },
+      { label: "결단의 찬송", content: "342장", assignees: "다 함 께" },
+      { label: "교 회 소 식", content: "", assignees: "인 도 자" },
+      { label: "성도의 교제", content: "", assignees: "다 함 께" },
+      { marker: "※", label: "송    영", content: "여기에 모인 우리", assignees: "다 함 께" },
       { marker: "※", label: "축    도", content: "", assignees: "이양재 목사" },
     ],
     memorizeVerse: {
@@ -559,7 +559,7 @@ export function BulletinFrontRight({ data }: { data: FrontData }) {
                         <td className="px-1">
                           <DottedLeaderCell content={sr.content} />
                         </td>
-                        <td className="px-1 w-28 whitespace-nowrap" style={{ textAlign: "justify", textAlignLast: "justify", textJustify: "inter-character" }}>
+                        <td className="px-1 w-16 whitespace-nowrap" style={{ textAlign: "justify", textAlignLast: "justify", textJustify: "inter-character" }}>
                           {sr.assignee}
                         </td>
                       </tr>
@@ -584,7 +584,7 @@ export function BulletinFrontRight({ data }: { data: FrontData }) {
                           bold={it.emphasize}
                         />
                       </td>
-                      <td className="px-1 w-28 whitespace-nowrap">
+                      <td className="px-1 w-16 whitespace-nowrap">
                         {assignees.map((a, k) => (
                           <div key={k} style={{ textAlign: "justify", textAlignLast: "justify", textJustify: "inter-character" }}>{a}</div>
                         ))}

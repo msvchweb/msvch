@@ -1,9 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadBulletinMaster } from "@/lib/bulletin-master";
-import Bulletin from "@/components/bulletin/Bulletin";
+import {
+  BulletinFrontLeft,
+  BulletinFrontRight,
+  weeklyToFrontData,
+} from "@/components/bulletin/BulletinFront";
+import {
+  BulletinBackLeft,
+  BulletinBackRight,
+  weeklyToBackData,
+} from "@/components/bulletin/BulletinBack";
 import { WeeklyForm, applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
 import type { WeeklyContentInput } from "@/lib/validation";
 import type { BulletinMasterData } from "@/types/bulletin-master";
@@ -18,7 +27,7 @@ interface Props {
   weeklyId?: string;
 }
 
-/** WeeklyContentInput → Weekly 변환 (미리보기 전용, DB 미저장 상태 반영) */
+/** WeeklyContentInput → Weekly 변환 (미리보기 전용) */
 function inputToWeekly(input: WeeklyContentInput, weeklyId?: string): Weekly {
   return {
     id: weeklyId ?? "preview",
@@ -63,6 +72,66 @@ function inputToWeekly(input: WeeklyContentInput, weeklyId?: string): Weekly {
   };
 }
 
+/**
+ * 한 페이지 카드: 컨테이너 폭에 맞춰 자동 축소 렌더링.
+ * 내부 자연 폭은 designWidth 이며 ResizeObserver 로 스케일을 계산한다.
+ * transform-origin: top left 이므로 래퍼 높이도 스케일에 비례해 설정.
+ */
+function PreviewPage({
+  page,
+  designWidth = 520,
+  children,
+}: {
+  page: number;
+  designWidth?: number;
+  children: React.ReactNode;
+}) {
+  const outerRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const [innerH, setInnerH] = useState<number | null>(null);
+
+  useEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return;
+    const update = () => {
+      const w = outer.clientWidth;
+      const s = Math.min(1, w / designWidth);
+      // offsetHeight 는 CSS transform 의 영향을 받지 않으므로 자연 높이를 돌려준다
+      const naturalH = inner.offsetHeight;
+      setScale(s);
+      setInnerH(naturalH * s);
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(outer);
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, [designWidth]);
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm">
+      <div className="bg-gray-700 px-3 py-1 text-xs font-semibold text-white">
+        페이지 {page}
+      </div>
+      <div ref={outerRef} className="relative w-full overflow-hidden" style={{ height: innerH ?? undefined }}>
+        <div
+          ref={innerRef}
+          style={{
+            width: designWidth,
+            transform: `scale(${scale})`,
+            transformOrigin: "top left",
+          }}
+          className="bg-white p-3 text-[10px] leading-tight text-gray-800"
+        >
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function WeeklyEditorWithPreview({
   initial,
   onSubmit,
@@ -89,6 +158,14 @@ export function WeeklyEditorWithPreview({
     () => inputToWeekly(applyPlaceholderDefaults(form), weeklyId),
     [form, weeklyId],
   );
+  const frontData = useMemo(
+    () => (master ? weeklyToFrontData(previewWeekly, master) : null),
+    [previewWeekly, master],
+  );
+  const backData = useMemo(
+    () => (master ? weeklyToBackData(previewWeekly, master) : null),
+    [previewWeekly, master],
+  );
 
   return (
     <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
@@ -107,13 +184,22 @@ export function WeeklyEditorWithPreview({
         <div className="sticky top-4">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-700">실시간 미리보기</h2>
-            <span className="text-xs text-gray-400">입력하는 내용이 즉시 반영됩니다</span>
+            <span className="text-xs text-gray-400">페이지 1 → 4 순서 (세로 스크롤)</span>
           </div>
-          {master ? (
-            <div className="max-h-[calc(100vh-6rem)] overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 p-2">
-              <div className="origin-top-left scale-[0.72] xl:scale-[0.85]" style={{ transformOrigin: "top left" }}>
-                <Bulletin weekly={previewWeekly} master={master} mode="web" />
-              </div>
+          {frontData && backData ? (
+            <div className="max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-gray-100 p-3">
+              <PreviewPage page={1}>
+                <BulletinFrontRight data={frontData} />
+              </PreviewPage>
+              <PreviewPage page={2}>
+                <BulletinBackLeft data={backData} />
+              </PreviewPage>
+              <PreviewPage page={3}>
+                <BulletinBackRight data={backData} />
+              </PreviewPage>
+              <PreviewPage page={4}>
+                <BulletinFrontLeft data={frontData} />
+              </PreviewPage>
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-12 text-center text-sm text-gray-400">

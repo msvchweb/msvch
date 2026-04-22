@@ -15,9 +15,7 @@ export const ALLOWED_IMAGE_EXTENSIONS = [
   "gif",
   "webp",
 ] as const;
-export const ALLOWED_PDF_EXTENSIONS = ["pdf"] as const;
 export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
-export const MAX_PDF_SIZE = 20 * 1024 * 1024; // 20 MB
 export const MAX_UPLOAD_FILES = 30;
 
 // ──────────────────────────────────────────────

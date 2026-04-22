@@ -11,25 +11,25 @@ import type {
 
 /** 주일예배 순서 — 16행 고정. marker/label 은 수정 불가, content/assignees 만 편집 */
 export const WORSHIP_ITEMS_TEMPLATE: readonly WorshipItemRow[] = [
-  { marker: "※", label: "예배의 부름",       content: "",      assignees: ["인도자"],   subRows: [], emphasize: false },
-  { marker: "※", label: "영광의 찬송",       content: "",      assignees: ["다함께"],   subRows: [], emphasize: false },
-  { marker: "※", label: "기    원",           content: "",      assignees: ["인도자"],   subRows: [], emphasize: false },
-  { marker: "※", label: "감사와 참회의 기도", content: "",      assignees: ["다함께"],   subRows: [], emphasize: false },
-  { marker: "※", label: "신 앙 고 백",       content: "사도신경", assignees: ["다함께"],   subRows: [], emphasize: false },
-  { marker: "※", label: "성 시 교 독",       content: "",      assignees: ["다함께"],   subRows: [], emphasize: false },
-  { marker: "",  label: "찬    송",            content: "",      assignees: ["다함께"],   subRows: [], emphasize: false },
+  { marker: "※", label: "예배의 부름",       content: "",      assignees: ["인 도 자"],   subRows: [], emphasize: false },
+  { marker: "※", label: "영광의 찬송",       content: "",      assignees: ["다 함 께"],   subRows: [], emphasize: false },
+  { marker: "※", label: "기    원",           content: "",      assignees: ["인 도 자"],   subRows: [], emphasize: false },
+  { marker: "※", label: "감사와 참회의 기도", content: "",      assignees: ["다 함 께"],   subRows: [], emphasize: false },
+  { marker: "※", label: "신 앙 고 백",       content: "사도신경", assignees: ["다 함 께"],   subRows: [], emphasize: false },
+  { marker: "※", label: "성 시 교 독",       content: "",      assignees: ["다 함 께"],   subRows: [], emphasize: false },
+  { marker: "",  label: "찬    송",            content: "",      assignees: ["다 함 께"],   subRows: [], emphasize: false },
   { marker: "",  label: "고백과 감사의 기도", content: "대표기도", assignees: ["", "", ""], subRows: [], emphasize: false },
-  { marker: "※", label: "봉헌 및 기도",       content: "(* 헌금은 입구 헌금함에 드리시기 바랍니다)", assignees: ["다함께"], subRows: [], emphasize: false },
-  { marker: "※", label: "성 경 봉 독",       content: "",      assignees: ["다함께"],   subRows: [], emphasize: false },
+  { marker: "※", label: "봉헌 및 기도",       content: "(* 헌금은 입구 헌금함에 드리시기 바랍니다)", assignees: ["다 함 께"], subRows: [], emphasize: false },
+  { marker: "※", label: "성 경 봉 독",       content: "",      assignees: ["다 함 께"],   subRows: [], emphasize: false },
   { marker: "",  label: "찬    양",            content: "",      assignees: [],           subRows: [
     { content: "1부 :", assignee: "" },
     { content: "2부 :", assignee: "" },
   ], emphasize: false },
   { marker: "",  label: "말    씀",            content: "",      assignees: [""],         subRows: [], emphasize: true  },
-  { marker: "",  label: "결단의 찬송",         content: "",      assignees: ["다함께"],   subRows: [], emphasize: false },
-  { marker: "",  label: "교 회 소 식",         content: "",      assignees: ["인도자"],   subRows: [], emphasize: false },
-  { marker: "",  label: "성도의 교제",         content: "",      assignees: ["다함께"],   subRows: [], emphasize: false },
-  { marker: "※", label: "송    영",            content: "",      assignees: ["다함께"],   subRows: [], emphasize: false },
+  { marker: "",  label: "결단의 찬송",         content: "",      assignees: ["다 함 께"],   subRows: [], emphasize: false },
+  { marker: "",  label: "교 회 소 식",         content: "",      assignees: ["인 도 자"],   subRows: [], emphasize: false },
+  { marker: "",  label: "성도의 교제",         content: "",      assignees: ["다 함 께"],   subRows: [], emphasize: false },
+  { marker: "※", label: "송    영",            content: "",      assignees: ["다 함 께"],   subRows: [], emphasize: false },
   { marker: "※", label: "축    도",            content: "",      assignees: [""],         subRows: [], emphasize: false },
 ] as const;
 
