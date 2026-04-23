@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createApiClient } from "@/lib/supabase/api";
+import { hasStaffAccess } from "@/lib/admin-auth";
 
 export const maxDuration = 60;
 export const runtime = "nodejs";
@@ -33,7 +34,7 @@ async function getChromiumExecutable(): Promise<string> {
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient();
+  const supabase = await createApiClient(req);
 
   // 관리자 인증
   const {
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest) {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (!profile || (profile as { role: string }).role !== "admin") {
+  if (!hasStaffAccess((profile as { role?: string } | null)?.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

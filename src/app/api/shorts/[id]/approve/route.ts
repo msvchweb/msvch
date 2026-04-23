@@ -1,15 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
 
 type Params = Promise<{ id: string }>;
 
 export async function POST(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Params },
 ) {
   try {
     const { id } = await params;
-    const { supabase } = await requireAdmin();
+    const { supabase } = await requireAdmin(request);
 
     const { error } = await supabase
       .from("shorts_clips")

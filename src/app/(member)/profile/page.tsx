@@ -27,6 +27,15 @@ export default async function ProfilePage() {
       <PageHeader title="내 프로필" />
       <Container>
         <div className="mx-auto max-w-md rounded-xl border border-gray-200 bg-white p-8">
+          {profile?.avatar_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={profile.avatar_url}
+              alt=""
+              referrerPolicy="no-referrer"
+              className="mx-auto mb-5 h-20 w-20 rounded-full border border-gray-100 object-cover"
+            />
+          )}
           <div className="space-y-4">
             <div>
               <label className="text-sm font-medium text-gray-500">이름</label>
@@ -38,7 +47,9 @@ export default async function ProfilePage() {
               <label className="text-sm font-medium text-gray-500">
                 이메일
               </label>
-              <p className="mt-1 text-gray-900">{user.email}</p>
+              <p className="mt-1 text-gray-900">
+                {profile?.email ?? user.email}
+              </p>
             </div>
             <div>
               <label className="text-sm font-medium text-gray-500">

@@ -4,7 +4,7 @@ import { ShortsTriggerSchema } from "@/lib/validation";
 
 export async function POST(request: NextRequest) {
   try {
-    const { supabase } = await requireAdmin();
+    const { supabase } = await requireAdmin(request);
 
     const parsed = ShortsTriggerSchema.safeParse(await request.json());
     if (!parsed.success) {

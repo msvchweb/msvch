@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import Bulletin from "@/components/bulletin/Bulletin";
 import { loadBulletinMaster } from "@/lib/bulletin-master";
+import { hasStaffAccess } from "@/lib/admin-auth";
 import type { Weekly } from "@/types/notice";
 
 async function loadWeekly(id: string, token: string | undefined) {
@@ -20,7 +21,7 @@ async function loadWeekly(id: string, token: string | undefined) {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (!profile || (profile as { role: string }).role !== "admin") {
+    if (!hasStaffAccess((profile as { role?: string } | null)?.role)) {
       return { forbidden: true as const };
     }
   }

@@ -1,29 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createApiClient } from "@/lib/supabase/api";
+import { hasStaffAccess } from "@/lib/admin-auth";
 import { summarizeSermonFromVideo, GeminiUnavailableError } from "@/lib/gemini";
 import { SermonSummarySchema } from "@/lib/validation";
 
 export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return cookieStore.getAll(); },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch { /* Server Component */ }
-        },
-      },
-    }
-  );
+  const supabase = await createApiClient(request);
 
   // Check admin
   const { data: { user } } = await supabase.auth.getUser();
@@ -35,7 +19,7 @@ export async function POST(request: NextRequest) {
     .select("role")
     .eq("id", user.id)
     .single();
-  if (profile?.role !== "admin") {
+  if (!hasStaffAccess((profile as { role?: string } | null)?.role)) {
     return NextResponse.json({ error: "관리자 권한이 필요합니다." }, { status: 403 });
   }
 

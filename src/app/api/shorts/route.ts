@@ -1,24 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createApiClient } from "@/lib/supabase/api";
+import { hasStaffAccess } from "@/lib/admin-auth";
 import { parseLimit } from "@/lib/validation";
 import type { ShortsJob, ShortsClip, ShortsJobWithClips } from "@/types/shorts";
 
 export const revalidate = 0;
 
 export async function GET(req: NextRequest) {
-  const supabase = await createClient();
+  const supabase = await createApiClient(req);
   const { searchParams } = req.nextUrl;
 
-  // 인증 확인 — 비관리자는 published만 조회 가능
+  // 인증 확인 — 비 staff 는 published 만 조회 가능
   const { data: { user } } = await supabase.auth.getUser();
-  let isAdmin = false;
+  let isStaff = false;
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
       .eq("id", user.id)
       .single();
-    isAdmin = profile?.role === "admin";
+    isStaff = hasStaffAccess((profile as { role?: string } | null)?.role);
   }
 
   const status = searchParams.get("status");
@@ -31,7 +32,7 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(limit);
 
-  if (!isAdmin) {
+  if (!isStaff) {
     jobQuery = jobQuery.eq("status", "published");
   } else {
     if (status) jobQuery = jobQuery.eq("status", status);

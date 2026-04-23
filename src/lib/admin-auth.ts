@@ -1,38 +1,35 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import type { NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { createApiClient } from "@/lib/supabase/api";
 
 interface AdminAuthResult {
   supabase: SupabaseClient;
   userId: string;
 }
 
+/** admin UI 에 접근 가능한 역할 — admin + staff */
+export const STAFF_ROLES = ["admin", "staff"] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
+
+/** role 이 staff 또는 admin 이면 true */
+export function hasStaffAccess(
+  role: string | null | undefined,
+): role is StaffRole {
+  return role === "admin" || role === "staff";
+}
+
 /**
- * API 라우트에서 admin 인증을 검증한다.
- * 실패 시 적절한 메시지와 함께 throw한다.
+ * API 라우트에서 admin UI 권한을 검증한다 (admin 또는 staff).
+ * request 를 넘기면 Authorization: Bearer 헤더 기반 인증도 지원(모바일 앱 호환).
+ * 실패 시 AuthError 를 throw 한다.
+ *
+ * 함수명은 호환성을 위해 유지하지만, 실제로는 staff 도 통과한다.
+ * admin 전용 작업이 필요하면 별도 헬퍼(requireStrictAdmin 등)를 추가하라.
  */
-export async function requireAdmin(): Promise<AdminAuthResult> {
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch {
-            // Server Component boundary
-          }
-        },
-      },
-    }
-  );
+export async function requireAdmin(
+  request?: NextRequest,
+): Promise<AdminAuthResult> {
+  const supabase = await createApiClient(request);
 
   const {
     data: { user },
@@ -46,9 +43,9 @@ export async function requireAdmin(): Promise<AdminAuthResult> {
     .from("profiles")
     .select("role")
     .eq("id", user.id)
-    .single();
+    .single<{ role: string }>();
 
-  if (profile?.role !== "admin") {
+  if (!hasStaffAccess(profile?.role)) {
     throw new AuthError("관리자 권한이 필요합니다.", 403);
   }
 

@@ -1,16 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { deleteCalendarEvent } from "@/lib/google-calendar";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
 
 type Params = Promise<{ id: string }>;
 
 export async function DELETE(
-  _request: Request,
+  request: NextRequest,
   { params }: { params: Params },
 ) {
   try {
     const { id } = await params;
-    await requireAdmin();
+    await requireAdmin(request);
 
     await deleteCalendarEvent(id);
     return NextResponse.json({ ok: true });

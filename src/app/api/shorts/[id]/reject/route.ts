@@ -1,16 +1,16 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
 import { ShortsRejectSchema } from "@/lib/validation";
 
 type Params = Promise<{ id: string }>;
 
 export async function POST(
-  request: Request,
+  request: NextRequest,
   { params }: { params: Params },
 ) {
   try {
     const { id } = await params;
-    const { supabase } = await requireAdmin();
+    const { supabase } = await requireAdmin(request);
 
     const parsed = ShortsRejectSchema.safeParse(await request.json());
     if (!parsed.success) {

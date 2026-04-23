@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin();
+    await requireAdmin(request);
 
     const parsed = CalendarEventSchema.safeParse(await request.json());
     if (!parsed.success) {

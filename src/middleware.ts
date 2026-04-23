@@ -1,5 +1,13 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { hasStaffAccess } from "@/lib/admin-auth";
+
+function loginRedirect(request: NextRequest) {
+  const url = new URL("/login", request.url);
+  const current = request.nextUrl.pathname + request.nextUrl.search;
+  url.searchParams.set("next", current);
+  return NextResponse.redirect(url);
+}
 
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -32,19 +40,21 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const path = request.nextUrl.pathname;
+
   // Protect member-only pages
-  if (request.nextUrl.pathname.startsWith("/groups") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (path.startsWith("/groups") && !user) {
+    return loginRedirect(request);
   }
 
-  if (request.nextUrl.pathname.startsWith("/profile") && !user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (path.startsWith("/profile") && !user) {
+    return loginRedirect(request);
   }
 
   // Protect admin pages
-  if (request.nextUrl.pathname.startsWith("/admin")) {
+  if (path.startsWith("/admin")) {
     if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      return loginRedirect(request);
     }
     const { data: profile } = await supabase
       .from("profiles")
@@ -52,7 +62,8 @@ export async function middleware(request: NextRequest) {
       .eq("id", user.id)
       .single();
 
-    if (profile?.role !== "admin") {
+    const role = (profile as { role?: string } | null)?.role;
+    if (!hasStaffAccess(role)) {
       return NextResponse.redirect(new URL("/", request.url));
     }
   }
