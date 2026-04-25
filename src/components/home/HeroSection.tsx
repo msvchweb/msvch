@@ -30,7 +30,7 @@ export function HeroSection({ slides }: { slides: HeroSlide[] }) {
   }, [list.length]);
 
   return (
-    <section className="relative bg-[var(--color-hero-bg-1)] px-4 pt-20 pb-16 text-center sm:px-12 sm:pt-[120px] sm:pb-20">
+    <section className="relative bg-[var(--color-hero-bg-1)] px-4 pt-[60px] pb-16 text-center sm:px-12 sm:pt-[100px] sm:pb-20">
       <h1 className="mx-auto mb-6 max-w-[900px] text-4xl font-bold leading-[1.15] tracking-[-0.035em] text-church-dark sm:text-5xl md:text-[68px]">
         꿈이 있는 건강한 교회
         <br />
