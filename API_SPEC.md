@@ -70,7 +70,7 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 
 ### POST `/api/revalidate`
 
-온디맨드 ISR 캐시 무효화.
+온디맨드 ISR 캐시 무효화 (서버-서버용 — naver-blog-sync 스크립트, 외부 cron 등).
 
 - **인증**: 시크릿 토큰 (`REVALIDATE_SECRET`, 타이밍-세이프 비교)
 - **요청 본문** (Zod 검증: `RevalidateSchema`):
@@ -86,6 +86,28 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 - **에러**:
   - `400` — 잘못된 요청 형식
   - `401` — 잘못된 시크릿
+
+---
+
+### POST `/api/admin/revalidate`
+
+관리자 UI 전용 revalidate — 시크릿 노출 없이 세션 인증으로 ISR 캐시를 무효화.
+`/admin/notices`에서 히어로 이미지 교체/공개 토글 등을 할 때 홈 `/`와 모바일 엔드포인트 `/api/home/hero-slides`를 즉시 갱신하기 위해 사용.
+
+- **인증**: admin 또는 staff 세션 (`requireAdmin()`) — 쿠키 또는 `Authorization: Bearer` 헤더
+- **요청 본문** (Zod 검증 내부):
+
+```ts
+{
+  paths: string[]; // max 20개, 각 `'/'`로 시작, max 500자
+}
+```
+
+- **응답 (200)**: `{ revalidated: true }`
+- **에러**:
+  - `400` — 잘못된 요청 형식
+  - `401` — 미인증
+  - `403` — 비 admin/staff
 
 ---
 

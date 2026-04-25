@@ -462,10 +462,11 @@ interface ShortsClip {
 | `gallery` | public | 갤러리 이미지 |
 | `weeklies` | public | 주보 PDF |
 | `shorts` | public | 쇼츠 mp4 (임시, 발행 후 삭제 가능) |
-| `blog-images` | public | 네이버 블로그 동기화 이미지 (notices/churchschool_posts 첨부, 홈 히어로 슬라이더 소스) |
+| `blog-images` | public | 네이버 블로그 동기화 이미지 + 관리자 UI 히어로 이미지 (notices/churchschool_posts 첨부, 홈 히어로 슬라이더 소스) |
 
 각 버킷 정책: 누구나 읽기, admin만 업로드/삭제. `shorts` 버킷은 service_role도 업로드/삭제 가능 (GitHub Actions용).
-`blog-images`는 service_role(네이버 블로그 sync 스크립트)만 업로드 가능.
+`blog-images`는 service_role(네이버 블로그 sync 스크립트) + staff(`is_staff()`, 마이그레이션 016)이 업로드/수정/삭제 가능.
+관리자 UI 업로드 경로: `admin-hero/{noticeId}/{timestamp}.{ext}` (네이버 sync 경로 `{logNo}/{n}.{ext}`와 충돌 회피).
 
 ### 업로드 제한 (앱 레벨, `src/lib/validation.ts`)
 
@@ -488,3 +489,4 @@ interface ShortsClip {
 | `supabase/migrations/005_shorts.sql` | shorts_jobs, shorts_clips, shorts_settings + storage |
 | `supabase/migrations/010_weeklies_content.sql` | weeklies 테이블에 콘텐츠 필드 추가 (volume, issue, sermon_title 등 20개 컬럼) |
 | `supabase/migrations/009_blog_images.sql` | blog-images Storage 버킷 + notices.images, churchschool_posts.images 컬럼 추가 |
+| `supabase/migrations/016_blog_images_staff_upload.sql` | blog-images 버킷에 staff INSERT/UPDATE/DELETE 정책 추가 (관리자 UI에서 공지 히어로 이미지 교체용) |

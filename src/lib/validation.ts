@@ -15,7 +15,8 @@ export const ALLOWED_IMAGE_EXTENSIONS = [
   "gif",
   "webp",
 ] as const;
-export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB
+export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB (gallery)
+export const MAX_BLOG_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB (blog-images 버킷 제한과 일치)
 export const MAX_UPLOAD_FILES = 30;
 
 // ──────────────────────────────────────────────

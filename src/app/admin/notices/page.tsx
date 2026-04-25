@@ -1,13 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useRef, useState, useEffect } from "react";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import { Plus, Eye, EyeOff, Trash2, Edit3, X } from "lucide-react";
+import { Plus, Eye, EyeOff, Trash2, Edit3, X, ImageIcon, Upload } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { NoticeSchema } from "@/lib/validation";
+import {
+  NoticeSchema,
+  validateFile,
+  safeExtension,
+  ALLOWED_IMAGE_EXTENSIONS,
+  MAX_BLOG_IMAGE_SIZE,
+} from "@/lib/validation";
 import type { Notice } from "@/types/notice";
 
 const CATEGORIES = ["일반", "긴급", "행사"] as const;
+const HERO_STORAGE_BUCKET = "blog-images";
+const HERO_STORAGE_PREFIX = "admin-hero";
 
 export default function AdminNoticesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -19,6 +28,8 @@ export default function AdminNoticesPage() {
   const [category, setCategory] = useState<string>("일반");
   const [content, setContent] = useState("");
   const [date, setDate] = useState("");
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const supabase = createClient();
 
   useEffect(() => { loadNotices(); }, []);
@@ -99,13 +110,97 @@ export default function AdminNoticesPage() {
 
   async function togglePublic(id: string, current: boolean) {
     await supabase.from("notices").update({ is_public: !current }).eq("id", id);
+    await revalidateHome();
     loadNotices();
   }
 
   async function deleteNotice(id: string) {
     if (!confirm("이 공지사항을 삭제하시겠습니까?")) return;
     await supabase.from("notices").delete().eq("id", id);
+    await revalidateHome();
     loadNotices();
+  }
+
+  /** 히어로 슬라이더 + 홈 ISR 캐시 무효화 (관리자 세션 인증) */
+  async function revalidateHome() {
+    try {
+      await fetch("/api/admin/revalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ paths: ["/", "/api/home/hero-slides"] }),
+      });
+    } catch {
+      // 캐시 실패는 사용자에게 즉시 영향 없음 — 다음 요청에서 TTL로 갱신됨
+    }
+  }
+
+  async function uploadHeroImage(notice: Notice, file: File) {
+    const check = validateFile(file, ALLOWED_IMAGE_EXTENSIONS, MAX_BLOG_IMAGE_SIZE);
+    if (!check.ok) {
+      alert(check.reason);
+      return;
+    }
+
+    setUploadingId(notice.id);
+    try {
+      const ext = safeExtension(file.name, ALLOWED_IMAGE_EXTENSIONS);
+      const path = `${HERO_STORAGE_PREFIX}/${notice.id}/${Date.now()}.${ext}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from(HERO_STORAGE_BUCKET)
+        .upload(path, file, { contentType: file.type });
+
+      if (uploadError) {
+        alert(`업로드 실패: ${uploadError.message}`);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from(HERO_STORAGE_BUCKET)
+        .getPublicUrl(path);
+
+      const rest = notice.images.slice(1);
+      const newImages = [urlData.publicUrl, ...rest];
+
+      const { error: updateError } = await supabase
+        .from("notices")
+        .update({ images: newImages })
+        .eq("id", notice.id);
+
+      if (updateError) {
+        alert(`DB 업데이트 실패: ${updateError.message}`);
+        return;
+      }
+
+      await revalidateHome();
+      await loadNotices();
+    } finally {
+      setUploadingId(null);
+    }
+  }
+
+  async function removeHeroImage(notice: Notice) {
+    if (notice.images.length === 0) return;
+    if (!confirm("히어로 이미지(첫번째 사진)를 제거할까요?\n본문 내 [IMG:..] 마커는 그대로 유지됩니다.")) return;
+
+    setUploadingId(notice.id);
+    try {
+      const remaining = notice.images.slice(1);
+      const { error } = await supabase
+        .from("notices")
+        .update({ images: remaining })
+        .eq("id", notice.id);
+
+      if (error) {
+        alert(`제거 실패: ${error.message}`);
+        return;
+      }
+
+      await revalidateHome();
+      await loadNotices();
+    } finally {
+      setUploadingId(null);
+    }
   }
 
   if (loading) return <div className="py-12 text-center text-gray-400">로딩 중...</div>;
@@ -178,6 +273,7 @@ export default function AdminNoticesPage() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-left text-sm">
+              <th className="px-4 py-3 font-medium text-gray-600">히어로</th>
               <th className="px-4 py-3 font-medium text-gray-600">제목</th>
               <th className="px-4 py-3 font-medium text-gray-600">카테고리</th>
               <th className="px-4 py-3 font-medium text-gray-600">날짜</th>
@@ -186,36 +282,92 @@ export default function AdminNoticesPage() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {notices.map((notice) => (
-              <tr key={notice.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm font-medium text-gray-900">{notice.title}</td>
-                <td className="px-4 py-3 text-sm text-gray-500">{notice.category}</td>
-                <td className="px-4 py-3 text-sm tabular-nums text-gray-400">
-                  {notice.date ? formatDate(notice.date) : "-"}
-                </td>
-                <td className="px-4 py-3">
-                  <button
-                    onClick={() => togglePublic(notice.id, notice.is_public)}
-                    className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                      notice.is_public ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
-                    }`}
-                  >
-                    {notice.is_public ? <Eye size={12} /> : <EyeOff size={12} />}
-                    {notice.is_public ? "공개" : "비공개"}
-                  </button>
-                </td>
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => startEdit(notice)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
-                      <Edit3 size={14} />
+            {notices.map((notice) => {
+              const hero = notice.images[0];
+              const isBusy = uploadingId === notice.id;
+              return (
+                <tr key={notice.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => fileInputRefs.current[notice.id]?.click()}
+                        disabled={isBusy}
+                        className="relative h-12 w-20 overflow-hidden rounded-md border border-gray-200 bg-gray-50 transition-colors hover:border-primary-400 disabled:opacity-50"
+                        title={hero ? "히어로 사진 교체" : "히어로 사진 업로드"}
+                      >
+                        {hero ? (
+                          <Image
+                            src={hero}
+                            alt="히어로"
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                            unoptimized={hero.startsWith("http")}
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-gray-400">
+                            <ImageIcon size={16} />
+                          </div>
+                        )}
+                        {isBusy && (
+                          <div className="absolute inset-0 flex items-center justify-center bg-white/70 text-xs text-gray-700">
+                            <Upload size={14} className="animate-pulse" />
+                          </div>
+                        )}
+                      </button>
+                      <input
+                        ref={(el) => { fileInputRefs.current[notice.id] = el; }}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = "";
+                          if (f) await uploadHeroImage(notice, f);
+                        }}
+                      />
+                      {hero && !isBusy && (
+                        <button
+                          type="button"
+                          onClick={() => removeHeroImage(notice)}
+                          className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600"
+                          title="히어로 이미지 제거"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm font-medium text-gray-900">{notice.title}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{notice.category}</td>
+                  <td className="px-4 py-3 text-sm tabular-nums text-gray-400">
+                    {notice.date ? formatDate(notice.date) : "-"}
+                  </td>
+                  <td className="px-4 py-3">
+                    <button
+                      onClick={() => togglePublic(notice.id, notice.is_public)}
+                      className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                        notice.is_public ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
+                      }`}
+                    >
+                      {notice.is_public ? <Eye size={12} /> : <EyeOff size={12} />}
+                      {notice.is_public ? "공개" : "비공개"}
                     </button>
-                    <button onClick={() => deleteNotice(notice.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => startEdit(notice)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                        <Edit3 size={14} />
+                      </button>
+                      <button onClick={() => deleteNotice(notice.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {notices.length === 0 && (
