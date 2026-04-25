@@ -36,9 +36,9 @@ yarn-error.log*
 # claude code local settings (contains tokens)
 .claude/
 
-/docs/
-
-/.temp/
+docs/
+supabase/
+.temp/
 
 # personal files
 claudeprompt
