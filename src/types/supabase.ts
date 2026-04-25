@@ -4,7 +4,7 @@ export interface Profile {
   phone: string | null;
   email: string | null;
   avatar_url: string | null;
-  role: "member" | "staff" | "admin";
+  role: "member" | "staff" | "admin" | "master";
   created_at: string;
 }
 

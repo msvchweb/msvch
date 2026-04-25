@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { LayoutDashboard, FileText, ImageIcon, Newspaper, Sparkles, Video, Calendar, MessageSquare, Database } from "lucide-react";
+import { LayoutDashboard, FileText, ImageIcon, Newspaper, Sparkles, Video, Calendar, MessageSquare, Database, Users } from "lucide-react";
+import { createClient } from "@/lib/supabase/server";
+import { hasMasterAccess } from "@/lib/admin-auth";
 
-const adminNav = [
+const baseNav = [
   { label: "대시보드", href: "/admin", icon: LayoutDashboard },
   { label: "공지사항", href: "/admin/notices", icon: Newspaper },
   { label: "주보", href: "/admin/weeklies", icon: FileText },
@@ -13,11 +15,34 @@ const adminNav = [
   { label: "문의 내역", href: "/admin/inquiries", icon: MessageSquare },
 ];
 
-export default function AdminLayout({
+const masterOnlyNav = [
+  { label: "회원관리", href: "/admin/members", icon: Users },
+];
+
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let role: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single<{ role: string }>();
+    role = profile?.role ?? null;
+  }
+
+  const adminNav = hasMasterAccess(role)
+    ? [...baseNav, ...masterOnlyNav]
+    : baseNav;
+
   return (
     <div className="flex min-h-[calc(100vh-4rem)]">
       <aside className="w-60 border-r border-gray-200 bg-gray-50 p-4">

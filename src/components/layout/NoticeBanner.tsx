@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from "next/navigation";
 
 const NOTICE_MESSAGES: Record<string, string> = {
   no_admin: "관리자 권한이 필요한 페이지입니다.",
+  no_master: "회원관리는 master 권한자만 접근할 수 있습니다.",
   no_login: "로그인이 필요합니다.",
 };
 
