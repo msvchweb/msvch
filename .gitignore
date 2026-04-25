@@ -36,6 +36,8 @@ yarn-error.log*
 # claude code local settings (contains tokens)
 .claude/
 
+/docs/
+
 /.temp/
 
 # personal files
@@ -47,6 +49,9 @@ ACCOUNTS.md
 research.md
 /scripts/migrate-*
 /scripts/*.mjs
+CLAUDE.md
+AGENTS.md
+PLAN*.md
 
 # vercel
 .vercel

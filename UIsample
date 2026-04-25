@@ -1,0 +1,174 @@
+// HomeOptionA.jsx
+import { useEffect, useState } from "react";
+import Image from "next/image";
+
+const HERO_SLIDES = [
+  {
+    img: "/images/main.jpg",
+    eyebrow: "환영합니다",
+    title: "꿈이 있는 건강한 교회",
+    subtitle: "복음의 열매를 맺는 교회\n제자는 Training! 훈련이다.",
+  },
+  {
+    img: "/images/worship-hall.avif",
+    eyebrow: "주일예배",
+    title: "함께 드리는 예배",
+    subtitle: "매주 주일 8·10·12시\n수요·금요·새벽예배",
+  },
+  {
+    img: "/images/churchschool.avif",
+    eyebrow: "교회학교",
+    title: "자라나는 다음세대",
+    subtitle: "영유치부부터 청년부까지\n신앙의 다음세대를 키웁니다",
+  },
+];
+
+const CARDS = [
+  { img: "/images/worship-hall.avif", title: "예배안내", desc: "주일예배, 수요예배, 새벽기도회", href: "/worship" },
+  { img: "/images/pastor-preaching.avif", title: "비전갤러리", desc: "교회 활동과 행사 사진", href: "/gallery" },
+  { img: "/images/churchschool.avif", title: "교회학교", desc: "영유치부, 아동부, 청소년부, 청년부", href: "/churchschool" },
+  { img: "/images/volunteer.avif", title: "봉사센터", desc: "지역사회를 섬기는 봉사 사역", href: "/volunteer-center" },
+];
+
+const SERVICES = [
+  { when: "매주 일요일 (1·2·3부)", title: "주일예배", time: "8:00 / 10:00 / 12:00" },
+  { when: "매주 수요일", title: "수요예배", time: "오후 7:30" },
+  { when: "매주 금요일", title: "금요기도회", time: "오후 8:30" },
+  { when: "월~금 (토 6:30)", title: "새벽예배", time: "오전 6:00" },
+];
+
+const NOTICES = [
+  { title: "2026 희망온돌 따뜻한 겨울나기 후원", date: "2026.04.15", href: "/notice/naver-224250572954" },
+  { title: "봄맞이 사랑나눔 바자회에 당신을 초대합니다", date: "2026.04.15", href: "/notice/naver-224250552514" },
+  { title: "명성비전교회를 소개합니다 (동작구 사당동)", date: "2026.04.15", href: "/notice/naver-224249979361" },
+];
+
+export default function HomeOptionA() {
+  const [slide, setSlide] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setSlide((p) => (p + 1) % HERO_SLIDES.length), 6000);
+    return () => clearInterval(t);
+  }, []);
+
+  const S = HERO_SLIDES[slide];
+
+  return (
+    <main className="font-pretendard antialiased text-[#1a2332] bg-[#eef2f8]">
+      {/* HERO */}
+      <section className="relative px-12 pt-[120px] pb-20 text-center">
+        <div className="mb-7 text-xs font-medium uppercase tracking-[0.36em] text-[rgba(30,40,60,0.55)]">
+          — {S.eyebrow} —
+        </div>
+
+        <h1 className="mx-auto mb-6 max-w-[900px] text-[68px] font-bold leading-[1.15] tracking-[-0.035em]">
+          {S.title}
+          <br />
+          <span className="text-[#2d5f9a]">명성비전교회</span>입니다
+        </h1>
+
+        <p className="mx-auto mb-11 max-w-[480px] whitespace-pre-line text-[17px] leading-[1.75] text-[rgba(30,40,60,0.65)]">
+          {S.subtitle}
+        </p>
+
+        <div className="mb-16 flex justify-center gap-2.5">
+          <a href="/worship" className="rounded-full bg-[#1a2332] px-7 py-3.5 text-sm font-medium text-[#faf7f1]">
+            예배 안내 →
+          </a>
+          <a href="/intro" className="rounded-full border border-[rgba(30,40,60,0.2)] px-7 py-3.5 text-sm font-medium text-[#1a2332]">
+            교회 소개
+          </a>
+        </div>
+
+        {/* Hero slider */}
+        <div className="relative mx-auto h-[440px] max-w-[1100px] overflow-hidden rounded-[20px] shadow-[0_30px_80px_-30px_rgba(30,40,60,0.3)]">
+          <Image
+            key={slide}
+            src={S.img}
+            alt={S.title}
+            fill
+            sizes="(max-width: 1100px) 100vw, 1100px"
+            className="object-cover transition-opacity duration-700"
+            priority
+          />
+          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 gap-2 rounded-full bg-white/85 px-3.5 py-2 backdrop-blur-md">
+            {HERO_SLIDES.map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setSlide(i)}
+                aria-label={`슬라이드 ${i + 1}`}
+                className="h-1.5 rounded-full transition-all"
+                style={{
+                  width: i === slide ? 24 : 6,
+                  background: i === slide ? "#1a2332" : "rgba(30,40,60,0.3)",
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 4 카테고리 카드 */}
+      <section className="bg-white px-12 py-20">
+        <div className="mx-auto grid max-w-[1200px] grid-cols-4 gap-5">
+          {CARDS.map((c) => (
+            <a key={c.title} href={c.href} className="group cursor-pointer">
+              <div className="mb-4 aspect-[4/5] overflow-hidden rounded-[14px] bg-[#e8eef5]">
+                <Image
+                  src={c.img}
+                  alt={c.title}
+                  width={400}
+                  height={500}
+                  className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+                />
+              </div>
+              <div className="mb-1.5 text-[17px] font-semibold tracking-[-0.02em]">{c.title}</div>
+              <div className="text-[13px] leading-[1.5] text-[rgba(30,40,60,0.6)]">{c.desc}</div>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* 예배 시간 */}
+      <section className="bg-[#dee6f1] px-12 py-[88px]">
+        <div className="mx-auto max-w-[1200px]">
+          <div className="mb-10 flex items-baseline gap-6">
+            <h2 className="text-4xl font-bold tracking-[-0.03em]">예배 시간</h2>
+            <div className="text-sm text-[rgba(30,40,60,0.55)]">매주 정기적으로 드리는 예배입니다</div>
+          </div>
+          <div className="grid grid-cols-4 gap-px overflow-hidden rounded-2xl bg-[rgba(30,40,60,0.1)]">
+            {SERVICES.map((s) => (
+              <div key={s.title} className="bg-[#eef2f8] px-7 py-8">
+                <div className="mb-4 text-xs tracking-[-0.01em] text-[rgba(30,40,60,0.55)]">{s.when}</div>
+                <div className="mb-2 text-[22px] font-bold tracking-[-0.025em]">{s.title}</div>
+                <div className="text-sm font-medium tabular-nums text-[#2d5f9a]">{s.time}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 공지사항 */}
+      <section className="bg-white px-12 py-[88px]">
+        <div className="mx-auto max-w-[1200px]">
+          <div className="mb-8 flex items-baseline justify-between">
+            <h2 className="text-4xl font-bold tracking-[-0.03em]">공지사항</h2>
+            <a href="/notice" className="text-[13px] text-[rgba(30,40,60,0.55)]">전체보기 →</a>
+          </div>
+          <ul className="border-t border-[rgba(30,40,60,0.1)]">
+            {NOTICES.map((n) => (
+              <li key={n.title}>
+                <a
+                  href={n.href}
+                  className="flex items-center justify-between border-b border-[rgba(30,40,60,0.1)] py-[22px]"
+                >
+                  <span className="text-base font-medium tracking-[-0.015em]">{n.title}</span>
+                  <span className="text-[13px] tabular-nums text-[rgba(30,40,60,0.5)]">{n.date}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    </main>
+  );
+}
