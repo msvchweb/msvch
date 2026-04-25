@@ -10,7 +10,7 @@ const FALLBACK: HeroSlide = {
   id: "fallback",
   eyebrow: "환영합니다",
   title: "꿈이 있는 건강한 교회",
-  subtitle: "복음의 열매를 맺는 교회\n제자는 Training! 훈련이다.",
+  subtitle: "",
   image: "/images/main.jpg",
   href: "/worship",
   date: null,
@@ -30,29 +30,22 @@ export function HeroSection({ slides }: { slides: HeroSlide[] }) {
   }, [list.length]);
 
   const s = list[idx];
+  const isFallback = s.id === "fallback";
 
   return (
     <section className="relative bg-[var(--color-hero-bg-1)] px-4 pt-20 pb-16 text-center sm:px-12 sm:pt-[120px] sm:pb-20">
-      <div className="mb-7 text-xs font-medium uppercase tracking-[0.36em] text-gray-500">
-        — {s.eyebrow} —
-      </div>
-
       <h1 className="mx-auto mb-6 max-w-[900px] text-4xl font-bold leading-[1.15] tracking-[-0.035em] text-church-dark sm:text-5xl md:text-[68px]">
-        {s.title}
+        꿈이 있는 건강한 교회
         <br />
         <span className="text-primary-700">명성비전교회</span>입니다
       </h1>
 
-      <p className="mx-auto mb-11 max-w-[480px] whitespace-pre-line text-base leading-[1.75] text-gray-600 sm:text-[17px]">
-        {s.subtitle}
-      </p>
-
       <div className="mb-12 flex justify-center gap-2.5 sm:mb-16">
         <Link
-          href={s.href}
+          href="/worship"
           className="group flex items-center gap-1 rounded-full bg-church-dark px-7 py-3.5 text-sm font-medium text-church-cream transition-colors hover:bg-gray-800"
         >
-          자세히 보기
+          예배 안내
           <ChevronRight size={16} className="transition-transform group-hover:translate-x-0.5" />
         </Link>
         <Link
@@ -74,8 +67,23 @@ export function HeroSection({ slides }: { slides: HeroSlide[] }) {
           priority
           unoptimized={s.image.startsWith("http")}
         />
+
+        {!isFallback && (
+          <>
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
+            <Link
+              href={s.href}
+              className="absolute inset-x-0 bottom-0 block px-6 pb-16 pt-10 text-left sm:px-10 sm:pb-20"
+            >
+              <h2 className="max-w-[900px] text-lg font-bold leading-[1.3] tracking-[-0.02em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] sm:text-2xl md:text-3xl">
+                {s.title}
+              </h2>
+            </Link>
+          </>
+        )}
+
         {list.length > 1 && (
-          <div className="absolute bottom-5 left-1/2 flex -translate-x-1/2 gap-2 rounded-full bg-white/85 px-3.5 py-2 backdrop-blur-md">
+          <div className="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2 rounded-full bg-white/85 px-3.5 py-2 backdrop-blur-md">
             {list.map((slide, i) => (
               <button
                 key={slide.id}
