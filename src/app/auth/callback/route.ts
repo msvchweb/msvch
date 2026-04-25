@@ -29,6 +29,10 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("OAuth code exchange failed:", error.message);
+    // 트리거에서 동일 이메일 중복을 막은 경우 — 사용자에게 처음 가입 방법으로 안내
+    if (error.message?.includes("EMAIL_ALREADY_REGISTERED")) {
+      return NextResponse.redirect(`${origin}/login?error=email_exists`);
+    }
     return NextResponse.redirect(`${origin}/login?error=oauth`);
   }
 

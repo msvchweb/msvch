@@ -64,7 +64,7 @@ export async function middleware(request: NextRequest) {
 
     const role = (profile as { role?: string } | null)?.role;
     if (!hasStaffAccess(role)) {
-      return NextResponse.redirect(new URL("/", request.url));
+      return NextResponse.redirect(new URL("/?notice=no_admin", request.url));
     }
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { GoogleGIcon } from "@/components/icons/GoogleGIcon";
@@ -20,10 +21,13 @@ function LoginInner() {
   const nextPath =
     rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
 
+  const errorCode = searchParams.get("error");
   const initialError =
-    searchParams.get("error") === "oauth"
-      ? "로그인 처리 중 오류가 발생했습니다. 다시 시도해 주세요."
-      : "";
+    errorCode === "email_exists"
+      ? "이미 다른 방법으로 가입된 이메일입니다. 처음 가입하신 방법(Google 또는 카카오)으로 로그인해 주세요."
+      : errorCode === "oauth"
+        ? "로그인 처리 중 오류가 발생했습니다. 다시 시도해 주세요."
+        : "";
 
   async function handleOAuth(provider: Provider) {
     setLoading(true);
@@ -51,9 +55,14 @@ function LoginInner() {
     <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center px-4 py-12">
       <div className="w-full max-w-sm">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-600 to-primary-800 text-xl font-bold text-white shadow-lg shadow-primary-500/20">
-            M
-          </div>
+          <Image
+            src="/icon.png"
+            alt="명성비전교회"
+            width={56}
+            height={56}
+            priority
+            className="mx-auto mb-4 h-14 w-14 rounded-2xl object-cover shadow-lg shadow-primary-500/20"
+          />
           <h1 className="text-2xl font-bold text-gray-900">로그인</h1>
           <p className="mt-1 text-sm text-gray-500">
             명성비전교회에 오신 것을 환영합니다
