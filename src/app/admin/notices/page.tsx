@@ -12,11 +12,14 @@ import {
   ALLOWED_IMAGE_EXTENSIONS,
   MAX_BLOG_IMAGE_SIZE,
 } from "@/lib/validation";
+import { compressImage } from "@/lib/image-compress";
 import type { Notice } from "@/types/notice";
 
 const CATEGORIES = ["일반", "긴급", "행사"] as const;
 const HERO_STORAGE_BUCKET = "blog-images";
 const HERO_STORAGE_PREFIX = "admin-hero";
+/** 압축 전 절대 상한 — 브라우저 OOM 방지 */
+const HERO_HARD_MAX_BYTES = 50 * 1024 * 1024;
 
 export default function AdminNoticesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -135,20 +138,40 @@ export default function AdminNoticesPage() {
   }
 
   async function uploadHeroImage(notice: Notice, file: File) {
-    const check = validateFile(file, ALLOWED_IMAGE_EXTENSIONS, MAX_BLOG_IMAGE_SIZE);
-    if (!check.ok) {
-      alert(check.reason);
+    // 1차 검증: 확장자 + 절대 상한 (50MB)
+    const baseCheck = validateFile(
+      file,
+      ALLOWED_IMAGE_EXTENSIONS,
+      HERO_HARD_MAX_BYTES,
+    );
+    if (!baseCheck.ok) {
+      alert(baseCheck.reason);
       return;
     }
 
     setUploadingId(notice.id);
     try {
-      const ext = safeExtension(file.name, ALLOWED_IMAGE_EXTENSIONS);
+      // 5MB 초과면 자동 압축 (Canvas 기반 JPEG)
+      let toUpload = file;
+      if (file.size > MAX_BLOG_IMAGE_SIZE) {
+        try {
+          const result = await compressImage(file, MAX_BLOG_IMAGE_SIZE);
+          toUpload = result.file;
+          console.log(
+            `[hero] 압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(result.file.size / 1024 / 1024).toFixed(2)}MB`,
+          );
+        } catch (e) {
+          alert(e instanceof Error ? e.message : "이미지 압축 실패");
+          return;
+        }
+      }
+
+      const ext = safeExtension(toUpload.name, ALLOWED_IMAGE_EXTENSIONS);
       const path = `${HERO_STORAGE_PREFIX}/${notice.id}/${Date.now()}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from(HERO_STORAGE_BUCKET)
-        .upload(path, file, { contentType: file.type });
+        .upload(path, toUpload, { contentType: toUpload.type });
 
       if (uploadError) {
         alert(`업로드 실패: ${uploadError.message}`);
