@@ -111,7 +111,8 @@ interface GroupPost {
 | `title` | `text NOT NULL` | 제목 |
 | `slug` | `text UNIQUE NOT NULL` | URL 슬러그 |
 | `category` | `text DEFAULT '일반'` | `'일반'`, `'긴급'`, `'행사'` |
-| `content` | `text NOT NULL` | 본문 |
+| `content` | `text NOT NULL` | 본문 (인라인 `[IMG:url]` 마커 지원) |
+| `images` | `text[] NOT NULL DEFAULT '{}'` | 첨부 이미지 Supabase Storage URL 배열 (마이그레이션 009). `images[0]`이 홈 히어로 슬라이더 배경으로 사용됨 |
 | `is_public` | `boolean DEFAULT true` | 공개 여부 |
 | `date` | `date` | 날짜 (nullable) |
 | `created_at` | `timestamptz DEFAULT now()` | 생성일 |
@@ -122,6 +123,9 @@ interface GroupPost {
 
 **앱 레벨 제약** (`NoticeSchema`): title 200자, content 50,000자, slug 100자
 
+**파생 용도**:
+- **홈 히어로 슬라이더** — `getHeroSlides()`가 `is_public=true` + `images[0] OR 본문 첫 [IMG:url]`이 존재하는 공지를 최신순으로 추려 `HeroSlide[]` DTO로 변환. 관리자가 공지를 게시하면 자동으로 슬라이더에 노출 (ISR 1시간 TTL). 신규 테이블 없이 기존 `notices`를 재활용하는 설계로 백엔드 수정 없이 모바일 앱과도 동일 데이터를 공유.
+
 **TypeScript 타입** (`src/types/notice.ts`):
 ```ts
 interface Notice {
@@ -130,9 +134,21 @@ interface Notice {
   slug: string;
   category: "일반" | "긴급" | "행사";
   content: string;
+  images: string[];
   is_public: boolean;
   date: string | null;
   created_at: string;
+}
+
+/** 홈 히어로 슬라이드 — 플랫폼 공용 DTO (notices에서 파생) */
+interface HeroSlide {
+  id: string;        // notices.slug
+  eyebrow: string;   // 카테고리 매핑
+  title: string;
+  subtitle: string;  // 본문에서 [IMG:..] 제거 후 ≤80자
+  image: string;     // images[0] 또는 본문 첫 [IMG:url]
+  href: string;      // /notice/{slug}
+  date: string | null;
 }
 ```
 
@@ -446,8 +462,10 @@ interface ShortsClip {
 | `gallery` | public | 갤러리 이미지 |
 | `weeklies` | public | 주보 PDF |
 | `shorts` | public | 쇼츠 mp4 (임시, 발행 후 삭제 가능) |
+| `blog-images` | public | 네이버 블로그 동기화 이미지 (notices/churchschool_posts 첨부, 홈 히어로 슬라이더 소스) |
 
 각 버킷 정책: 누구나 읽기, admin만 업로드/삭제. `shorts` 버킷은 service_role도 업로드/삭제 가능 (GitHub Actions용).
+`blog-images`는 service_role(네이버 블로그 sync 스크립트)만 업로드 가능.
 
 ### 업로드 제한 (앱 레벨, `src/lib/validation.ts`)
 
@@ -469,3 +487,4 @@ interface ShortsClip {
 | `supabase/migrations/004_gallery_tags.sql` | gallery_albums에 tags 컬럼 + GIN 인덱스 |
 | `supabase/migrations/005_shorts.sql` | shorts_jobs, shorts_clips, shorts_settings + storage |
 | `supabase/migrations/010_weeklies_content.sql` | weeklies 테이블에 콘텐츠 필드 추가 (volume, issue, sermon_title 등 20개 컬럼) |
+| `supabase/migrations/009_blog_images.sql` | blog-images Storage 버킷 + notices.images, churchschool_posts.images 컬럼 추가 |

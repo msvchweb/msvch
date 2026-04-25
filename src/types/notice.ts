@@ -10,6 +10,20 @@ export interface Notice {
   created_at: string;
 }
 
+/**
+ * 홈 히어로 슬라이드 — 플랫폼 공용 DTO.
+ * 웹/모바일 동일 스펙. 데이터 소스가 바뀌어도 이 형태가 안정이면 클라이언트 무수정.
+ */
+export interface HeroSlide {
+  id: string;
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  image: string;
+  href: string;
+  date: string | null;
+}
+
 export interface SpecialPraise {
   song: string;
   choir: string;

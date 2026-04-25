@@ -66,6 +66,9 @@ src/
 │   └── api/                     # API 라우트
 │       ├── calendar/            # 교회 일정 CRUD (Google Calendar, 모바일 호환)
 │       ├── gallery/             # 갤러리 목록 (태그 필터, 모바일 호환)
+│       ├── home/
+│       │   └── hero-slides/     # 홈 히어로 슬라이드 (공지→HeroSlide[], 모바일 호환)
+│       ├── new-content/         # 콘텐츠 최신일자 스냅샷 (레드닷 배지)
 │       ├── og/                  # OG 이미지 생성 (Edge)
 │       ├── revalidate/          # ISR 캐시 무효화
 │       ├── sermon-summary/      # Gemini 설교 요약
@@ -82,12 +85,12 @@ src/
 │   │   ├── nav-config.ts        # Header 메뉴 설정
 │   │   └── tab-config.ts        # 탭바 설정 (플랫폼 공용)
 │   │
-│   ├── home/                    # 홈페이지 섹션
-│   │   ├── HeroSection.tsx
-│   │   ├── QuickLinks.tsx
-│   │   ├── WorshipTimeCard.tsx
+│   ├── home/                    # 홈페이지 섹션 (UIsample 디자인 기반)
+│   │   ├── HeroSection.tsx        # 클라이언트 슬라이더 (HeroSlide[] props, 공지 자동 채움)
+│   │   ├── QuickLinks.tsx         # 4카드 그리드 (aspect-[4/5])
+│   │   ├── WorshipTimeCard.tsx    # 분할선 4분할 그리드
 │   │   ├── UpcomingEvents.tsx     # 다가오는 일정 위젯
-│   │   ├── RecentNotice.tsx
+│   │   ├── RecentNotice.tsx       # 라인 리스트 (border-t/border-b)
 │   │   └── LatestSermon.tsx
 │   │
 │   ├── gallery/
@@ -127,7 +130,7 @@ src/
 │   ├── admin-auth.ts            # API admin 인증 헬퍼
 │   ├── gemini.ts                # Gemini AI 호출 (폴백 체인)
 │   ├── google-calendar.ts       # Google Calendar API v3
-│   ├── notices.ts               # 공지/주보 데이터
+│   ├── notices.ts               # 공지/주보 데이터 + getHeroSlides() (홈 히어로 DTO)
 │   ├── utils.ts                 # cn(), formatDate()
 │   ├── validation.ts            # Zod 스키마 + 파일/입력 검증 유틸
 │   ├── weekly-html-template.ts  # 주보 HTML 빌더 (앞/뒷면, A4 인쇄용)
@@ -169,6 +172,28 @@ src/
 ### Admin 사이드바
 - `admin/layout.tsx` — 좌측 사이드바
 - 7개 메뉴: 대시보드, 공지사항, 주보, 갤러리, 교회일정, 설교 요약, 쇼츠
+
+---
+
+## 홈 히어로 슬라이더 (공지 자동 주입)
+
+```
+notices 테이블 (is_public=true, order by date desc)
+    │
+    ▼
+getHeroSlides(limit=5)       ← src/lib/notices.ts
+    │  이미지 추출 사슬: notices.images[0] → 본문 첫 [IMG:url] → skip
+    │  eyebrow 매핑: 카테고리 → "교회소식" | "긴급공지" | "교회행사"
+    │  subtitle: 본문 [IMG:..] 제거 후 80자 트림
+    ▼
+HeroSlide[]                  ← src/types/notice.ts (플랫폼 공용 DTO)
+    ├── 웹 RSC: src/app/page.tsx가 직접 호출 → <HeroSection slides={...} />
+    └── 모바일: GET /api/home/hero-slides?limit=5 (같은 DTO)
+```
+
+**설계 포인트**: 데이터 소스가 변경되어도(별도 `hero_slides` 테이블 등) DTO와 엔드포인트가
+안정적이라면 클라이언트(웹/모바일) 무수정. 현재는 `notices`를 재활용하므로 추가 DB 작업 없이
+관리자가 공지 게시 → ISR(1시간) 후 슬라이더 자동 반영.
 
 ---
 
@@ -340,10 +365,13 @@ upsert 후 실제 seq로 재upsert.
 | 토큰 | 값 | 용도 |
 |------|---|------|
 | `primary-600` | `#444ce7` | 주요 액센트, 활성 탭 |
+| `primary-700` | `#3538cd` | 강조 텍스트 (홈 타이틀 하이라이트) |
 | `church-gold` | `#c9a84c` | 골드 강조, 구분선 |
-| `church-cream` | `#faf8f4` | 밝은 배경 |
-| `church-dark` | `#111827` | 어두운 배경 (Footer) |
+| `church-cream` | `#faf8f4` | 밝은 배경, 버튼 텍스트 |
+| `church-dark` | `#111827` | 어두운 배경 (Footer), CTA 버튼 |
 | `church-warm` | `#78716c` | 보조 텍스트 |
+| `hero-bg-1` | `#eef2f8` | 홈 Hero/카드 soft 배경 (tint 1) |
+| `hero-bg-2` | `#dee6f1` | 예배시간 섹션 배경 (tint 2) |
 
 ### 폰트
 - Pretendard Variable (한국어 최적화 산세리프)

@@ -226,6 +226,62 @@ GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인�
 
 ---
 
+### GET `/api/home/hero-slides`
+
+홈페이지 히어로 슬라이더용 데이터. `notices` 테이블에서 이미지가 있는 공개 공지를 최신순으로 반환.
+웹과 모바일 앱이 동일한 DTO를 소비하도록 설계됨 — 클라이언트는 이 엔드포인트만 호출하면 슬라이더를 렌더할 수 있다.
+
+- **인증**: 불필요
+- **캐시**: ISR 1시간 (`revalidate: 3600`)
+- **쿼리 파라미터**:
+  - `limit` — 최대 결과 수 (기본 5, 상한 100, `parseLimit()`)
+- **응답**: `HeroSlide[]`
+
+```ts
+interface HeroSlide {
+  id: string;        // notices.slug (React key + 모바일 딥링크 식별자)
+  eyebrow: string;   // 카테고리 매핑 ("교회소식" | "긴급공지" | "교회행사")
+  title: string;     // notices.title
+  subtitle: string;  // 본문에서 [IMG:..] 제거 후 최대 80자 (초과 시 "…" 말줄임)
+  image: string;     // notices.images[0] | 본문 첫 [IMG:url] (둘 다 없으면 슬라이드 제외)
+  href: string;      // "/notice/{slug}" (웹/모바일 공용 경로)
+  date: string | null; // notices.date (YYYY-MM-DD)
+}
+```
+
+**데이터 선택 규칙**:
+1. `notices.is_public = true`
+2. `date` 내림차순
+3. 이미지 추출 사슬: `images[0]` → 본문 첫 `[IMG:url]` → 슬라이드 제외
+4. 최종 `limit`개 반환 (기본 5)
+
+**예시**:
+```
+GET /api/home/hero-slides           → 최대 5개 슬라이드
+GET /api/home/hero-slides?limit=3   → 최대 3개
+```
+
+---
+
+### GET `/api/new-content`
+
+홈/탭바의 레드닷 배지용 — 콘텐츠 최신 일자 4종을 스냅샷으로 반환.
+
+- **인증**: 불필요
+- **캐시**: ISR 10분 (`revalidate: 600`)
+- **응답**: `NewContentDates`
+
+```ts
+interface NewContentDates {
+  notices: string | null;  // 최신 공지 date
+  sermons: string | null;  // 최신 YouTube 설교 publishedAt
+  gallery: string | null;  // 최신 앨범 created_at
+  weeklies: string | null; // 최신 주보 date
+}
+```
+
+---
+
 ### GET `/api/calendar`
 
 교회 Google Calendar에서 다가오는 이벤트를 조회한다.
@@ -309,6 +365,7 @@ Google Calendar에서 이벤트를 삭제한다.
 | GET `/api/gallery` | `parseLimit()` | limit 상한 100 |
 | GET `/api/shorts` | `parseLimit()` | limit 상한 100 |
 | GET `/api/calendar` | `parseLimit()` | limit 상한 100, days 상한 365 |
+| GET `/api/home/hero-slides` | `parseLimit()` | limit 기본 5, 상한 100 |
 
 ---
 
@@ -351,6 +408,7 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `loadWeeklyWithMaster(supabase, id)` | `src/lib/bulletin-master.ts` | 주보 1건 + 마스터 동시 로드 |
 | `getNotices()` | `src/lib/notices.ts` | 공개 공지사항 목록 (날짜 역순) |
 | `getNoticeBySlug(slug)` | `src/lib/notices.ts` | 단건 공지 조회 |
+| `getHeroSlides(limit)` | `src/lib/notices.ts` | 홈 히어로 슬라이드 (이미지 보유 공지 → HeroSlide[]) |
 | `getWeeklies()` | `src/lib/notices.ts` | 발행된 주보 목록 (`is_published=true`, 최근 20개) |
 | `getWeeklyById(id)` | `src/lib/notices.ts` | 주보 단건 조회 (관리자 편집용) |
 | `getGalleryAlbums(options?)` | `src/lib/gallery.ts` | 공개 앨범 + 이미지 (태그 필터 지원) |

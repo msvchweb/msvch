@@ -1,66 +1,58 @@
 import Link from "next/link";
+import { Bell } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { ArrowRight, Bell } from "lucide-react";
 import type { Notice } from "@/types/notice";
 
 export function RecentNotice({ notices }: { notices: Notice[] }) {
   return (
-    <section className="py-20">
-      <div className="mx-auto max-w-7xl px-4 lg:px-8">
-        <div className="mb-8 flex items-end justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900 md:text-3xl">
-              공지사항
-            </h2>
-            <p className="mt-1 text-gray-500">교회 소식을 확인하세요</p>
-          </div>
-          <Link
-            href="/notice"
-            className="group flex items-center gap-1 text-sm font-medium text-primary-600 hover:text-primary-700"
-          >
-            전체보기
-            <ArrowRight size={14} className="transition-transform group-hover:translate-x-0.5" />
+    <section className="bg-white px-4 py-16 sm:px-12 sm:py-[88px]">
+      <div className="mx-auto max-w-[1200px]">
+        <div className="mb-8 flex items-baseline justify-between">
+          <h2 className="text-3xl font-bold tracking-[-0.03em] text-church-dark sm:text-4xl">
+            공지사항
+          </h2>
+          <Link href="/notice" className="text-[13px] text-gray-500 hover:text-gray-700">
+            전체보기 →
           </Link>
         </div>
 
-        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
-          {notices.length > 0 ? (
-            notices.map((notice, idx) => (
-              <Link
-                key={notice.id}
-                href={`/notice/${notice.slug}`}
-                className={`flex items-center justify-between px-6 py-4.5 transition-colors hover:bg-gray-50 ${
-                  idx !== notices.length - 1 ? "border-b border-gray-50" : ""
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  {notice.category === "긴급" ? (
-                    <span className="flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600">
-                      <Bell size={10} />
-                      긴급
+        {notices.length > 0 ? (
+          <ul className="border-t border-gray-200">
+            {notices.map((n) => (
+              <li key={n.id}>
+                <Link
+                  href={`/notice/${n.slug}`}
+                  className="flex items-center justify-between gap-4 border-b border-gray-200 py-[22px] transition-colors hover:bg-gray-50"
+                >
+                  <span className="flex min-w-0 items-center gap-3">
+                    {n.category === "긴급" && (
+                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-red-50 px-2.5 py-0.5 text-xs font-semibold text-red-600">
+                        <Bell size={10} /> 긴급
+                      </span>
+                    )}
+                    {n.category === "행사" && (
+                      <span className="shrink-0 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600">
+                        행사
+                      </span>
+                    )}
+                    <span className="truncate text-base font-medium tracking-[-0.015em] text-church-dark">
+                      {n.title}
                     </span>
-                  ) : notice.category && notice.category !== "일반" ? (
-                    <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-600">
-                      {notice.category}
-                    </span>
-                  ) : null}
-                  <span className="font-medium text-gray-800">
-                    {notice.title}
                   </span>
-                </div>
-                {notice.date && (
-                  <time className="shrink-0 text-sm tabular-nums text-gray-400">
-                    {formatDate(notice.date)}
-                  </time>
-                )}
-              </Link>
-            ))
-          ) : (
-            <div className="px-6 py-16 text-center">
-              <p className="text-gray-400">공지사항이 준비 중입니다.</p>
-            </div>
-          )}
-        </div>
+                  {n.date && (
+                    <span className="shrink-0 text-[13px] tabular-nums text-gray-500">
+                      {formatDate(n.date)}
+                    </span>
+                  )}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="border-t border-b border-gray-200 py-12 text-center text-gray-400">
+            등록된 공지사항이 없습니다.
+          </p>
+        )}
       </div>
     </section>
   );

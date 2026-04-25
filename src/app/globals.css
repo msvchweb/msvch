@@ -22,6 +22,10 @@
   --color-accent-rose: #e11d48;
   --color-accent-emerald: #059669;
 
+  /* Hero / soft background tints */
+  --color-hero-bg-1: #eef2f8;
+  --color-hero-bg-2: #dee6f1;
+
   --font-sans: "Pretendard Variable", "Pretendard", "Noto Sans KR", system-ui,
     -apple-system, sans-serif;
 
