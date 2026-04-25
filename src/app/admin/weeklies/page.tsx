@@ -5,10 +5,12 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Trash2, FileText, Pencil, CheckCircle, Clock, Printer, Globe } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { fetchAuthorMap } from "@/lib/content-authors";
 import type { Weekly } from "@/types/notice";
 
 export default function AdminWeekliesPage() {
   const [weeklies, setWeeklies] = useState<Weekly[]>([]);
+  const [authorMap, setAuthorMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -21,7 +23,10 @@ export default function AdminWeekliesPage() {
       .from("weeklies")
       .select("*")
       .order("date", { ascending: false });
-    setWeeklies((data ?? []) as Weekly[]);
+    const list = (data ?? []) as Weekly[];
+    setWeeklies(list);
+    const map = await fetchAuthorMap(supabase, "weekly", list.map((w) => w.id));
+    setAuthorMap(map);
     setLoading(false);
   }
 
@@ -83,6 +88,7 @@ export default function AdminWeekliesPage() {
                   {w.volume && w.issue
                     ? ` · ${w.volume}권 ${w.issue}호`
                     : ""}
+                  {authorMap[w.id] ? ` · 작성: ${authorMap[w.id]}` : ""}
                 </p>
               </div>
             </div>

@@ -12,6 +12,7 @@ import {
   MAX_UPLOAD_FILES,
   GalleryAlbumSchema,
 } from "@/lib/validation";
+import { fetchAuthorMap } from "@/lib/content-authors";
 import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
 
 const CATEGORIES = ["예배", "교회학교", "교회행사", "봉사센터", "새가족"] as const;
@@ -23,6 +24,7 @@ const SUB_CATEGORIES: Record<string, string[]> = {
 
 export default function AdminGalleryPage() {
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
+  const [authorMap, setAuthorMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -68,6 +70,12 @@ export default function AdminGalleryPage() {
     }));
 
     setAlbums(result);
+    const map = await fetchAuthorMap(
+      supabase,
+      "gallery_album",
+      result.map((a) => a.id),
+    );
+    setAuthorMap(map);
     setLoading(false);
   }
 
@@ -294,6 +302,7 @@ export default function AdminGalleryPage() {
                 <p className="text-sm text-gray-500">
                   {album.category} &middot; {album.date} &middot;{" "}
                   {album.images.length}장
+                  {authorMap[album.id] ? ` · 작성: ${authorMap[album.id]}` : ""}
                 </p>
               </div>
               <div className="flex items-center gap-2">

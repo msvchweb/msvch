@@ -13,6 +13,7 @@ import {
   MAX_BLOG_IMAGE_SIZE,
 } from "@/lib/validation";
 import { compressImage } from "@/lib/image-compress";
+import { fetchAuthorMap } from "@/lib/content-authors";
 import type { Notice } from "@/types/notice";
 
 const CATEGORIES = ["일반", "긴급", "행사"] as const;
@@ -23,6 +24,7 @@ const HERO_HARD_MAX_BYTES = 50 * 1024 * 1024;
 
 export default function AdminNoticesPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [authorMap, setAuthorMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Notice | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -42,7 +44,10 @@ export default function AdminNoticesPage() {
       .from("notices")
       .select("*")
       .order("date", { ascending: false });
-    setNotices((data ?? []) as Notice[]);
+    const list = (data ?? []) as Notice[];
+    setNotices(list);
+    const map = await fetchAuthorMap(supabase, "notice", list.map((n) => n.id));
+    setAuthorMap(map);
     setLoading(false);
   }
 
@@ -300,6 +305,7 @@ export default function AdminNoticesPage() {
               <th className="px-4 py-3 font-medium text-gray-600">제목</th>
               <th className="px-4 py-3 font-medium text-gray-600">카테고리</th>
               <th className="px-4 py-3 font-medium text-gray-600">날짜</th>
+              <th className="px-4 py-3 font-medium text-gray-600">작성자</th>
               <th className="px-4 py-3 font-medium text-gray-600">상태</th>
               <th className="px-4 py-3 font-medium text-gray-600">관리</th>
             </tr>
@@ -366,6 +372,9 @@ export default function AdminNoticesPage() {
                   <td className="px-4 py-3 text-sm text-gray-500">{notice.category}</td>
                   <td className="px-4 py-3 text-sm tabular-nums text-gray-400">
                     {notice.date ? formatDate(notice.date) : "-"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    {authorMap[notice.id] ?? <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3">
                     <button
