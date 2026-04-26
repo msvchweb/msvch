@@ -142,7 +142,7 @@ export default function AdminGalleryPage() {
     loadAlbums();
   }
 
-  async function uploadImages(albumId: string, files: FileList) {
+  async function uploadImages(albumId: string, files: File[]) {
     if (files.length > MAX_UPLOAD_FILES) {
       alert(`한 번에 최대 ${MAX_UPLOAD_FILES}장까지 업로드할 수 있습니다.`);
       return;
@@ -444,9 +444,12 @@ export default function AdminGalleryPage() {
           const albumId = fileInputRef.current?.getAttribute("data-album-id");
           const picked = e.target.files;
           if (albumId && picked && picked.length > 0) {
-            console.log(`[gallery] picked ${picked.length} file(s)`);
-            uploadImages(albumId, picked);
+            // FileList → Array 로 스냅샷. 이후 input.value="" 가
+            // input.files 를 비워도 업로드 루프는 영향 없음.
+            const snapshot = Array.from(picked);
+            console.log(`[gallery] picked ${snapshot.length} file(s)`);
             e.target.value = "";
+            uploadImages(albumId, snapshot);
           }
         }}
       />
