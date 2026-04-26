@@ -21,7 +21,7 @@
 - [x] Step 16: `src/lib/google-calendar.ts` 삭제 + 환경변수 정리 가이드
 - [x] 최종 typecheck + lint
 - [x] 문서 갱신 (API_SPEC.md / ARCHIT.md / DB_SCHEMA.md)
-- [ ] 커밋 + 푸시
+- [x] 커밋 + 푸시
 
 ---
 
