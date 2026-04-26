@@ -9,6 +9,7 @@ const baseNav: AdminNavItem[] = [
   { label: "주보 마스터", href: "/admin/masters", icon: "masters" },
   { label: "갤러리", href: "/admin/gallery", icon: "gallery" },
   { label: "교회일정", href: "/admin/calendar", icon: "calendar" },
+  { label: "일정 구독자", href: "/admin/event-subscribers", icon: "subscribers" },
   { label: "설교 요약", href: "/admin/sermons", icon: "sermons" },
   { label: "쇼츠", href: "/admin/shorts", icon: "shorts" },
   { label: "문의 내역", href: "/admin/inquiries", icon: "inquiries" },

@@ -380,13 +380,112 @@ interface GalleryImage {
 
 ---
 
+### `events`
+
+자체 캘린더 일정 (마이그레이션 022). Google Calendar 의존 제거.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `title` | `text NOT NULL` | 제목 (1~200자) |
+| `description` | `text` | 설명 (≤5000자) |
+| `location` | `text` | 장소 (≤200자) |
+| `date` | `date NOT NULL` | 일자 (필수) |
+| `start_time` | `time` | 시작 시간 (NULL = 종일 일정) |
+| `end_time` | `time` | 종료 시간 (NULL = 미정/오픈엔드) |
+| `end_date` | `date` | v2 다일 일정용 (v1 미사용) |
+| `rrule` | `text` | v2 반복 일정 RRULE (v1 미사용) |
+| `notify` | `boolean DEFAULT false` | 알림톡 발송 대상 여부 |
+| `created_by` | `uuid` | 작성자 user id (`auth.users.id` ON DELETE SET NULL) |
+| `created_at` | `timestamptz DEFAULT now()` | |
+| `updated_at` | `timestamptz DEFAULT now()` | 자동 갱신 트리거 |
+
+**CHECK 제약**:
+- `end_date IS NULL OR end_date >= date`
+- `end_time IS NULL OR start_time IS NULL OR end_time > start_time`
+
+**RLS 정책** (022 + 021 패턴):
+- SELECT: 누구나 (캘린더는 공개)
+- INSERT/UPDATE: staff
+- DELETE: **작성자 본인 OR admin OR master** (`is_admin_or_master() OR is_content_author('event', id)`)
+
+**작성자 추적**: INSERT 시 `record_content_author('event')` 트리거 (020 재사용, 022 에서 `'event'` content_type 추가).
+
+**인덱스**:
+- `idx_events_date` (date)
+- `idx_events_notify` partial index — 알림 cron 의 빠른 조회용
+
+**TypeScript 타입** (`src/types/calendar.ts`):
+```ts
+interface CalendarEvent {
+  id: string;
+  title: string;
+  description: string | null;
+  location: string | null;
+  start: string;       // ISO 8601 (KST +09:00) 또는 YYYY-MM-DD (종일)
+  end: string | null;  // null = 미정/오픈엔드
+  isAllDay: boolean;
+  recurrence: string | null;  // v2
+  notify: boolean;
+}
+```
+
+---
+
+### `event_subscribers`
+
+일정 알림톡 수신자 명단 (마이그레이션 023). admin/master 가 직접 관리.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `name` | `text NOT NULL` | 수신자 이름 (1~100자) |
+| `phone` | `text NOT NULL UNIQUE` | 010-XXXX-XXXX (앱 레벨 정규화) |
+| `is_active` | `boolean DEFAULT true` | 활성 여부 |
+| `notify_d1` | `boolean DEFAULT true` | 하루 전 알림 (D-1) 수신 |
+| `notify_d_day` | `boolean DEFAULT false` | 당일 알림 (D-day) 수신 |
+| `note` | `text` | 메모 (≤500자, 예: "임원", "청년부장") |
+| `created_at` | `timestamptz DEFAULT now()` | |
+| `updated_at` | `timestamptz DEFAULT now()` | 자동 갱신 트리거 |
+
+**RLS 정책**:
+- SELECT: staff
+- INSERT/UPDATE/DELETE: admin/master 만 (`is_admin_or_master()`)
+
+**인덱스**: `idx_event_subscribers_active` partial (`is_active = true`)
+
+---
+
+### `alimtalk_sent`
+
+알림톡 발송 추적 (마이그레이션 023). 중복 발송 방지 + 운영 가시성.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `template` | `text NOT NULL` | 카카오 비즈 템플릿 코드 (예: `'event_d1'`) |
+| `event_id` | `uuid` | `events.id` ON DELETE CASCADE (nullable — 일정 외 알림 대비) |
+| `recipient` | `text NOT NULL` | 정규화된 수신자 전화번호 |
+| `sent_at` | `timestamptz DEFAULT now()` | |
+| `status` | `text NOT NULL` | `'sent'` \| `'failed'` \| `'noop'` |
+| `error` | `text` | 실패/noop 사유 |
+| **UNIQUE** | `(template, event_id, recipient)` | 중복 발송 방지 |
+
+**RLS 정책**:
+- SELECT: staff (운영 가시성)
+- INSERT/UPDATE/DELETE: 정책 없음 — service_role(cron 라우트) 만 가능
+
+**인덱스**: `idx_alimtalk_sent_event`, `idx_alimtalk_sent_at`
+
+---
+
 ### `content_authors`
 
 컨텐츠 작성자 추적 shadow 테이블 (마이그레이션 020). 베이스 테이블에 author 컬럼을 추가하지 않으므로 공개 응답에 작성자 정보가 절대 노출되지 않음.
 
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
-| `content_type` | `text NOT NULL` | `'notice'` \| `'weekly'` \| `'gallery_album'` |
+| `content_type` | `text NOT NULL` | `'notice'` \| `'weekly'` \| `'gallery_album'` \| `'event'` (022 에서 추가) |
 | `content_id` | `uuid NOT NULL` | 대상 컨텐츠 id |
 | `author_id` | `uuid` | `auth.users.id` (작성자 삭제 시 SET NULL) |
 | `author_name` | `text` | 작성 시점의 닉네임 스냅샷 (이후 닉네임 변경에도 과거 기록 유지) |
@@ -397,7 +496,7 @@ interface GalleryImage {
 - SELECT: staff (admin UI 작성자 표시용)
 - INSERT: 정책 없음 — `record_content_author(content_type)` 트리거(SECURITY DEFINER) 만 가능
 
-**트리거 부착 대상**: `notices`, `weeklies`, `gallery_albums` 의 AFTER INSERT 트리거가 자동 호출.
+**트리거 부착 대상**: `notices`, `weeklies`, `gallery_albums`, `events` 의 AFTER INSERT 트리거가 자동 호출.
 
 **용도**:
 - admin UI 컨텐츠 목록에 작성자 표시 (`fetchAuthorRecordMap()`)
@@ -561,3 +660,5 @@ interface ShortsClip {
 | `019_master_role.sql` | role 에 `'master'` 추가 + `is_master()` + role 변경을 master 단독 권한으로 |
 | `020_content_authors.sql` | content_authors shadow 테이블 + 작성자 추적 트리거 (notice/weekly/gallery_album) |
 | `021_content_delete_policies.sql` | notices/weeklies/gallery_albums/gallery_images DELETE 정책 분리 — 작성자 OR admin OR master 만 |
+| `022_events.sql` | 자체 캘린더 events 테이블 + 작성자 트리거 + 021 패턴 DELETE 정책 + content_authors CHECK 에 'event' 추가 |
+| `023_alimtalk_subscribers.sql` | event_subscribers + alimtalk_sent (카카오 비즈 알림톡 인프라) |

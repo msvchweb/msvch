@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type ContentType = "notice" | "weekly" | "gallery_album";
+export type ContentType = "notice" | "weekly" | "gallery_album" | "event";
 
 export interface ContentAuthor {
   /** 작성자 user id (UUID). 미상이면 null */

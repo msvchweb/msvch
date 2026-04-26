@@ -120,6 +120,101 @@ Authorization: Bearer eyJhbGc...
 
 ---
 
+### GET `/api/admin/event-subscribers`
+
+일정 알림 수신자 목록 조회 (admin/master).
+
+- **인증**: staff (`requireAdmin()`) — RLS 상 staff SELECT 가능
+- **응답**: `EventSubscriber[]`
+
+```ts
+interface EventSubscriber {
+  id: string;
+  name: string;
+  phone: string;          // 010-XXXX-XXXX
+  isActive: boolean;
+  notifyD1: boolean;      // D-1 알림
+  notifyDDay: boolean;    // D-day 알림
+  note: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### POST `/api/admin/event-subscribers`
+
+수신자 등록.
+
+- **인증**: admin/master (RLS — `is_admin_or_master()`)
+- **요청 본문** (Zod 검증: `EventSubscriberSchema`):
+
+```ts
+{
+  name: string;           // 1~100
+  phone: string;          // 자동 정규화 (다양한 입력 → 010-XXXX-XXXX)
+  isActive?: boolean;     // 기본 true
+  notifyD1?: boolean;     // 기본 true
+  notifyDDay?: boolean;   // 기본 false
+  note?: string;          // max 500
+}
+```
+
+- **응답 (201)**: `EventSubscriber`
+- **에러**:
+  - `400` — 형식 오류 / 휴대폰 번호 형식 오류
+  - `401`, `403` — 권한
+  - `409` — 이미 등록된 전화번호 (UNIQUE 제약)
+
+### PATCH `/api/admin/event-subscribers/[id]`
+
+수신자 정보 수정 (필드별 옵셔널).
+
+- **인증**: admin/master
+- **요청 본문**: 위 스키마의 partial
+- **응답 (200)**: `{ ok: true }`
+
+### DELETE `/api/admin/event-subscribers/[id]`
+
+수신자 삭제.
+
+- **인증**: admin/master
+- **응답 (200)**: `{ ok: true }`
+
+---
+
+### GET `/api/admin/cron/alimtalk-events`
+
+Vercel Cron 엔드포인트 — 다음 날(D-1) 일정 중 `notify=true` 인 건을 활성 구독자(`notify_d1=true`)에게 알림톡 발송.
+
+- **인증**: `x-cron-secret` 헤더 OR `Authorization: Bearer <CRON_SECRET>` (`crypto.timingSafeEqual` 비교)
+- **스케줄**: 매일 06:00 KST (`vercel.json` — `0 21 * * *` UTC)
+- **동작**:
+  1. D-1 일자의 `events.notify=true` 일정 조회
+  2. 활성 구독자(`is_active=true AND notify_d1=true`) 조회
+  3. `alimtalk_sent` 에 미기록 (event_id × recipient) 조합만 `sendAlimtalk()` 호출
+  4. 결과 status (`sent`/`failed`/`noop`) 와 함께 `alimtalk_sent` 기록
+- **카카오 비즈 미설정 시**: `sendAlimtalk` 가 `noop` 반환 → 추적만 기록되고 실 발송 없음
+- **응답 (200)**:
+
+```ts
+{
+  template: "event_d1";
+  targetDate: string;             // YYYY-MM-DD
+  events: number;
+  subscribers: number;
+  sent: number;
+  failed: number;
+  noop: number;
+  skipped_already_sent: number;
+}
+```
+
+- **에러**:
+  - `401` — 시크릿 불일치
+  - `500` — Supabase env 누락 / 조회 실패
+
+---
+
 ### PATCH `/api/admin/members`
 
 회원의 role 을 변경한다 (master 단독 권한).
@@ -360,10 +455,10 @@ interface NewContentDates {
 
 ### GET `/api/calendar`
 
-교회 Google Calendar에서 다가오는 이벤트를 조회한다.
+자체 DB(`events` 테이블)에서 다가오는 일정을 조회. 마이그레이션 022 이후 Google Calendar 의존 제거.
 
 - **인증**: 불필요
-- **캐시**: ISR 10분 (`revalidate: 600`)
+- **캐시**: 없음 (`dynamic: "force-dynamic"`)
 - **쿼리 파라미터**:
   - `limit` — 최대 결과 수 (기본 20, 상한 100, `parseLimit()`)
   - `days` — 오늘부터 며칠 후까지 (기본 60, 상한 365)
@@ -375,10 +470,15 @@ interface CalendarEvent {
   title: string;
   description: string | null;
   location: string | null;
-  start: string;     // ISO 8601 또는 YYYY-MM-DD (종일)
-  end: string;
+  /** ISO 8601 datetime (KST +09:00) 또는 YYYY-MM-DD (종일) */
+  start: string;
+  /** ISO 8601 / YYYY-MM-DD / null. null = 종료시간 미정/오픈엔드 */
+  end: string | null;
   isAllDay: boolean;
-  htmlLink: string;
+  /** RRULE — v2 예정, v1 항상 null */
+  recurrence: string | null;
+  /** 알림톡 발송 대상 표시 (관리 UI 용) */
+  notify: boolean;
 }
 ```
 
@@ -388,39 +488,43 @@ GET /api/calendar?limit=5&days=7    → 이번 주, 최대 5개
 GET /api/calendar?days=30           → 이번 달
 ```
 
-- **외부 API**: Google Calendar API v3 (공개 캘린더, API 키 인증)
-- **에러**: API 키 미설정 또는 Google API 오류 시 빈 배열 `[]` 반환
-
 ### POST `/api/calendar`
 
-Google Calendar에 이벤트를 생성한다.
+자체 DB 에 일정을 생성. 작성자(`created_by`) 자동 기록 + `content_authors` 트리거.
 
-- **인증**: admin 역할 필수 (`requireAdmin()`)
-- **외부 API**: Google Calendar API v3 (Service Account JWT 인증)
+- **인증**: staff/admin/master (`requireAdmin()`) — 쿠키 또는 Bearer
 - **요청 본문** (Zod 검증: `CalendarEventSchema`):
 
 ```ts
 {
-  title: string;         // max 200
+  title: string;         // 1~200
   description?: string;  // max 5000
   location?: string;     // max 200
-  startDate: string;     // YYYY-MM-DD
-  endDate: string;       // YYYY-MM-DD
-  startTime?: string;    // HH:mm (없으면 종일)
-  endTime?: string;      // HH:mm (없으면 종일)
+  date: string;          // YYYY-MM-DD (필수)
+  startTime?: string;    // HH:mm — 미지정 = 종일
+  endTime?: string;      // HH:mm — 미지정 = 미정/오픈엔드
+  notify?: boolean;      // 알림톡 발송 대상 (기본 false)
 }
 ```
 
+- **검증 규칙**: `endTime` 만 있고 `startTime` 없으면 거부. `endTime <= startTime` 거부.
 - **응답 (201)**: `CalendarEvent`
 - **에러**: `400`, `401`, `403`, `500`
 
----
+### PATCH `/api/calendar/[id]`
+
+일정을 수정. 모든 필드 옵셔널, 보낸 필드만 갱신.
+
+- **인증**: staff (`requireAdmin()`)
+- **요청 본문**: `CalendarEventSchema.partial()` 와 동일 + 동일 일관성 검증
+- **응답 (200)**: `{ ok: true }`
+- **에러**: `400`, `401`, `403`, `500`
 
 ### DELETE `/api/calendar/[id]`
 
-Google Calendar에서 이벤트를 삭제한다.
+일정을 삭제. RLS 정책상 **작성자 본인 OR admin OR master** 만 통과 (021 패턴 / 022 적용).
 
-- **인증**: admin 역할 필수 (`requireAdmin()`)
+- **인증**: staff (`requireAdmin()`) — 추가로 RLS 가 작성자 매칭
 - **응답 (200)**: `{ ok: true }`
 - **에러**: `401`, `403`, `500`
 
@@ -441,6 +545,10 @@ Google Calendar에서 이벤트를 삭제한다.
 | GET `/api/gallery` | `parseLimit()` | limit 상한 100 |
 | GET `/api/shorts` | `parseLimit()` | limit 상한 100 |
 | GET `/api/calendar` | `parseLimit()` | limit 상한 100, days 상한 365 |
+| POST `/api/calendar` | `CalendarEventSchema` | endTime 옵셔널, refine 일관성 검증 |
+| PATCH `/api/calendar/[id]` | `CalendarEventPatchSchema` | partial + 동일 refine |
+| POST `/api/admin/event-subscribers` | `EventSubscriberSchema` | 휴대폰 자동 정규화 |
+| PATCH `/api/admin/event-subscribers/[id]` | `EventSubscriberSchema.partial()` | |
 | GET `/api/home/hero-slides` | `parseLimit()` | limit 기본 5, 상한 100 |
 
 ---
@@ -533,6 +641,8 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | Google Gemini | AI 설교 요약 + 쇼츠 하이라이트 | `GEMINI_API_KEY` |
 | Next.js ISR | 캐시 무효화 | `REVALIDATE_SECRET` |
 | Google Maps Embed | 찾아오시는 길 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` |
-| Google Calendar API v3 | 교회 일정 조회/생성/삭제 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY` |
+| Google Calendar API v3 | 1회 마이그레이션 스크립트(`scripts/migrate-google-calendar.ts`)에서만 사용 — 일상 트래픽 의존 없음 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY` (마이그레이션 후 제거 권장) |
 | GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |
 | Puppeteer + @sparticuz/chromium | 주보 PDF 자동 생성 | `CHROME_EXECUTABLE_PATH` (개발 환경만, 선택) |
+| Vercel Cron | 일정 알림톡 D-1 발송 (`/api/admin/cron/alimtalk-events`) | `CRON_SECRET` |
+| 카카오 비즈니스 알림톡 (중계사 — NHN Cloud / Aligo / Solapi 등) | 일정 알림톡 발송 — 비즈 승인 후 환경변수 채우면 동작 | `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY`, `KAKAO_BIZ_API_URL` |

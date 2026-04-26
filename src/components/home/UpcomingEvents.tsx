@@ -44,11 +44,9 @@ export function UpcomingEvents({ events }: { events: CalendarEvent[] }) {
 
         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
           {events.map((event, idx) => (
-            <a
+            <Link
               key={event.id}
-              href={event.htmlLink}
-              target="_blank"
-              rel="noopener noreferrer"
+              href="/calendar"
               className={`flex items-center justify-between px-6 py-4.5 transition-colors hover:bg-gray-50 ${
                 idx !== events.length - 1
                   ? "border-b border-gray-50"
@@ -73,7 +71,7 @@ export function UpcomingEvents({ events }: { events: CalendarEvent[] }) {
               <time className="shrink-0 text-sm tabular-nums text-gray-400">
                 {formatShortDate(event.start, event.isAllDay)}
               </time>
-            </a>
+            </Link>
           ))}
         </div>
       </div>

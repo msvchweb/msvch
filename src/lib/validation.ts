@@ -320,13 +320,79 @@ export function createEmptyWeeklyInput(): WeeklyContentInput {
   };
 }
 
-/** 캘린더 이벤트 생성 */
-export const CalendarEventSchema = z.object({
+/** 캘린더 이벤트 base schema — partial 등 변형용 */
+export const CalendarEventBaseSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
   description: z.string().max(5000).optional(),
   location: z.string().max(200).optional(),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식: YYYY-MM-DD"),
-  endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식: YYYY-MM-DD"),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm").optional(),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm").optional(),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식: YYYY-MM-DD"),
+  startTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm")
+    .optional(),
+  endTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm")
+    .optional(),
+  notify: z.boolean().optional(),
+});
+
+/** 캘린더 이벤트 생성/수정 (자체 DB 캘린더 v1 — 단일 날짜) */
+export const CalendarEventSchema = CalendarEventBaseSchema
+  .refine((d) => !d.endTime || d.startTime, {
+    message: "종료 시간만 단독 입력은 불가합니다 (시작 시간이 필요).",
+    path: ["endTime"],
+  })
+  .refine(
+    (d) => !d.startTime || !d.endTime || d.endTime > d.startTime,
+    {
+      message: "종료 시간은 시작 시간 이후여야 합니다.",
+      path: ["endTime"],
+    },
+  );
+
+/** PATCH 용 — 모든 필드 옵셔널, 시간 일관성 검증은 그대로 */
+export const CalendarEventPatchSchema = CalendarEventBaseSchema.partial()
+  .refine((d) => !d.endTime || d.startTime, {
+    message: "종료 시간만 단독 입력은 불가합니다 (시작 시간이 필요).",
+    path: ["endTime"],
+  })
+  .refine(
+    (d) => !d.startTime || !d.endTime || d.endTime > d.startTime,
+    {
+      message: "종료 시간은 시작 시간 이후여야 합니다.",
+      path: ["endTime"],
+    },
+  );
+
+/**
+ * 한국 휴대폰 번호 정규화: 10~11자리 숫자만 추출 → 010-XXXX-XXXX 형태로 변환.
+ * 입력 예: "01012345678", "010-1234-5678", "+82 10 1234 5678" → "010-1234-5678"
+ */
+export function normalizeKoreanPhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  // +82 로 시작하면 0 으로 치환
+  const local = digits.startsWith("82")
+    ? "0" + digits.slice(2)
+    : digits;
+  // 010 + 8자리 (총 11자리) 만 허용
+  if (!/^010\d{8}$/.test(local)) return null;
+  return `${local.slice(0, 3)}-${local.slice(3, 7)}-${local.slice(7)}`;
+}
+
+/** 일정 알림 수신자 등록/수정 */
+export const EventSubscriberSchema = z.object({
+  name: z.string().min(1, "이름을 입력하세요").max(100, "이름은 100자까지"),
+  phone: z
+    .string()
+    .min(1, "전화번호를 입력하세요")
+    .max(20, "전화번호 형식 오류")
+    .refine(
+      (v) => normalizeKoreanPhone(v) !== null,
+      "휴대폰 번호 형식: 010-XXXX-XXXX",
+    ),
+  isActive: z.boolean().optional(),
+  notifyD1: z.boolean().optional(),
+  notifyDDay: z.boolean().optional(),
+  note: z.string().max(500).optional(),
 });

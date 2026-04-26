@@ -61,7 +61,8 @@ src/
 │   │   ├── gallery/
 │   │   ├── notices/
 │   │   ├── sermons/
-│   │   ├── calendar/            # 교회일정 관리 (Google Calendar 생성/삭제)
+│   │   ├── calendar/            # 교회일정 관리 (자체 DB events 테이블)
+│   │   ├── event-subscribers/   # 일정 알림톡 구독자 관리 (admin/master)
 │   │   ├── shorts/              # 쇼츠 관리 (생성/검수/승인)
 │   │   ├── inquiries/           # 챗봇 문의 내역 (열람/삭제)
 │   │   ├── members/             # 회원관리 (master 단독, role 변경)
@@ -70,9 +71,14 @@ src/
 │   │
 │   └── api/                     # API 라우트
 │       ├── admin/
-│       │   ├── members/         # PATCH (master 전용 role 변경)
-│       │   └── revalidate/      # 세션 인증 ISR 무효화
-│       ├── calendar/            # 교회 일정 CRUD (Google Calendar, 모바일 호환)
+│       │   ├── cron/
+│       │   │   └── alimtalk-events/ # Vercel Cron — D-1 일정 알림톡 발송
+│       │   ├── event-subscribers/   # 일정 알림 수신자 CRUD (master)
+│       │   │   └── [id]/
+│       │   ├── members/             # PATCH (master 전용 role 변경)
+│       │   └── revalidate/          # 세션 인증 ISR 무효화
+│       ├── calendar/            # 교회 일정 CRUD (자체 DB, 모바일 호환)
+│       │   └── [id]/                # PATCH/DELETE
 │       ├── chat/                # 챗봇 (Gemini)
 │       │   └── inquiry/         # 챗봇 문의 접수
 │       ├── gallery/             # 갤러리 목록 (태그 필터, 모바일 호환)
@@ -144,11 +150,12 @@ src/
 │   ├── bulletin-master.ts       # 5개 마스터 테이블 병렬 로드 + parseTopicOfYear
 │   ├── gallery.ts               # 갤러리 데이터
 │   ├── admin-auth.ts            # requireAdmin/Master, hasStaffAccess/MasterAccess
-│   ├── content-authors.ts       # content_authors shadow 테이블 조회 (admin 전용)
+│   ├── content-authors.ts       # content_authors shadow 테이블 조회 (notice/weekly/gallery_album/event)
 │   ├── use-me.ts                # useMe() + canDelete() 클라이언트 훅 (auth 이벤트 구독)
 │   ├── image-compress.ts        # Canvas 기반 이미지 압축 (5/10MB 제한 대응)
 │   ├── gemini.ts                # Gemini AI 호출 (폴백 체인)
-│   ├── google-calendar.ts       # Google Calendar API v3
+│   ├── events.ts                # 자체 캘린더 데이터 함수 (events 테이블)
+│   ├── alimtalk.ts              # 알림톡 추상화 (카카오 비즈 미설정 시 noop)
 │   ├── notices.ts               # 공지/주보 데이터 + getHeroSlides() (홈 히어로 DTO)
 │   ├── new-content-provider.ts  # 새 콘텐츠 레드닷 React Context
 │   ├── utils.ts                 # cn(), formatDate()
@@ -158,7 +165,8 @@ src/
 │
 ├── types/
 │   ├── bulletin-master.ts       # BulletinMasterData, 5개 row 타입
-│   ├── calendar.ts              # CalendarEvent
+│   ├── calendar.ts              # CalendarEvent (자체 DB 기반 DTO)
+│   ├── subscribers.ts           # EventSubscriber, AlimtalkSentRow
 │   ├── gallery.ts
 │   ├── notice.ts
 │   ├── shorts.ts                # ShortsJob, ShortsClip, ShortsSettings
@@ -194,7 +202,7 @@ src/
 ### Admin 네비게이션
 - `admin/layout.tsx` — PC(`lg+`): 좌측 사이드바, 모바일: 상단 sticky 가로 스크롤 pill 탭
 - `AdminNav.tsx` — `AdminSidebar` + `AdminMobileTabs` (활성 상태 표시, 아이콘은 문자열 키로 직렬화 가능)
-- 메뉴: 대시보드, 공지사항, 주보, 주보 마스터, 갤러리, 교회일정, 설교 요약, 쇼츠, 문의 내역, 회원관리(master 전용)
+- 메뉴: 대시보드, 공지사항, 주보, 주보 마스터, 갤러리, 교회일정, 일정 구독자, 설교 요약, 쇼츠, 문의 내역, 회원관리(master 전용)
 
 ---
 
@@ -410,6 +418,61 @@ upsert 후 실제 seq로 재upsert.
 
 ---
 
+## 캘린더 + 알림톡 아키텍처
+
+### 자체 캘린더 (마이그레이션 022 이후)
+
+```
+events 테이블 (단일 소스)
+    │  RLS:
+    │   - SELECT: 누구나 (캘린더 공개)
+    │   - INSERT/UPDATE: staff
+    │   - DELETE: 작성자 본인 OR admin OR master (021 패턴)
+    │  컬럼: date(필수), start_time/end_time(둘 다 nullable), notify, end_date/rrule(v2 예약)
+    │
+    ▼
+src/lib/events.ts → CalendarEvent[]  (KST +09:00 ISO 변환)
+    ├── /(public)/calendar/page.tsx + CalendarView.tsx (호버/탭 popover)
+    ├── /admin/calendar/page.tsx (입력 폼: 시작시간만 필수, 종료시간 옵셔널)
+    ├── /api/calendar (GET/POST) — 모바일 호환 DTO
+    └── /api/calendar/[id] (PATCH/DELETE)
+```
+
+**Google Calendar 의존 제거**. 마이그레이션 시 1회용 `scripts/migrate-google-calendar.ts` 가
+`GOOGLE_CALENDAR_ID` + `GOOGLE_CALENDAR_API_KEY` 로 기존 일정을 import 한 후, 환경변수 정리 가능.
+
+### 일정 알림톡 파이프라인
+
+```
+event_subscribers 테이블 (admin/master 가 직접 관리)
+    │  컬럼: name, phone(010-XXXX-XXXX 정규화), is_active, notify_d1, notify_d_day, note
+    │
+    │  /admin/event-subscribers/page.tsx 에서 CRUD
+    │
+    ▼
+Vercel Cron (vercel.json — 매일 06:00 KST)
+    │
+    ▼
+GET /api/admin/cron/alimtalk-events  (x-cron-secret 헤더 인증)
+    │
+    │  1. D-1 일자 events.notify=true 조회
+    │  2. is_active=true AND notify_d1=true 구독자 조회
+    │  3. (event × subscriber) 조합으로 alimtalk_sent 미기록만 sendAlimtalk()
+    │  4. 결과 status('sent'/'failed'/'noop') 와 함께 alimtalk_sent 기록 (UNIQUE 키로 중복 방지)
+    │
+    ▼
+src/lib/alimtalk.ts — sendAlimtalk(payload)
+    ├── KAKAO_BIZ_* env 미설정 → 'noop' 반환 (실 발송 X, 추적만)
+    └── env 설정 시 → 카카오 비즈 중계사 API 호출 (NHN Cloud / Aligo / Solapi 등)
+```
+
+**핵심 설계**:
+- 알림톡 추상화 격리 — 카카오 비즈 승인 + 환경변수만 채우면 즉시 동작
+- `alimtalk_sent` UNIQUE(template, event_id, recipient) 로 중복 발송 방지
+- 'noop' 상태도 기록 — 카카오 비즈 승인 후 재실행 시 이미 noop 처리된 건은 재발송 안 됨 (의도적 안전장치). 신규 발송 정책 필요 시 별도 마이그레이션으로 정리.
+
+---
+
 ## 보안
 
 ### 입력 검증
@@ -476,6 +539,8 @@ upsert 후 실제 seq로 재upsert.
 - **플랫폼**: Vercel (GitHub 자동 배포)
 - **빌드**: `npm run build` → Next.js static + dynamic
 - **CI/CD**: GitHub Actions (쇼츠 생성 파이프라인)
-- **환경변수 (Vercel)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`
+- **환경변수 (Vercel — 일상 트래픽)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`, `CRON_SECRET`
+- **환경변수 (선택, 카카오 비즈 승인 후 추가)**: `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY`, `KAKAO_BIZ_API_URL`
+- **환경변수 (마이그레이션 1회용 — 사용 후 제거 권장)**: `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`
 - **환경변수 (로컬 개발 only)**: `CHROME_EXECUTABLE_PATH` — 로컬 Chrome 경로 (Puppeteer PDF 생성용, Vercel에서는 @sparticuz/chromium 자동 사용)
 - **GitHub Secrets**: `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
