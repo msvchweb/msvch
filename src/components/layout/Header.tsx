@@ -8,6 +8,7 @@ import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { navItems } from "./nav-config";
 import { useNewContent } from "@/lib/new-content-provider";
 import { useMe } from "@/lib/use-me";
+import { AuthButton } from "./AuthButton";
 import { cn } from "@/lib/utils";
 import type { ContentKey } from "@/app/api/new-content/route";
 
@@ -111,7 +112,7 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Desktop right: admin + Instagram */}
+        {/* Desktop right: admin + auth + Instagram */}
         <div className="hidden items-center gap-1 lg:flex">
           {isStaff && (
             <Link
@@ -122,6 +123,7 @@ export function Header() {
               관리자
             </Link>
           )}
+          <AuthButton variant="desktop" />
           <a
             href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
             target="_blank"
@@ -133,18 +135,8 @@ export function Header() {
           </a>
         </div>
 
-        {/* Mobile: admin + Instagram + toggle */}
+        {/* Mobile: Instagram + toggle (admin/auth 는 햄버거 메뉴 안으로) */}
         <div className="ml-auto flex items-center gap-1 lg:hidden">
-          {isStaff && (
-            <Link
-              href="/admin"
-              className="flex h-10 items-center gap-1 rounded-xl bg-primary-50 px-2.5 text-xs font-medium text-primary-700 transition-colors active:bg-primary-100"
-              aria-label="관리자 페이지"
-            >
-              <Shield size={14} />
-              관리자
-            </Link>
-          )}
           <a
             href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
             target="_blank"
@@ -177,6 +169,21 @@ export function Header() {
       {/* Mobile menu */}
       {mobileOpen && (
         <nav className="animate-slide-down border-t border-gray-100 bg-white px-4 pb-6 pt-4 lg:hidden">
+          {/* 인증/관리자 영역 — 메뉴 최상단, divider 로 본 nav 와 분리 */}
+          <div className="mb-2 border-b border-gray-100 pb-2">
+            {isStaff && (
+              <Link
+                href="/admin"
+                onClick={() => setMobileOpen(false)}
+                className="flex w-full items-center gap-2 py-3 text-[0.95rem] font-medium text-primary-700"
+              >
+                <Shield size={16} />
+                관리자 페이지
+              </Link>
+            )}
+            <AuthButton variant="menu" onAction={() => setMobileOpen(false)} />
+          </div>
+
           {navItems.map((item) => (
             <div key={item.href} className="border-b border-gray-50 last:border-0">
               {item.children ? (

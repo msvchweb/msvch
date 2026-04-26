@@ -8,29 +8,46 @@ Supabase (PostgreSQL) 기반. 모든 테이블에 Row Level Security(RLS) 적용
 
 ### `profiles`
 
-Supabase Auth `auth.users`를 확장하는 사용자 프로필.
+Supabase Auth `auth.users`를 확장하는 사용자 프로필. OAuth(Google/Kakao) 가입 사용자만 존재.
 
 | 컬럼 | 타입 | 설명 |
 |------|------|------|
 | `id` | `uuid` PK | `auth.users.id` 참조 |
-| `name` | `text NOT NULL` | 사용자 이름 |
-| `phone` | `text` | 전화번호 (nullable) |
-| `role` | `text DEFAULT 'member'` | `'member'` 또는 `'admin'` |
+| `name` | `text NOT NULL` | 사용자 이름 (OAuth provider 의 닉네임) |
+| `phone` | `text` | 전화번호 (nullable, 사용 안 함) |
+| `role` | `text DEFAULT 'member'` | `'member'` \| `'staff'` \| `'admin'` \| `'master'` (마이그레이션 015/019) |
+| `email` | `text` | OAuth 이메일 (마이그레이션 014) |
+| `avatar_url` | `text` | OAuth 프로필 사진 URL (마이그레이션 014) |
+| `provider` | `text` | `'google'` \| `'kakao'` (마이그레이션 014) |
 | `created_at` | `timestamptz DEFAULT now()` | 생성일 |
 
-**RLS 정책**:
+**RLS 정책** (015/019):
 - 모든 사용자: SELECT 가능
 - 본인만: UPDATE 가능 (`auth.uid() = id`)
+- master: 모든 사용자의 profile UPDATE 가능 (회원관리 페이지에서 role 변경 단독 권한)
 
-**트리거**: `auth.users` INSERT 시 자동으로 `profiles` 레코드 생성.
+**트리거**:
+- `auth.users` INSERT 시 자동으로 `profiles` 레코드 생성 (017 — Kakao OAuth 응답 metadata 처리 포함)
+- `profiles.role` UPDATE 시 `prevent_unauthorized_role_change()` 가 master 가 아닌 사용자의 role 변경 차단 (019)
+- 동일 이메일이 다른 OAuth provider 로 가입 시 `EMAIL_ALREADY_REGISTERED` 발생 (018)
+
+**역할 헬퍼 함수** (015/019/021):
+- `public.is_staff()` — staff/admin/master 중 하나면 true
+- `public.is_admin_or_master()` — admin 또는 master 면 true
+- `public.is_master()` — master 면 true
+- `public.is_content_author(content_type, content_id)` — 현재 사용자가 해당 컨텐츠 작성자면 true
 
 **TypeScript 타입** (`src/types/supabase.ts`):
 ```ts
+type Role = "member" | "staff" | "admin" | "master";
 interface Profile {
   id: string;
   name: string;
   phone: string | null;
-  role: "member" | "admin";
+  role: Role;
+  email: string | null;
+  avatar_url: string | null;
+  provider: string | null;
   created_at: string;
 }
 ```
@@ -117,11 +134,14 @@ interface GroupPost {
 | `date` | `date` | 날짜 (nullable) |
 | `created_at` | `timestamptz DEFAULT now()` | 생성일 |
 
-**RLS 정책**:
-- 공개 공지: 모든 사용자 SELECT 가능
-- admin만: INSERT, UPDATE, DELETE
+**RLS 정책** (003 + 015 + 021):
+- 공개 공지(`is_public=true`): 모든 사용자 SELECT 가능
+- staff(staff/admin/master): SELECT 모두, INSERT, UPDATE
+- DELETE: **작성자 본인 OR admin OR master** (`is_admin_or_master() OR is_content_author('notice', id)`)
 
 **앱 레벨 제약** (`NoticeSchema`): title 200자, content 50,000자, slug 100자
+
+**작성자 추적**: INSERT 시 `record_content_author('notice')` 트리거가 `content_authors` 에 자동 기록 (020)
 
 **파생 용도**:
 - **홈 히어로 슬라이더** — `getHeroSlides()`가 `is_public=true` + `images[0] OR 본문 첫 [IMG:url]`이 존재하는 공지를 최신순으로 추려 `HeroSlide[]` DTO로 변환. 관리자가 공지를 게시하면 자동으로 슬라이더에 노출 (ISR 1시간 TTL). 신규 테이블 없이 기존 `notices`를 재활용하는 설계로 백엔드 수정 없이 모바일 앱과도 동일 데이터를 공유.
@@ -200,7 +220,12 @@ interface HeroSlide {
 | `week_total` | `text` | 지난주 헌금 총액 |
 | `cumulative_total` | `text` | 누계 |
 
-**RLS 정책**: `is_published=true` 레코드는 공개 읽기, admin만 CUD
+**RLS 정책** (003 + 015 + 021):
+- 모든 사용자: SELECT 가능 (003 정책 — `using (true)`. `is_published` 는 앱 레벨 필터)
+- staff: INSERT, UPDATE
+- DELETE: **작성자 본인 OR admin OR master**
+
+**작성자 추적**: INSERT 시 `record_content_author('weekly')` 트리거 (020)
 
 **마이그레이션**:
 - `010_weeklies_content.sql` — 초기 콘텐츠 필드(20개) 추가
@@ -299,7 +324,12 @@ interface HeroSlide {
 | `is_public` | `boolean DEFAULT true` | 공개 여부 |
 | `created_at` | `timestamptz DEFAULT now()` | 생성일 |
 
-**RLS 정책**: 공개 앨범 읽기, admin 쓰기
+**RLS 정책** (002 + 015 + 021):
+- 공개 앨범(`is_public=true`): 모든 사용자 SELECT 가능
+- staff: SELECT 모두, INSERT, UPDATE
+- DELETE: **작성자 본인 OR admin OR master**
+
+**작성자 추적**: INSERT 시 `record_content_author('gallery_album')` 트리거 (020)
 
 **인덱스**: `idx_gallery_albums_tags` — GIN 인덱스 (tags 배열 검색)
 
@@ -332,7 +362,10 @@ interface GalleryAlbum {
 | `sort_order` | `int DEFAULT 0` | 정렬 순서 |
 | `created_at` | `timestamptz DEFAULT now()` | 생성일 |
 
-**RLS 정책**: 공개 이미지 읽기, admin 쓰기
+**RLS 정책** (002 + 015 + 021):
+- 공개 앨범의 이미지: 모든 사용자 SELECT 가능
+- staff: SELECT 모두, INSERT, UPDATE
+- DELETE: **부모 앨범의 작성자 OR admin OR master** (`is_admin_or_master() OR is_content_author('gallery_album', album_id)`)
 
 **TypeScript 타입**:
 ```ts
@@ -344,6 +377,31 @@ interface GalleryImage {
   created_at: string;
 }
 ```
+
+---
+
+### `content_authors`
+
+컨텐츠 작성자 추적 shadow 테이블 (마이그레이션 020). 베이스 테이블에 author 컬럼을 추가하지 않으므로 공개 응답에 작성자 정보가 절대 노출되지 않음.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `content_type` | `text NOT NULL` | `'notice'` \| `'weekly'` \| `'gallery_album'` |
+| `content_id` | `uuid NOT NULL` | 대상 컨텐츠 id |
+| `author_id` | `uuid` | `auth.users.id` (작성자 삭제 시 SET NULL) |
+| `author_name` | `text` | 작성 시점의 닉네임 스냅샷 (이후 닉네임 변경에도 과거 기록 유지) |
+| `created_at` | `timestamptz DEFAULT now()` | |
+| **PK** | `(content_type, content_id)` | |
+
+**RLS 정책**:
+- SELECT: staff (admin UI 작성자 표시용)
+- INSERT: 정책 없음 — `record_content_author(content_type)` 트리거(SECURITY DEFINER) 만 가능
+
+**트리거 부착 대상**: `notices`, `weeklies`, `gallery_albums` 의 AFTER INSERT 트리거가 자동 호출.
+
+**용도**:
+- admin UI 컨텐츠 목록에 작성자 표시 (`fetchAuthorRecordMap()`)
+- DELETE 권한 체크 (`is_content_author()`) — 마이그레이션 021
 
 ---
 
@@ -482,11 +540,24 @@ interface ShortsClip {
 
 | 파일 | 내용 |
 |------|------|
-| `supabase/migrations/001_initial.sql` | profiles, groups, group_posts + 초기 데이터 |
-| `supabase/migrations/002_gallery.sql` | gallery_albums, gallery_images + storage |
-| `supabase/migrations/003_notices_weeklies.sql` | notices, weeklies + storage |
-| `supabase/migrations/004_gallery_tags.sql` | gallery_albums에 tags 컬럼 + GIN 인덱스 |
-| `supabase/migrations/005_shorts.sql` | shorts_jobs, shorts_clips, shorts_settings + storage |
-| `supabase/migrations/010_weeklies_content.sql` | weeklies 테이블에 콘텐츠 필드 추가 (volume, issue, sermon_title 등 20개 컬럼) |
-| `supabase/migrations/009_blog_images.sql` | blog-images Storage 버킷 + notices.images, churchschool_posts.images 컬럼 추가 |
-| `supabase/migrations/016_blog_images_staff_upload.sql` | blog-images 버킷에 staff INSERT/UPDATE/DELETE 정책 추가 (관리자 UI에서 공지 히어로 이미지 교체용) |
+| `001_initial.sql` | profiles, groups, group_posts + 초기 데이터 |
+| `002_gallery.sql` | gallery_albums, gallery_images + storage |
+| `003_notices_weeklies.sql` | notices, weeklies + storage |
+| `004_gallery_tags.sql` | gallery_albums 에 tags 컬럼 + GIN 인덱스 |
+| `005_shorts.sql` | shorts_jobs, shorts_clips, shorts_settings + storage |
+| `006_chat_inquiries.sql` | 챗봇 문의 테이블 (`chat_inquiries`) |
+| `007_churchschool_posts.sql` | 교회학교 게시물 테이블 |
+| `008_chat_rate_limit.sql` | 챗봇 IP 기반 rate limit 테이블 |
+| `009_blog_images.sql` | blog-images Storage 버킷 + notices.images, churchschool_posts.images 컬럼 |
+| `010_weeklies_content.sql` | weeklies 테이블에 콘텐츠 필드 추가 (20개 컬럼) |
+| `011_weeklies_layout_fields.sql` | weeklies 레이아웃 필드 15개 (news, meetings, worship_items 등) |
+| `012_bulletin_master_tables.sql` | 주보 마스터 5개 테이블 (church_settings, mokjang_entries, servants, support_sections, community_prayers) |
+| `013_mokjang_drop_year.sql` | mokjang_entries.year 제약 완화 |
+| `014_profiles_oauth_fields.sql` | profiles 에 email, avatar_url, provider 컬럼 추가 |
+| `015_staff_role.sql` | role 에 `'staff'` 추가 + `is_staff()` 헬퍼 + 모든 admin 정책을 staff 로 확대 |
+| `016_blog_images_staff_upload.sql` | blog-images 버킷에 staff INSERT/UPDATE/DELETE 정책 추가 |
+| `017_handle_new_user_kakao.sql` | Kakao OAuth metadata 처리 (handle_new_user 트리거 갱신) |
+| `018_block_duplicate_email_provider.sql` | 동일 이메일이 다른 OAuth provider 로 가입 시 차단 |
+| `019_master_role.sql` | role 에 `'master'` 추가 + `is_master()` + role 변경을 master 단독 권한으로 |
+| `020_content_authors.sql` | content_authors shadow 테이블 + 작성자 추적 트리거 (notice/weekly/gallery_album) |
+| `021_content_delete_policies.sql` | notices/weeklies/gallery_albums/gallery_images DELETE 정책 분리 — 작성자 OR admin OR master 만 |

@@ -1,5 +1,5 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { createApiClient } from "@/lib/supabase/api";
 import { hasStaffAccess } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
@@ -13,8 +13,8 @@ export interface MeResponse {
   isAdminOrMaster: boolean;
 }
 
-export async function GET() {
-  const supabase = await createClient();
+export async function GET(request: NextRequest) {
+  const supabase = await createApiClient(request);
   const {
     data: { user },
   } = await supabase.auth.getUser();

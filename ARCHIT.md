@@ -46,31 +46,43 @@ src/
 │   │   └── worship/             # 예배안내 (시간표 통합)
 │   │
 │   ├── (auth)/                  # 인증 페이지
-│   │   ├── login/
-│   │   └── signup/
+│   │   └── login/               # OAuth 로그인 (Google + Kakao)
+│   │
+│   ├── auth/
+│   │   └── callback/            # OAuth 리디렉트 콜백 (exchangeCodeForSession)
 │   │
 │   ├── (member)/                # 회원 전용 (미들웨어 보호)
 │   │   ├── groups/
 │   │   └── profile/
 │   │
-│   ├── admin/                   # 관리자 전용 (미들웨어 보호)
-│   │   ├── layout.tsx           # 사이드바 레이아웃
+│   ├── admin/                   # 관리자 전용 (미들웨어 보호 — staff/admin/master)
+│   │   ├── layout.tsx           # PC 사이드바 + 모바일 상단 가로 스크롤 탭
+│   │   ├── AdminNav.tsx         # 사이드바/모바일탭 클라이언트 컴포넌트
 │   │   ├── gallery/
 │   │   ├── notices/
 │   │   ├── sermons/
 │   │   ├── calendar/            # 교회일정 관리 (Google Calendar 생성/삭제)
 │   │   ├── shorts/              # 쇼츠 관리 (생성/검수/승인)
+│   │   ├── inquiries/           # 챗봇 문의 내역 (열람/삭제)
+│   │   ├── members/             # 회원관리 (master 단독, role 변경)
 │   │   ├── masters/             # 주보 마스터 (올해표어/목장/섬기는이/후원/공동체기도)
 │   │   └── weeklies/
 │   │
 │   └── api/                     # API 라우트
+│       ├── admin/
+│       │   ├── members/         # PATCH (master 전용 role 변경)
+│       │   └── revalidate/      # 세션 인증 ISR 무효화
 │       ├── calendar/            # 교회 일정 CRUD (Google Calendar, 모바일 호환)
+│       ├── chat/                # 챗봇 (Gemini)
+│       │   └── inquiry/         # 챗봇 문의 접수
 │       ├── gallery/             # 갤러리 목록 (태그 필터, 모바일 호환)
+│       │   └── [id]/images/
 │       ├── home/
 │       │   └── hero-slides/     # 홈 히어로 슬라이드 (공지→HeroSlide[], 모바일 호환)
+│       ├── me/                  # 현재 사용자 인증/권한 (쿠키 OR Bearer)
 │       ├── new-content/         # 콘텐츠 최신일자 스냅샷 (레드닷 배지)
 │       ├── og/                  # OG 이미지 생성 (Edge)
-│       ├── revalidate/          # ISR 캐시 무효화
+│       ├── revalidate/          # ISR 캐시 무효화 (시크릿)
 │       ├── sermon-summary/      # Gemini 설교 요약
 │       ├── sermons/             # 설교 목록
 │       ├── shorts/              # 쇼츠 CRUD + 트리거 (모바일 호환)
@@ -79,8 +91,11 @@ src/
 │
 ├── components/
 │   ├── layout/                  # 레이아웃 컴포넌트
-│   │   ├── Header.tsx           # 상단 네비게이션
+│   │   ├── Header.tsx           # 상단 네비게이션 (PC: nav+admin+auth+IG, 모바일: IG+햄버거)
+│   │   ├── AuthButton.tsx       # 로그인/로그아웃 토글 (desktop pill / menu 행 두 변형)
+│   │   ├── NavigationShell.tsx  # Header + BottomTabBar 클라이언트 경계
 │   │   ├── Footer.tsx           # 하단 푸터
+│   │   ├── NoticeBanner.tsx     # 노티스 배너 (홈 공지 강조)
 │   │   ├── BottomTabBar.tsx     # 하단 탭바 (모바일/태블릿)
 │   │   ├── nav-config.ts        # Header 메뉴 설정
 │   │   └── tab-config.ts        # 탭바 설정 (플랫폼 공용)
@@ -124,13 +139,18 @@ src/
 ├── lib/
 │   ├── supabase/
 │   │   ├── client.ts            # 브라우저 Supabase 클라이언트
-│   │   └── server.ts            # 서버 Supabase 클라이언트
+│   │   ├── server.ts            # 서버 Supabase 클라이언트 (쿠키)
+│   │   └── api.ts               # API 라우트용 — Bearer 토큰 OR 쿠키 자동 분기 (모바일 호환)
 │   ├── bulletin-master.ts       # 5개 마스터 테이블 병렬 로드 + parseTopicOfYear
 │   ├── gallery.ts               # 갤러리 데이터
-│   ├── admin-auth.ts            # API admin 인증 헬퍼
+│   ├── admin-auth.ts            # requireAdmin/Master, hasStaffAccess/MasterAccess
+│   ├── content-authors.ts       # content_authors shadow 테이블 조회 (admin 전용)
+│   ├── use-me.ts                # useMe() + canDelete() 클라이언트 훅 (auth 이벤트 구독)
+│   ├── image-compress.ts        # Canvas 기반 이미지 압축 (5/10MB 제한 대응)
 │   ├── gemini.ts                # Gemini AI 호출 (폴백 체인)
 │   ├── google-calendar.ts       # Google Calendar API v3
 │   ├── notices.ts               # 공지/주보 데이터 + getHeroSlides() (홈 히어로 DTO)
+│   ├── new-content-provider.ts  # 새 콘텐츠 레드닷 React Context
 │   ├── utils.ts                 # cn(), formatDate()
 │   ├── validation.ts            # Zod 스키마 + 파일/입력 검증 유틸
 │   ├── weekly-html-template.ts  # 주보 HTML 빌더 (앞/뒷면, A4 인쇄용)
@@ -157,21 +177,24 @@ src/
 - 5개 카테고리: 교회소개, 말씀영상, 비전갤러리, 교회학교, 봉사센터
 - children 없는 메뉴(말씀영상, 비전갤러리)는 단일 링크로 동작
 - 상위 메뉴 자체의 badgeKey도 레드닷 표시 지원
+- **우측**: (staff 일 때) "관리자" → `<AuthButton variant="desktop" />` → Instagram
 - 설정: `nav-config.ts` (`NavItem[]`)
 
 ### Header (모바일)
-- `lg:hidden` — 햄버거 → 아코디언 메뉴
-- children 없는 항목은 `<Link>`, 있는 항목은 `<button>` + accordion
+- `lg:hidden` — 우측에 Instagram + 햄버거만 노출 (320px 폭 안전성 확보)
+- 햄버거 메뉴 최상단에 (staff 면) "관리자 페이지" + `<AuthButton variant="menu" />` 행을 divider 로 분리해 배치
+- 본 nav: children 없는 항목은 `<Link>`, 있는 항목은 `<button>` + accordion
 
 ### BottomTabBar (모바일/태블릿)
 - `lg:hidden` — 5개 고정 탭
 - 탭: 홈, 말씀, 갤러리, 소식, 더보기
 - 설정: `tab-config.ts` (`TabItem[]`)
-- 숨김: `/admin/*`, `/login`, `/signup`
+- 숨김: `/admin/*`, `/login`, `/auth/*`
 
-### Admin 사이드바
-- `admin/layout.tsx` — 좌측 사이드바
-- 7개 메뉴: 대시보드, 공지사항, 주보, 갤러리, 교회일정, 설교 요약, 쇼츠
+### Admin 네비게이션
+- `admin/layout.tsx` — PC(`lg+`): 좌측 사이드바, 모바일: 상단 sticky 가로 스크롤 pill 탭
+- `AdminNav.tsx` — `AdminSidebar` + `AdminMobileTabs` (활성 상태 표시, 아이콘은 문자열 키로 직렬화 가능)
+- 메뉴: 대시보드, 공지사항, 주보, 주보 마스터, 갤러리, 교회일정, 설교 요약, 쇼츠, 문의 내역, 회원관리(master 전용)
 
 ---
 
@@ -249,6 +272,27 @@ GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
 
 ## 인증 아키텍처
 
+### 로그인 흐름 (OAuth)
+
+```
+/login (Google 또는 Kakao 버튼 클릭)
+    │
+    ▼
+supabase.auth.signInWithOAuth({ provider, options: { redirectTo } })
+    │
+    ▼
+외부 OAuth 페이지 (Google / Kakao 동의)
+    │
+    ▼
+GET /auth/callback?code=...&next=...
+    │  exchangeCodeForSession(code) → 쿠키 설정
+    │  (이메일 중복 차단: handle_new_user 트리거가 EMAIL_ALREADY_REGISTERED 발생)
+    ▼
+NextResponse.redirect(`${origin}${next}`)  → 원래 가려던 경로로 복귀
+```
+
+### 미들웨어 보호
+
 ```
 브라우저 요청
     │
@@ -256,13 +300,57 @@ GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
 middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*)
     │
     ├── 비보호 경로 → 통과
-    ├── 미인증 → /login 리다이렉트
-    └── /admin + 비admin → / 리다이렉트
+    ├── 미인증 → /login?next=<원경로> 리다이렉트
+    └── /admin + 비-staff → /?notice=no_admin 리다이렉트
 ```
 
-- 세션: 쿠키 기반 (Supabase SSR)
-- 역할: `profiles.role` (`member` | `admin`)
-- 로그아웃: `LogoutButton` 컴포넌트 (프로필 페이지에 배치)
+### 권한 등급
+
+| role | admin UI 접근 | 컨텐츠 삭제 | role 변경 |
+|------|--------------|------------|----------|
+| `member` | ✗ | 본인 작성만 | ✗ |
+| `staff` | ✓ | 본인 작성만 | ✗ |
+| `admin` | ✓ | 모두 | ✗ |
+| `master` | ✓ | 모두 | ✓ (단독) |
+
+- 세션: 쿠키 기반 (Supabase SSR) **OR** `Authorization: Bearer <access_token>` (모바일 앱)
+- API 라우트: `createApiClient(request)` 가 두 방식을 자동 분기
+- 로그인 UI: `/login` (OAuth Google + Kakao)
+- 로그아웃: 클라이언트 SDK `supabase.auth.signOut()` — 별도 백엔드 엔드포인트 없음
+  - Header 우측 `AuthButton` (PC) / 햄버거 메뉴 안 (모바일) — `useMe` 훅이 `onAuthStateChange` 이벤트로 즉시 갱신
+  - 프로필 페이지(`/profile`)의 풀폭 `LogoutButton` 도 동일 동작
+
+### 클라이언트 권한 훅
+
+```
+useMe() → MeResponse  (src/lib/use-me.ts)
+    │  마운트 시 onAuthStateChange 구독
+    │  INITIAL_SESSION/SIGNED_IN/SIGNED_OUT/TOKEN_REFRESHED → /api/me 재조회
+    ▼
+{ authenticated, userId, role, isStaff, isAdminOrMaster }
+
+canDelete(me, authorId) → boolean
+    └── admin/master = true, 그 외 = userId === authorId
+```
+
+### 컨텐츠 작성자 추적
+
+`content_authors` shadow 테이블 (`supabase/migrations/020_content_authors.sql`):
+- `notices`, `weeklies`, `gallery_albums` 의 INSERT 트리거가 `(content_type, content_id, author_id, author_name)` 자동 기록
+- RLS: SELECT 는 staff 만 (admin UI 작성자 표시용), INSERT 는 트리거(SECURITY DEFINER) 만
+- 베이스 테이블에는 author 컬럼을 추가하지 않으므로 공개 응답에 절대 노출 안 됨
+
+### 컨텐츠 삭제 RLS (`021_content_delete_policies.sql`)
+
+기존 `FOR ALL USING (is_staff())` → SELECT/INSERT/UPDATE 는 staff 유지, **DELETE 만 분리**:
+
+```sql
+DELETE USING (is_admin_or_master() OR is_content_author(type, id))
+```
+
+- `is_admin_or_master()`, `is_content_author(type, id)` 헬퍼 (021)
+- 적용 테이블: `notices`, `weeklies`, `gallery_albums`, `gallery_images` (gallery_images 는 부모 앨범의 작성자 권한을 따름)
+- UI 측: `canDelete(me, authorId)` 로 삭제 버튼을 사전에 숨김
 
 ---
 

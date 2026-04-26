@@ -89,6 +89,60 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 
 ---
 
+### GET `/api/me`
+
+현재 로그인 사용자의 인증 상태와 권한을 반환. 클라이언트 헤더의 로그인/로그아웃 토글, admin 진입 버튼 노출, 컨텐츠 삭제 권한 가드 등에서 사용.
+
+- **인증**: 선택. 비인증 시 `authenticated: false` 반환
+- **인증 방식**: 쿠키(웹) **OR** `Authorization: Bearer <access_token>`(모바일 앱) — `createApiClient(request)` 헬퍼가 자동 분기
+- **캐시**: 없음 (`Cache-Control: no-store`, `dynamic: "force-dynamic"`)
+- **응답**: `MeResponse`
+
+```ts
+interface MeResponse {
+  authenticated: boolean;
+  userId: string | null;        // auth.users.id (UUID), 미인증 시 null
+  role: string | null;          // 'member' | 'staff' | 'admin' | 'master', 미인증 시 null
+  isStaff: boolean;             // staff/admin/master 중 하나면 true (admin UI 접근 가능 권한)
+  isAdminOrMaster: boolean;     // 모든 컨텐츠 삭제 가능한 권한
+}
+```
+
+**예시**:
+```
+# 웹 (쿠키 자동)
+GET /api/me
+
+# 모바일 앱
+GET /api/me
+Authorization: Bearer eyJhbGc...
+```
+
+---
+
+### PATCH `/api/admin/members`
+
+회원의 role 을 변경한다 (master 단독 권한).
+
+- **인증**: master 권한 (`requireMaster()`) — 쿠키 또는 Bearer
+- **요청 본문**:
+
+```ts
+{
+  id: string;    // 대상 user id (UUID)
+  role: "member" | "staff" | "admin" | "master";
+}
+```
+
+- **응답 (200)**: `{ ok: true }`
+- **에러**:
+  - `400` — 유효하지 않은 입력 / 자기 자신의 권한 변경 시도
+  - `401` — 미인증
+  - `403` — 비 master
+  - `500` — DB 에러
+
+---
+
 ### POST `/api/admin/revalidate`
 
 관리자 UI 전용 revalidate — 시크릿 노출 없이 세션 인증으로 ISR 캐시를 무효화.
@@ -451,10 +505,24 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 
 ## 인증 흐름
 
-- **Supabase Auth** (이메일/비밀번호)
-- 클라이언트: `createBrowserClient` (`src/lib/supabase/client.ts`)
-- 서버: `createServerClient` + cookies (`src/lib/supabase/server.ts`)
-- 미들웨어: `/groups/*`, `/profile/*`, `/admin/*` 보호
+- **Supabase Auth + OAuth** (Google, Kakao) — 이메일/비밀번호 로그인은 사용하지 않음
+- **로그인** 페이지 `/login` → `signInWithOAuth({ provider })` → 외부 OAuth → `/auth/callback?code=...` → `exchangeCodeForSession(code)` → 쿠키 세션 + `/?next=...`로 복귀
+- **로그아웃**: 클라이언트에서 `supabase.auth.signOut()` 호출 (별도 백엔드 엔드포인트 없음). 같은 탭의 헤더는 `useMe`의 `onAuthStateChange` 구독으로 즉시 갱신
+- **클라이언트 SDK**: `createBrowserClient` (`src/lib/supabase/client.ts`)
+- **RSC/Route Handler**: `createServerClient` + cookies (`src/lib/supabase/server.ts`)
+- **API 라우트 (모바일 호환)**: `createApiClient(request)` (`src/lib/supabase/api.ts`) — `Authorization: Bearer` 헤더 OR 쿠키 자동 분기
+- **미들웨어**: `/groups/*`, `/profile/*`, `/admin/*` 보호. admin 경로는 `hasStaffAccess(role)` (staff/admin/master 허용)
+- **role 헬퍼**: `src/lib/admin-auth.ts`
+  - `requireAdmin(request?)` — staff/admin/master 통과
+  - `requireMaster(request?)` — master 단독
+  - `hasStaffAccess(role)`, `hasMasterAccess(role)`
+- **클라이언트 권한 훅**: `useMe()` (`src/lib/use-me.ts`) → `MeResponse`. Supabase auth 이벤트(INITIAL_SESSION/SIGNED_IN/SIGNED_OUT/TOKEN_REFRESHED)마다 `/api/me` 자동 재조회
+- **삭제 권한 헬퍼**: `canDelete(me, authorId)` — admin/master 또는 본인이 작성한 글일 때만 true
+- **role 등급**:
+  - `member` — 일반 회원 (기본)
+  - `staff` — admin UI 접근 가능, 본인이 작성한 컨텐츠만 삭제
+  - `admin` — 컨텐츠 최상위 관리자, 모든 컨텐츠 삭제
+  - `master` — admin 권한 + 회원 role 변경 단독 권한
 
 ## 외부 서비스
 
