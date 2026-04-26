@@ -3,12 +3,13 @@
 import Link from "next/link";
 import Image from "next/image";
 import { useState, useEffect } from "react";
-import { Menu, X, ChevronDown } from "lucide-react";
+import { Menu, X, ChevronDown, Shield } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { navItems } from "./nav-config";
 import { useNewContent } from "@/lib/new-content-provider";
 import { cn } from "@/lib/utils";
 import type { ContentKey } from "@/app/api/new-content/route";
+import type { MeResponse } from "@/app/api/me/route";
 
 function RedDot() {
   return (
@@ -41,12 +42,26 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
   const { dots } = useNewContent();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/me", { credentials: "same-origin" })
+      .then((r) => (r.ok ? (r.json() as Promise<MeResponse>) : null))
+      .then((data) => {
+        if (!cancelled && data) setIsStaff(data.isStaff);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return (
@@ -109,19 +124,40 @@ export function Header() {
           ))}
         </nav>
 
-        {/* Instagram */}
-        <a
-          href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hidden rounded-lg p-2 text-gray-400 transition-colors hover:text-pink-500 lg:block"
-          aria-label="Instagram"
-        >
-          <InstagramIcon size={20} />
-        </a>
+        {/* Desktop right: admin + Instagram */}
+        <div className="hidden items-center gap-1 lg:flex">
+          {isStaff && (
+            <Link
+              href="/admin"
+              className="flex items-center gap-1.5 rounded-lg bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-100"
+            >
+              <Shield size={16} />
+              관리자
+            </Link>
+          )}
+          <a
+            href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg p-2 text-gray-400 transition-colors hover:text-pink-500"
+            aria-label="Instagram"
+          >
+            <InstagramIcon size={20} />
+          </a>
+        </div>
 
-        {/* Mobile: Instagram + toggle */}
+        {/* Mobile: admin + Instagram + toggle */}
         <div className="ml-auto flex items-center gap-1 lg:hidden">
+          {isStaff && (
+            <Link
+              href="/admin"
+              className="flex h-10 items-center gap-1 rounded-xl bg-primary-50 px-2.5 text-xs font-medium text-primary-700 transition-colors active:bg-primary-100"
+              aria-label="관리자 페이지"
+            >
+              <Shield size={14} />
+              관리자
+            </Link>
+          )}
           <a
             href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
             target="_blank"

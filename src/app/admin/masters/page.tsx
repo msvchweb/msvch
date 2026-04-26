@@ -31,8 +31,8 @@ const sections = [
 export default function AdminMastersHubPage() {
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">주보 마스터</h1>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">주보 마스터</h1>
         <p className="mt-1 text-sm text-gray-500">
           매주 바뀌지 않고, 주보 여러 페이지에서 공용으로 쓰는 값들을 관리합니다. 저장 즉시 다음 주보 렌더링부터 반영됩니다.
         </p>

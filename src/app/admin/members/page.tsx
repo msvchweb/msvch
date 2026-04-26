@@ -65,12 +65,13 @@ export default async function MembersPage() {
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">회원관리</h1>
+      <h1 className="mb-2 text-xl font-bold text-gray-900 sm:text-2xl">회원관리</h1>
       <p className="mb-6 text-sm text-gray-500">
         총 {members.length}명. 본인의 권한은 변경할 수 없습니다.
       </p>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+      {/* 데스크톱 테이블 */}
+      <div className="hidden overflow-x-auto rounded-xl border border-gray-200 bg-white md:block">
         <table className="w-full text-sm">
           <thead className="border-b border-gray-200 bg-gray-50 text-left text-xs uppercase tracking-wider text-gray-500">
             <tr>
@@ -130,6 +131,56 @@ export default async function MembersPage() {
             })}
           </tbody>
         </table>
+      </div>
+
+      {/* 모바일 카드 */}
+      <div className="space-y-3 md:hidden">
+        {members.map((m) => {
+          const isSelf = m.id === user.id;
+          return (
+            <div key={m.id} className="rounded-xl border border-gray-200 bg-white p-3">
+              <div className="flex items-center gap-3">
+                {m.avatar_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={m.avatar_url}
+                    alt=""
+                    className="h-10 w-10 shrink-0 rounded-full border border-gray-100 object-cover"
+                  />
+                ) : (
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gray-200 text-sm text-gray-500">
+                    {(m.name || "?").charAt(0)}
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-gray-900">
+                      {m.name || "(이름없음)"}
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${ROLE_BADGE[m.role]}`}
+                    >
+                      {ROLE_LABEL[m.role]}
+                    </span>
+                  </div>
+                  <p className="truncate text-xs text-gray-500">
+                    {m.email || "—"}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    가입 {m.created_at.slice(0, 10)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <MemberRoleEditor
+                  id={m.id}
+                  currentRole={m.role}
+                  isSelf={isSelf}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

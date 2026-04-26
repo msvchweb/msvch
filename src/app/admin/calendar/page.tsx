@@ -143,9 +143,9 @@ export default function AdminCalendarPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">
             교회 일정 관리
           </h1>
           <p className="mt-1 text-sm text-gray-500">
@@ -157,7 +157,7 @@ export default function AdminCalendarPage() {
             if (showForm) resetForm();
             else setShowForm(true);
           }}
-          className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          className="flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
         >
           {showForm ? <X size={16} /> : <Plus size={16} />}
           {showForm ? "취소" : "일정 추가"}
@@ -168,7 +168,7 @@ export default function AdminCalendarPage() {
       {showForm && (
         <form
           onSubmit={handleSubmit}
-          className="mb-8 rounded-xl border border-gray-200 bg-white p-6"
+          className="mb-8 rounded-xl border border-gray-200 bg-white p-4 sm:p-6"
         >
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
@@ -301,11 +301,11 @@ export default function AdminCalendarPage() {
         {events.map((event) => (
           <div
             key={event.id}
-            className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-4"
+            className="flex items-start justify-between gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:px-6 sm:py-4"
           >
-            <div>
+            <div className="min-w-0 flex-1">
               <p className="font-medium text-gray-900">{event.title}</p>
-              <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-gray-400">
+              <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-gray-400">
                 <span className="flex items-center gap-1">
                   {event.isAllDay ? (
                     <Calendar size={13} />
@@ -322,7 +322,7 @@ export default function AdminCalendarPage() {
                 )}
               </div>
               {event.description && (
-                <p className="mt-1 line-clamp-1 text-sm text-gray-400">
+                <p className="mt-1 line-clamp-2 text-sm text-gray-400">
                   {event.description}
                 </p>
               )}

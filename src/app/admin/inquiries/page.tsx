@@ -38,9 +38,9 @@ export default function AdminInquiriesPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">문의 내역</h1>
-        <span className="rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
+      <div className="mb-6 flex items-center justify-between gap-3 sm:mb-8">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">문의 내역</h1>
+        <span className="shrink-0 rounded-full bg-blue-100 px-3 py-1 text-sm font-medium text-blue-700">
           총 {inquiries.length}건
         </span>
       </div>
@@ -50,19 +50,19 @@ export default function AdminInquiriesPage() {
       ) : (
         <div className="space-y-4">
           {inquiries.map((item) => (
-            <div key={item.id} className="rounded-xl border border-gray-200 bg-white p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 space-y-2">
-                  <div className="flex flex-wrap items-center gap-4 text-sm">
+            <div key={item.id} className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+              <div className="flex items-start justify-between gap-3 sm:gap-4">
+                <div className="min-w-0 flex-1 space-y-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
                     <span className="flex items-center gap-1.5 font-medium text-gray-900">
                       <User size={14} className="text-gray-400" />
                       {item.name}
                     </span>
                     <span className="flex items-center gap-1.5 text-gray-600">
                       <Phone size={14} className="text-gray-400" />
-                      {item.phone}
+                      <a href={`tel:${item.phone}`} className="hover:underline">{item.phone}</a>
                     </span>
-                    <span className="text-gray-400">
+                    <span className="text-xs text-gray-400">
                       {new Date(item.created_at).toLocaleString("ko-KR")}
                     </span>
                   </div>

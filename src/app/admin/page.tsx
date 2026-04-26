@@ -20,7 +20,7 @@ export default async function AdminDashboard() {
 
   return (
     <div>
-      <h1 className="mb-8 text-2xl font-bold text-gray-900">대시보드</h1>
+      <h1 className="mb-6 text-xl font-bold text-gray-900 sm:mb-8 sm:text-2xl">대시보드</h1>
       <div className="grid gap-4 sm:grid-cols-3">
         <StatCard label="전체 회원" value={memberCount ?? 0} />
         <StatCard label="공지사항" value={noticeCount ?? 0} />

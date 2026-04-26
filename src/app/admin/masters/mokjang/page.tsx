@@ -83,9 +83,9 @@ export default function AdminMasterMokjangPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">소그룹 목장</h1>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">소그룹 목장</h1>
           <p className="mt-1 text-sm text-gray-500">
             주보 3페이지 목장 표 (최대 40목장). 빈 줄은 주보에서 &ldquo;비활성&rdquo; 처리 시 제외됩니다.
           </p>
@@ -94,7 +94,7 @@ export default function AdminMasterMokjangPage() {
           type="button"
           onClick={handleSaveAll}
           disabled={saving || dirty.size === 0}
-          className="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+          className="sticky bottom-4 z-10 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white shadow-lg hover:bg-primary-700 disabled:opacity-50 sm:static sm:shadow-none"
         >
           {saving ? "저장 중..." : `변경사항 저장 (${dirty.size})`}
         </button>

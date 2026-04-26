@@ -50,8 +50,8 @@ export default function AdminWeeklyNewPage() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">새 주보 작성</h1>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">새 주보 작성</h1>
         <p className="mt-1 text-sm text-gray-500">
           내용을 입력하고 발행하면 홈페이지에 즉시 반영됩니다.
         </p>

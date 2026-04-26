@@ -235,11 +235,11 @@ export default function AdminNoticesPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">공지사항 관리</h1>
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">공지사항 관리</h1>
         <button
           onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}
-          className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          className="flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 sm:w-auto"
         >
           {showForm ? <X size={16} /> : <Plus size={16} />}
           {showForm ? "취소" : "새 공지"}
@@ -247,7 +247,7 @@ export default function AdminNoticesPage() {
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="mb-8 rounded-xl border border-gray-200 bg-white p-6">
+        <form onSubmit={handleSubmit} className="mb-8 rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="sm:col-span-2">
               <label className="mb-1 block text-sm font-medium text-gray-700">제목</label>
@@ -297,7 +297,8 @@ export default function AdminNoticesPage() {
         </form>
       )}
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+      {/* 데스크톱 테이블 */}
+      <div className="hidden overflow-hidden rounded-xl border border-gray-200 bg-white md:block">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50 text-left text-sm">
@@ -402,6 +403,98 @@ export default function AdminNoticesPage() {
             })}
           </tbody>
         </table>
+        {notices.length === 0 && (
+          <p className="py-8 text-center text-gray-400">공지사항이 없습니다.</p>
+        )}
+      </div>
+
+      {/* 모바일 카드 */}
+      <div className="space-y-3 md:hidden">
+        {notices.map((notice) => {
+          const hero = notice.images[0];
+          const isBusy = uploadingId === notice.id;
+          return (
+            <div key={notice.id} className="rounded-xl border border-gray-200 bg-white p-3">
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => fileInputRefs.current[notice.id]?.click()}
+                  disabled={isBusy}
+                  className="relative h-16 w-24 shrink-0 overflow-hidden rounded-md border border-gray-200 bg-gray-50 disabled:opacity-50"
+                  title={hero ? "히어로 사진 교체" : "히어로 사진 업로드"}
+                >
+                  {hero ? (
+                    <Image
+                      src={hero}
+                      alt="히어로"
+                      fill
+                      sizes="96px"
+                      className="object-cover"
+                      unoptimized={hero.startsWith("http")}
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-gray-400">
+                      <ImageIcon size={18} />
+                    </div>
+                  )}
+                  {isBusy && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-white/70">
+                      <Upload size={14} className="animate-pulse text-gray-700" />
+                    </div>
+                  )}
+                </button>
+                <input
+                  ref={(el) => { fileInputRefs.current[notice.id] = el; }}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    e.target.value = "";
+                    if (f) await uploadHeroImage(notice, f);
+                  }}
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-gray-900">{notice.title}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
+                    <span>{notice.category}</span>
+                    {notice.date && <span className="text-gray-400">· {formatDate(notice.date)}</span>}
+                    {authorMap[notice.id] && <span className="text-gray-400">· {authorMap[notice.id]}</span>}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
+                <button
+                  onClick={() => togglePublic(notice.id, notice.is_public)}
+                  className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
+                    notice.is_public ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  {notice.is_public ? <Eye size={12} /> : <EyeOff size={12} />}
+                  {notice.is_public ? "공개" : "비공개"}
+                </button>
+                <div className="flex items-center gap-1">
+                  {hero && !isBusy && (
+                    <button
+                      type="button"
+                      onClick={() => removeHeroImage(notice)}
+                      className="rounded-lg p-2 text-gray-400 active:bg-red-50 active:text-red-600"
+                      title="히어로 제거"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                  <button onClick={() => startEdit(notice)} className="rounded-lg p-2 text-gray-500 active:bg-gray-100">
+                    <Edit3 size={16} />
+                  </button>
+                  <button onClick={() => deleteNotice(notice.id)} className="rounded-lg p-2 text-gray-400 active:bg-red-50 active:text-red-600">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
         {notices.length === 0 && (
           <p className="py-8 text-center text-gray-400">공지사항이 없습니다.</p>
         )}

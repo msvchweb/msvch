@@ -113,9 +113,9 @@ export default function AdminMasterServantsPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">섬기는 분들</h1>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">섬기는 분들</h1>
           <p className="mt-1 text-sm text-gray-500">
             주보 4페이지 좌측 &ldquo;섬기는 분들&rdquo; 역할 ↔ 이름. 여러 이름은 &ldquo;줄바꿈&rdquo;으로 구분합니다.
           </p>

@@ -110,9 +110,9 @@ export default function AdminMasterSupportsPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">우리가 후원하는 분들</h1>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">우리가 후원하는 분들</h1>
           <p className="mt-1 text-sm text-gray-500">섹션별 제목과 줄 단위 목록.</p>
         </div>
         <div className="flex gap-2">

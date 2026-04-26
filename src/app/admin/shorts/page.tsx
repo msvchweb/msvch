@@ -47,9 +47,9 @@ function ClipCard({
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="border-b border-gray-50 p-5 last:border-b-0">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex-1">
+    <div className="border-b border-gray-50 p-4 last:border-b-0 sm:p-5">
+      <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:gap-4">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <Play size={14} className="text-primary-600" />
             <span className="font-medium text-gray-900">
@@ -214,9 +214,9 @@ export default function AdminShortsPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">쇼츠 관리</h1>
+          <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">쇼츠 관리</h1>
           <p className="mt-1 text-sm text-gray-500">
             설교 영상에서 쇼츠를 자동 생성합니다
           </p>
@@ -224,14 +224,14 @@ export default function AdminShortsPage() {
         <div className="flex gap-2">
           <button
             onClick={() => { setLoading(true); loadJobs(); }}
-            className="flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200"
+            className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-gray-100 px-3 py-2 text-sm text-gray-600 hover:bg-gray-200 sm:flex-none"
           >
             <RefreshCw size={14} />
             새로고침
           </button>
           <button
             onClick={openSermonPicker}
-            className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 sm:flex-none"
           >
             <Video size={16} />
             쇼츠 생성
@@ -240,7 +240,7 @@ export default function AdminShortsPage() {
       </div>
 
       {showSermonPicker && (
-        <div className="mb-8 rounded-xl border border-gray-200 bg-white p-6">
+        <div className="mb-8 rounded-xl border border-gray-200 bg-white p-4 sm:p-6">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="font-bold text-gray-900">설교 영상 선택</h3>
             <button onClick={() => setShowSermonPicker(false)}>
@@ -292,19 +292,19 @@ export default function AdminShortsPage() {
               key={job.id}
               className="rounded-xl border border-gray-200 bg-white"
             >
-              <div className="flex items-center gap-4 p-5">
+              <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:p-5">
                 {job.video_thumbnail && (
-                  <div className="relative aspect-video w-40 shrink-0 overflow-hidden rounded-lg">
+                  <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-lg sm:w-40">
                     <Image
                       src={job.video_thumbnail}
                       alt=""
                       fill
                       className="object-cover"
-                      sizes="160px"
+                      sizes="(min-width: 640px) 160px, 100vw"
                     />
                   </div>
                 )}
-                <div className="flex-1">
+                <div className="min-w-0 flex-1">
                   <h3 className="font-bold text-gray-900">
                     {job.video_title}
                   </h3>
@@ -317,7 +317,7 @@ export default function AdminShortsPage() {
                   )}
                 </div>
                 <span
-                  className={`rounded-lg px-3 py-1.5 text-xs font-medium ${st.color}`}
+                  className={`shrink-0 self-start rounded-lg px-3 py-1.5 text-xs font-medium sm:self-auto ${st.color}`}
                 >
                   {st.text}
                 </span>

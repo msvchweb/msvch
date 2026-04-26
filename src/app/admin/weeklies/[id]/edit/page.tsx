@@ -151,8 +151,8 @@ export default function AdminWeeklyEditPage({
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">주보 수정</h1>
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">주보 수정</h1>
         <p className="mt-1 text-sm text-gray-500">{weekly.title}</p>
       </div>
       <WeeklyEditorWithPreview

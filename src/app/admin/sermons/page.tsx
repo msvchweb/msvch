@@ -59,8 +59,8 @@ export default function AdminSermonsPage() {
 
   return (
     <div>
-      <h1 className="mb-2 text-2xl font-bold text-gray-900">설교 요약</h1>
-      <p className="mb-8 text-sm text-gray-500">
+      <h1 className="mb-2 text-xl font-bold text-gray-900 sm:text-2xl">설교 요약</h1>
+      <p className="mb-6 text-sm text-gray-500 sm:mb-8">
         AI가 설교 영상의 자막을 분석하여 요약을 생성합니다.
       </p>
 
@@ -70,14 +70,14 @@ export default function AdminSermonsPage() {
             key={video.videoId}
             className="overflow-hidden rounded-xl border border-gray-200 bg-white"
           >
-            <div className="flex gap-4 p-5">
-              <div className="relative aspect-video w-48 shrink-0 overflow-hidden rounded-lg">
+            <div className="flex flex-col gap-4 p-4 sm:flex-row sm:p-5">
+              <div className="relative aspect-video w-full shrink-0 overflow-hidden rounded-lg sm:w-48">
                 <Image
                   src={video.thumbnail}
                   alt={video.title}
                   fill
                   className="object-cover"
-                  sizes="192px"
+                  sizes="(min-width: 640px) 192px, 100vw"
                 />
               </div>
               <div className="flex-1">
@@ -85,7 +85,7 @@ export default function AdminSermonsPage() {
                 <p className="mt-1 text-sm text-gray-400">
                   {video.publishedAt.split("T")[0]}
                 </p>
-                <div className="mt-3 flex gap-2">
+                <div className="mt-3 flex flex-wrap gap-2">
                   <button
                     onClick={() => handleSummarize(video, false)}
                     disabled={summarizing === video.videoId}
@@ -117,7 +117,7 @@ export default function AdminSermonsPage() {
             </div>
 
             {summaryResult[video.videoId] && (
-              <div className="border-t border-gray-100 bg-gray-50 p-5">
+              <div className="border-t border-gray-100 bg-gray-50 p-4 sm:p-5">
                 <h4 className="mb-2 text-sm font-semibold text-gray-700">
                   요약 결과
                 </h4>

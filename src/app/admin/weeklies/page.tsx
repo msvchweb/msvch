@@ -51,11 +51,11 @@ export default function AdminWeekliesPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">주보 관리</h1>
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">주보 관리</h1>
         <Link
           href="/admin/weeklies/new"
-          className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          className="flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
         >
           <Plus size={16} />
           새 주보 작성
@@ -66,12 +66,12 @@ export default function AdminWeekliesPage() {
         {weeklies.map((w) => (
           <div
             key={w.id}
-            className="flex items-center justify-between rounded-xl border border-gray-200 bg-white px-6 py-4"
+            className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-4"
           >
-            <div className="flex items-center gap-3">
-              <FileText className="text-primary-500" size={20} />
-              <div>
-                <div className="flex items-center gap-2">
+            <div className="flex min-w-0 items-center gap-3">
+              <FileText className="shrink-0 text-primary-500" size={20} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium text-gray-900">{w.title}</p>
                   {w.is_published ? (
                     <span className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs text-green-600">
@@ -93,7 +93,7 @@ export default function AdminWeekliesPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
               <Link
                 href={`/admin/weeklies/${w.id}/edit`}
                 className="flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-100"

@@ -208,11 +208,11 @@ export default function AdminGalleryPage() {
 
   return (
     <div>
-      <div className="mb-8 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-gray-900">갤러리 관리</h1>
+      <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">갤러리 관리</h1>
         <button
           onClick={() => setShowForm(!showForm)}
-          className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          className="flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
         >
           <Plus size={16} />
           {showForm ? "취소" : "새 앨범"}
@@ -222,7 +222,7 @@ export default function AdminGalleryPage() {
       {showForm && (
         <form
           onSubmit={createAlbum}
-          className="mb-8 rounded-xl border border-gray-200 bg-white p-6"
+          className="mb-8 rounded-xl border border-gray-200 bg-white p-4 sm:p-6"
         >
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
@@ -294,18 +294,18 @@ export default function AdminGalleryPage() {
         {albums.map((album) => (
           <div
             key={album.id}
-            className="rounded-xl border border-gray-200 bg-white p-6"
+            className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6"
           >
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h3 className="font-bold text-gray-900">{album.title}</h3>
+            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <h3 className="truncate font-bold text-gray-900">{album.title}</h3>
                 <p className="text-sm text-gray-500">
                   {album.category} &middot; {album.date} &middot;{" "}
                   {album.images.length}장
                   {authorMap[album.id] ? ` · 작성: ${authorMap[album.id]}` : ""}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => togglePublic(album.id, album.is_public)}
                   className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium ${
@@ -340,7 +340,7 @@ export default function AdminGalleryPage() {
             </div>
 
             {album.images.length > 0 ? (
-              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 md:grid-cols-8">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 md:grid-cols-8">
                 {album.images.map((img) => (
                   <div key={img.id} className="group relative aspect-square">
                     <Image
