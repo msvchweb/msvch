@@ -12,8 +12,12 @@ import {
   MAX_UPLOAD_FILES,
   GalleryAlbumSchema,
 } from "@/lib/validation";
+import { compressImage } from "@/lib/image-compress";
 import { fetchAuthorMap } from "@/lib/content-authors";
 import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
+
+/** 압축 전 절대 상한 — 브라우저 OOM 방지 */
+const HARD_MAX_BYTES = 50 * 1024 * 1024;
 
 const CATEGORIES = ["예배", "교회학교", "교회행사", "봉사센터", "새가족"] as const;
 
@@ -32,6 +36,7 @@ export default function AdminGalleryPage() {
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [subCategory, setSubCategory] = useState<string>("");
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -143,49 +148,98 @@ export default function AdminGalleryPage() {
       return;
     }
 
-    for (let i = 0; i < files.length; i++) {
-      const check = validateFile(files[i], ALLOWED_IMAGE_EXTENSIONS, MAX_IMAGE_SIZE);
-      if (!check.ok) {
-        alert(`${files[i].name}: ${check.reason}`);
-        return;
-      }
-    }
-
     setUploading(true);
+    setUploadProgress({ done: 0, total: files.length });
+
     const album = albums.find((a) => a.id === albumId);
     const existingCount = album?.images.length ?? 0;
+    const failures: string[] = [];
+    let successCount = 0;
+    let firstUploadedUrl: string | null = null;
 
     for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const ext = safeExtension(file.name, ALLOWED_IMAGE_EXTENSIONS);
+      const original = files[i];
+
+      // 1차 검증: 확장자 + 절대 상한 (50MB)
+      const baseCheck = validateFile(
+        original,
+        ALLOWED_IMAGE_EXTENSIONS,
+        HARD_MAX_BYTES,
+      );
+      if (!baseCheck.ok) {
+        failures.push(`${original.name}: ${baseCheck.reason}`);
+        setUploadProgress({ done: i + 1, total: files.length });
+        continue;
+      }
+
+      // MAX_IMAGE_SIZE(10MB) 초과면 자동 압축
+      let toUpload = original;
+      if (original.size > MAX_IMAGE_SIZE) {
+        try {
+          const result = await compressImage(original, MAX_IMAGE_SIZE);
+          toUpload = result.file;
+        } catch (e) {
+          failures.push(
+            `${original.name}: ${e instanceof Error ? e.message : "압축 실패"}`,
+          );
+          setUploadProgress({ done: i + 1, total: files.length });
+          continue;
+        }
+      }
+
+      const ext = safeExtension(toUpload.name, ALLOWED_IMAGE_EXTENSIONS);
       const path = `${albumId}/${Date.now()}-${i}.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("gallery")
-        .upload(path, file);
+        .upload(path, toUpload, { contentType: toUpload.type });
 
-      if (!uploadError) {
-        const { data: urlData } = supabase.storage
-          .from("gallery")
-          .getPublicUrl(path);
-
-        await supabase.from("gallery_images").insert({
-          album_id: albumId,
-          image_url: urlData.publicUrl,
-          sort_order: existingCount + i,
-        });
-
-        // Set first image as thumbnail if none
-        if (existingCount === 0 && i === 0) {
-          await supabase
-            .from("gallery_albums")
-            .update({ thumbnail_url: urlData.publicUrl })
-            .eq("id", albumId);
-        }
+      if (uploadError) {
+        failures.push(`${original.name}: ${uploadError.message}`);
+        setUploadProgress({ done: i + 1, total: files.length });
+        continue;
       }
+
+      const { data: urlData } = supabase.storage
+        .from("gallery")
+        .getPublicUrl(path);
+
+      const { error: dbError } = await supabase.from("gallery_images").insert({
+        album_id: albumId,
+        image_url: urlData.publicUrl,
+        sort_order: existingCount + successCount,
+      });
+
+      if (dbError) {
+        failures.push(`${original.name}: ${dbError.message}`);
+        setUploadProgress({ done: i + 1, total: files.length });
+        continue;
+      }
+
+      if (firstUploadedUrl === null) firstUploadedUrl = urlData.publicUrl;
+      successCount++;
+      setUploadProgress({ done: i + 1, total: files.length });
+    }
+
+    // 빈 앨범에 처음 업로드된 사진이 있으면 thumbnail 설정
+    if (existingCount === 0 && firstUploadedUrl) {
+      await supabase
+        .from("gallery_albums")
+        .update({ thumbnail_url: firstUploadedUrl })
+        .eq("id", albumId);
     }
 
     setUploading(false);
+    setUploadProgress(null);
+
+    if (failures.length > 0) {
+      alert(
+        `${successCount}장 업로드 완료, ${failures.length}장 실패:\n\n` +
+          failures.slice(0, 10).join("\n") +
+          (failures.length > 10 ? `\n…외 ${failures.length - 10}장` : ""),
+      );
+    }
+
     loadAlbums();
   }
 
@@ -327,7 +381,11 @@ export default function AdminGalleryPage() {
                   className="flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-100 disabled:opacity-50"
                 >
                   <Upload size={14} />
-                  {uploading ? "업로드 중..." : "사진 추가"}
+                  {uploading
+                    ? uploadProgress
+                      ? `업로드 ${uploadProgress.done}/${uploadProgress.total}`
+                      : "업로드 중..."
+                    : `사진 추가 (최대 ${MAX_UPLOAD_FILES}장)`}
                 </button>
                 <button
                   onClick={() => deleteAlbum(album.id)}
@@ -377,7 +435,7 @@ export default function AdminGalleryPage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".jpg,.jpeg,.png,.gif,.webp"
+        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.gif,.webp"
         multiple
         className="hidden"
         onChange={(e) => {
