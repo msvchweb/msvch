@@ -9,7 +9,7 @@
 - [x] Step 4: Header 통합 (PC: 인라인 / 모바일: 햄버거 안)
 - [x] 최종 typecheck + lint
 - [x] 문서 갱신 (API_SPEC.md / ARCHIT.md / DB_SCHEMA.md)
-- [ ] 커밋 + 푸시
+- [x] 커밋 + 푸시
 
 ---
 
