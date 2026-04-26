@@ -238,6 +238,8 @@ export default function AdminGalleryPage() {
           failures.slice(0, 10).join("\n") +
           (failures.length > 10 ? `\n…외 ${failures.length - 10}장` : ""),
       );
+    } else if (files.length > 1) {
+      alert(`${successCount}장 업로드 완료`);
     }
 
     loadAlbums();
@@ -385,7 +387,7 @@ export default function AdminGalleryPage() {
                     ? uploadProgress
                       ? `업로드 ${uploadProgress.done}/${uploadProgress.total}`
                       : "업로드 중..."
-                    : `사진 추가 (최대 ${MAX_UPLOAD_FILES}장)`}
+                    : `사진 추가 (여러 장 가능, 최대 ${MAX_UPLOAD_FILES}장)`}
                 </button>
                 <button
                   onClick={() => deleteAlbum(album.id)}
@@ -435,13 +437,15 @@ export default function AdminGalleryPage() {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp,image/gif,.jpg,.jpeg,.png,.gif,.webp"
+        accept="image/*"
         multiple
         className="hidden"
         onChange={(e) => {
           const albumId = fileInputRef.current?.getAttribute("data-album-id");
-          if (albumId && e.target.files && e.target.files.length > 0) {
-            uploadImages(albumId, e.target.files);
+          const picked = e.target.files;
+          if (albumId && picked && picked.length > 0) {
+            console.log(`[gallery] picked ${picked.length} file(s)`);
+            uploadImages(albumId, picked);
             e.target.value = "";
           }
         }}
