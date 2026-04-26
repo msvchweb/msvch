@@ -2,13 +2,50 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
+import {
+  LayoutDashboard,
+  FileText,
+  ImageIcon,
+  Newspaper,
+  Sparkles,
+  Video,
+  Calendar,
+  MessageSquare,
+  Database,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
+
+export type AdminIconKey =
+  | "dashboard"
+  | "notices"
+  | "weeklies"
+  | "masters"
+  | "gallery"
+  | "calendar"
+  | "sermons"
+  | "shorts"
+  | "inquiries"
+  | "members";
+
+const ICONS: Record<AdminIconKey, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  notices: Newspaper,
+  weeklies: FileText,
+  masters: Database,
+  gallery: ImageIcon,
+  calendar: Calendar,
+  sermons: Sparkles,
+  shorts: Video,
+  inquiries: MessageSquare,
+  members: Users,
+};
 
 export interface AdminNavItem {
   label: string;
   href: string;
-  icon: LucideIcon;
+  icon: AdminIconKey;
 }
 
 function isActive(pathname: string, href: string): boolean {
@@ -26,6 +63,7 @@ export function AdminSidebar({ items }: { items: AdminNavItem[] }) {
       </h2>
       <nav className="space-y-1">
         {items.map((item) => {
+          const Icon = ICONS[item.icon];
           const active = isActive(pathname, item.href);
           return (
             <Link
@@ -38,7 +76,7 @@ export function AdminSidebar({ items }: { items: AdminNavItem[] }) {
                   : "text-gray-700 hover:bg-gray-200",
               )}
             >
-              <item.icon size={18} />
+              <Icon size={18} />
               {item.label}
             </Link>
           );
@@ -58,6 +96,7 @@ export function AdminMobileTabs({ items }: { items: AdminNavItem[] }) {
     >
       <div className="flex gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
+          const Icon = ICONS[item.icon];
           const active = isActive(pathname, item.href);
           return (
             <Link
@@ -70,7 +109,7 @@ export function AdminMobileTabs({ items }: { items: AdminNavItem[] }) {
                   : "bg-gray-100 text-gray-600 active:bg-gray-200",
               )}
             >
-              <item.icon size={14} />
+              <Icon size={14} />
               {item.label}
             </Link>
           );
