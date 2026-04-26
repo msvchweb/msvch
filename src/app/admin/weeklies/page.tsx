@@ -5,12 +5,14 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Plus, Trash2, FileText, Pencil, CheckCircle, Clock, Printer, Globe } from "lucide-react";
 import { formatDate } from "@/lib/utils";
-import { fetchAuthorMap } from "@/lib/content-authors";
+import { fetchAuthorRecordMap, type ContentAuthor } from "@/lib/content-authors";
+import { useMe, canDelete } from "@/lib/use-me";
 import type { Weekly } from "@/types/notice";
 
 export default function AdminWeekliesPage() {
+  const me = useMe();
   const [weeklies, setWeeklies] = useState<Weekly[]>([]);
-  const [authorMap, setAuthorMap] = useState<Record<string, string>>({});
+  const [authorMap, setAuthorMap] = useState<Record<string, ContentAuthor>>({});
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -25,7 +27,11 @@ export default function AdminWeekliesPage() {
       .order("date", { ascending: false });
     const list = (data ?? []) as Weekly[];
     setWeeklies(list);
-    const map = await fetchAuthorMap(supabase, "weekly", list.map((w) => w.id));
+    const map = await fetchAuthorRecordMap(
+      supabase,
+      "weekly",
+      list.map((w) => w.id),
+    );
     setAuthorMap(map);
     setLoading(false);
   }
@@ -88,7 +94,7 @@ export default function AdminWeekliesPage() {
                   {w.volume && w.issue
                     ? ` · ${w.volume}권 ${w.issue}호`
                     : ""}
-                  {authorMap[w.id] ? ` · 작성: ${authorMap[w.id]}` : ""}
+                  {authorMap[w.id]?.name ? ` · 작성: ${authorMap[w.id]?.name}` : ""}
                 </p>
               </div>
             </div>
@@ -114,12 +120,14 @@ export default function AdminWeekliesPage() {
               >
                 <Printer size={14} /> 인쇄
               </Link>
-              <button
-                onClick={() => deleteWeekly(w)}
-                className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100"
-              >
-                <Trash2 size={14} />
-              </button>
+              {canDelete(me, authorMap[w.id]?.id) && (
+                <button
+                  onClick={() => deleteWeekly(w)}
+                  className="rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
             </div>
           </div>
         ))}

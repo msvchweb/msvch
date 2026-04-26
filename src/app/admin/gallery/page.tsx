@@ -13,7 +13,8 @@ import {
   GalleryAlbumSchema,
 } from "@/lib/validation";
 import { compressImage } from "@/lib/image-compress";
-import { fetchAuthorMap } from "@/lib/content-authors";
+import { fetchAuthorRecordMap, type ContentAuthor } from "@/lib/content-authors";
+import { useMe, canDelete } from "@/lib/use-me";
 import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
 
 /** 압축 전 절대 상한 — 브라우저 OOM 방지 */
@@ -27,8 +28,9 @@ const SUB_CATEGORIES: Record<string, string[]> = {
 };
 
 export default function AdminGalleryPage() {
+  const me = useMe();
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
-  const [authorMap, setAuthorMap] = useState<Record<string, string>>({});
+  const [authorMap, setAuthorMap] = useState<Record<string, ContentAuthor>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
@@ -75,7 +77,7 @@ export default function AdminGalleryPage() {
     }));
 
     setAlbums(result);
-    const map = await fetchAuthorMap(
+    const map = await fetchAuthorRecordMap(
       supabase,
       "gallery_album",
       result.map((a) => a.id),
@@ -358,7 +360,7 @@ export default function AdminGalleryPage() {
                 <p className="text-sm text-gray-500">
                   {album.category} &middot; {album.date} &middot;{" "}
                   {album.images.length}장
-                  {authorMap[album.id] ? ` · 작성: ${authorMap[album.id]}` : ""}
+                  {authorMap[album.id]?.name ? ` · 작성: ${authorMap[album.id]?.name}` : ""}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
@@ -389,13 +391,15 @@ export default function AdminGalleryPage() {
                       : "업로드 중..."
                     : `사진 추가 (여러 장 가능, 최대 ${MAX_UPLOAD_FILES}장)`}
                 </button>
-                <button
-                  onClick={() => deleteAlbum(album.id)}
-                  className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100"
-                >
-                  <Trash2 size={14} />
-                  삭제
-                </button>
+                {canDelete(me, authorMap[album.id]?.id) && (
+                  <button
+                    onClick={() => deleteAlbum(album.id)}
+                    className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100"
+                  >
+                    <Trash2 size={14} />
+                    삭제
+                  </button>
+                )}
               </div>
             </div>
 
@@ -410,12 +414,14 @@ export default function AdminGalleryPage() {
                       className="rounded-lg object-cover"
                       sizes="100px"
                     />
-                    <button
-                      onClick={() => deleteImage(img.id, img.image_url)}
-                      className="absolute right-1 top-1 hidden rounded-full bg-red-500 p-1 text-white group-hover:block"
-                    >
-                      <Trash2 size={12} />
-                    </button>
+                    {canDelete(me, authorMap[album.id]?.id) && (
+                      <button
+                        onClick={() => deleteImage(img.id, img.image_url)}
+                        className="absolute right-1 top-1 hidden rounded-full bg-red-500 p-1 text-white group-hover:block"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>

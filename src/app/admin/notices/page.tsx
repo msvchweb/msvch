@@ -13,7 +13,8 @@ import {
   MAX_BLOG_IMAGE_SIZE,
 } from "@/lib/validation";
 import { compressImage } from "@/lib/image-compress";
-import { fetchAuthorMap } from "@/lib/content-authors";
+import { fetchAuthorRecordMap, type ContentAuthor } from "@/lib/content-authors";
+import { useMe, canDelete } from "@/lib/use-me";
 import type { Notice } from "@/types/notice";
 
 const CATEGORIES = ["일반", "긴급", "행사"] as const;
@@ -23,8 +24,9 @@ const HERO_STORAGE_PREFIX = "admin-hero";
 const HERO_HARD_MAX_BYTES = 50 * 1024 * 1024;
 
 export default function AdminNoticesPage() {
+  const me = useMe();
   const [notices, setNotices] = useState<Notice[]>([]);
-  const [authorMap, setAuthorMap] = useState<Record<string, string>>({});
+  const [authorMap, setAuthorMap] = useState<Record<string, ContentAuthor>>({});
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<Notice | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -46,7 +48,11 @@ export default function AdminNoticesPage() {
       .order("date", { ascending: false });
     const list = (data ?? []) as Notice[];
     setNotices(list);
-    const map = await fetchAuthorMap(supabase, "notice", list.map((n) => n.id));
+    const map = await fetchAuthorRecordMap(
+      supabase,
+      "notice",
+      list.map((n) => n.id),
+    );
     setAuthorMap(map);
     setLoading(false);
   }
@@ -375,7 +381,7 @@ export default function AdminNoticesPage() {
                     {notice.date ? formatDate(notice.date) : "-"}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {authorMap[notice.id] ?? <span className="text-gray-300">—</span>}
+                    {authorMap[notice.id]?.name ?? <span className="text-gray-300">—</span>}
                   </td>
                   <td className="px-4 py-3">
                     <button
@@ -393,9 +399,11 @@ export default function AdminNoticesPage() {
                       <button onClick={() => startEdit(notice)} className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
                         <Edit3 size={14} />
                       </button>
-                      <button onClick={() => deleteNotice(notice.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
-                        <Trash2 size={14} />
-                      </button>
+                      {canDelete(me, authorMap[notice.id]?.id) && (
+                        <button onClick={() => deleteNotice(notice.id)} className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-600">
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -459,7 +467,7 @@ export default function AdminNoticesPage() {
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-gray-500">
                     <span>{notice.category}</span>
                     {notice.date && <span className="text-gray-400">· {formatDate(notice.date)}</span>}
-                    {authorMap[notice.id] && <span className="text-gray-400">· {authorMap[notice.id]}</span>}
+                    {authorMap[notice.id]?.name && <span className="text-gray-400">· {authorMap[notice.id]?.name}</span>}
                   </div>
                 </div>
               </div>
@@ -487,9 +495,11 @@ export default function AdminNoticesPage() {
                   <button onClick={() => startEdit(notice)} className="rounded-lg p-2 text-gray-500 active:bg-gray-100">
                     <Edit3 size={16} />
                   </button>
-                  <button onClick={() => deleteNotice(notice.id)} className="rounded-lg p-2 text-gray-400 active:bg-red-50 active:text-red-600">
-                    <Trash2 size={16} />
-                  </button>
+                  {canDelete(me, authorMap[notice.id]?.id) && (
+                    <button onClick={() => deleteNotice(notice.id)} className="rounded-lg p-2 text-gray-400 active:bg-red-50 active:text-red-600">
+                      <Trash2 size={16} />
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

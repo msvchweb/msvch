@@ -7,9 +7,9 @@ import { Menu, X, ChevronDown, Shield } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { navItems } from "./nav-config";
 import { useNewContent } from "@/lib/new-content-provider";
+import { useMe } from "@/lib/use-me";
 import { cn } from "@/lib/utils";
 import type { ContentKey } from "@/app/api/new-content/route";
-import type { MeResponse } from "@/app/api/me/route";
 
 function RedDot() {
   return (
@@ -42,26 +42,13 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
-  const [isStaff, setIsStaff] = useState(false);
   const { dots } = useNewContent();
+  const { isStaff } = useMe();
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetch("/api/me", { credentials: "same-origin" })
-      .then((r) => (r.ok ? (r.json() as Promise<MeResponse>) : null))
-      .then((data) => {
-        if (!cancelled && data) setIsStaff(data.isStaff);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   return (
