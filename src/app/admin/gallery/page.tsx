@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import { Upload, Trash2, Plus, Eye, EyeOff } from "lucide-react";
+import { Upload, Trash2, Plus, Eye, EyeOff, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
 import {
   validateFile,
   safeExtension,
@@ -27,9 +27,25 @@ const SUB_CATEGORIES: Record<string, string[]> = {
   봉사센터: ["반찬", "이미용", "비전문화", "탁구"],
 };
 
+/** 사용자 친화 사전검증 — HEIC 등 흔한 비호환 형식 안내 */
+function preflightCheck(file: File): { ok: true } | { ok: false; reason: string } {
+  const lowerName = file.name.toLowerCase();
+  if (lowerName.endsWith(".heic") || lowerName.endsWith(".heif")) {
+    return {
+      ok: false,
+      reason: "HEIC 형식은 지원하지 않습니다. iPhone 설정에서 카메라 → 포맷 → '높은 호환성(JPEG)' 으로 바꾸거나, 사진을 JPEG로 변환 후 업로드 해주세요.",
+    };
+  }
+  return validateFile(file, ALLOWED_IMAGE_EXTENSIONS, HARD_MAX_BYTES);
+}
+
 export default function AdminGalleryPage() {
   const me = useMe();
   const [albums, setAlbums] = useState<GalleryAlbum[]>([]);
+  const [imageCounts, setImageCounts] = useState<Record<string, number>>({});
+  const [expandedAlbums, setExpandedAlbums] = useState<Set<string>>(new Set());
+  const [albumImages, setAlbumImages] = useState<Record<string, GalleryImage[]>>({});
+  const [albumLoadingIds, setAlbumLoadingIds] = useState<Set<string>>(new Set());
   const [authorMap, setAuthorMap] = useState<Record<string, ContentAuthor>>({});
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -39,14 +55,13 @@ export default function AdminGalleryPage() {
   const [subCategory, setSubCategory] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
+  /** 업로드 실패 내역 — albumId 별로 누적, 사용자가 명시적으로 닫기 전까지 표시 */
+  const [uploadFailures, setUploadFailures] = useState<Record<string, string[]>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
-  useEffect(() => {
-    loadAlbums();
-  }, []);
-
-  async function loadAlbums() {
+  const loadAlbums = useCallback(async () => {
+    // 앨범만 가져오기 — 이미지는 lazy fetch
     const { data: albumsData } = await supabase
       .from("gallery_albums")
       .select("*")
@@ -57,12 +72,18 @@ export default function AdminGalleryPage() {
       return;
     }
 
+    // 이미지 카운트만 가벼운 쿼리로 한 번에
     const albumIds = albumsData.map((a) => a.id as string);
-    const { data: imagesData } = await supabase
+    const { data: countRows } = await supabase
       .from("gallery_images")
-      .select("*")
-      .in("album_id", albumIds)
-      .order("sort_order");
+      .select("album_id")
+      .in("album_id", albumIds);
+
+    const counts: Record<string, number> = {};
+    for (const row of countRows ?? []) {
+      const id = row.album_id as string;
+      counts[id] = (counts[id] ?? 0) + 1;
+    }
 
     const result: GalleryAlbum[] = albumsData.map((album) => ({
       id: album.id as string,
@@ -73,10 +94,11 @@ export default function AdminGalleryPage() {
       thumbnail_url: album.thumbnail_url as string | null,
       is_public: album.is_public as boolean,
       created_at: album.created_at as string,
-      images: (imagesData?.filter((img) => img.album_id === album.id) ?? []) as GalleryImage[],
+      images: [],
     }));
 
     setAlbums(result);
+    setImageCounts(counts);
     const map = await fetchAuthorRecordMap(
       supabase,
       "gallery_album",
@@ -84,6 +106,54 @@ export default function AdminGalleryPage() {
     );
     setAuthorMap(map);
     setLoading(false);
+  }, [supabase]);
+
+  useEffect(() => {
+    loadAlbums();
+  }, [loadAlbums]);
+
+  async function fetchAlbumImages(albumId: string): Promise<GalleryImage[]> {
+    const { data } = await supabase
+      .from("gallery_images")
+      .select("*")
+      .eq("album_id", albumId)
+      .order("sort_order", { ascending: true });
+    return (data ?? []) as GalleryImage[];
+  }
+
+  async function toggleExpand(albumId: string) {
+    const isOpen = expandedAlbums.has(albumId);
+    if (isOpen) {
+      setExpandedAlbums((prev) => {
+        const next = new Set(prev);
+        next.delete(albumId);
+        return next;
+      });
+      return;
+    }
+
+    setExpandedAlbums((prev) => new Set(prev).add(albumId));
+
+    // 이미 로드된 적 있으면 재사용
+    if (albumImages[albumId]) return;
+
+    setAlbumLoadingIds((prev) => new Set(prev).add(albumId));
+    try {
+      const images = await fetchAlbumImages(albumId);
+      setAlbumImages((prev) => ({ ...prev, [albumId]: images }));
+    } finally {
+      setAlbumLoadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(albumId);
+        return next;
+      });
+    }
+  }
+
+  async function refreshAlbumImages(albumId: string) {
+    const images = await fetchAlbumImages(albumId);
+    setAlbumImages((prev) => ({ ...prev, [albumId]: images }));
+    setImageCounts((prev) => ({ ...prev, [albumId]: images.length }));
   }
 
   async function createAlbum(e: React.FormEvent) {
@@ -128,19 +198,26 @@ export default function AdminGalleryPage() {
   async function deleteAlbum(albumId: string) {
     if (!confirm("이 앨범과 모든 사진을 삭제하시겠습니까?")) return;
 
-    // Delete storage files
-    const album = albums.find((a) => a.id === albumId);
-    if (album) {
-      const paths = album.images.map((img) => {
+    // 삭제 시점에 이미지 목록 확보 (lazy 로드 안 됐을 수 있음)
+    const images = albumImages[albumId] ?? (await fetchAlbumImages(albumId));
+    const paths = images.map((img) => {
+      try {
         const url = new URL(img.image_url);
         return url.pathname.split("/gallery/")[1];
-      }).filter(Boolean);
-      if (paths.length > 0) {
-        await supabase.storage.from("gallery").remove(paths);
+      } catch {
+        return "";
       }
+    }).filter(Boolean);
+    if (paths.length > 0) {
+      await supabase.storage.from("gallery").remove(paths);
     }
 
     await supabase.from("gallery_albums").delete().eq("id", albumId);
+    setAlbumImages((prev) => {
+      const next = { ...prev };
+      delete next[albumId];
+      return next;
+    });
     loadAlbums();
   }
 
@@ -150,29 +227,55 @@ export default function AdminGalleryPage() {
       return;
     }
 
+    // ── 1단계: 사전검증 ────────────────────────────────────────
+    // 업로드 시작 전에 모든 파일을 검사해서 즉시 사용자에게 거부 사유 제공
+    const validFiles: File[] = [];
+    const preflightFailures: string[] = [];
+    for (const f of files) {
+      const r = preflightCheck(f);
+      if (r.ok) {
+        validFiles.push(f);
+      } else {
+        preflightFailures.push(`${f.name}: ${r.reason}`);
+        console.error("[gallery upload] preflight fail", f.name, r.reason);
+      }
+    }
+
+    if (validFiles.length === 0) {
+      setUploadFailures((prev) => ({ ...prev, [albumId]: preflightFailures }));
+      alert(
+        `업로드 가능한 파일이 없습니다.\n\n` +
+          preflightFailures.slice(0, 10).join("\n") +
+          (preflightFailures.length > 10
+            ? `\n…외 ${preflightFailures.length - 10}장`
+            : ""),
+      );
+      return;
+    }
+
+    if (preflightFailures.length > 0) {
+      const proceed = confirm(
+        `${preflightFailures.length}장은 업로드할 수 없습니다 (HEIC/형식/용량). ` +
+          `${validFiles.length}장만 업로드할까요?\n\n` +
+          preflightFailures.slice(0, 5).join("\n") +
+          (preflightFailures.length > 5
+            ? `\n…외 ${preflightFailures.length - 5}장`
+            : ""),
+      );
+      if (!proceed) return;
+    }
+
     setUploading(true);
-    setUploadProgress({ done: 0, total: files.length });
+    setUploadProgress({ done: 0, total: validFiles.length });
 
     const album = albums.find((a) => a.id === albumId);
-    const existingCount = album?.images.length ?? 0;
-    const failures: string[] = [];
+    const existingCount = imageCounts[albumId] ?? album?.images.length ?? 0;
+    const failures: string[] = [...preflightFailures];
     let successCount = 0;
     let firstUploadedUrl: string | null = null;
 
-    for (let i = 0; i < files.length; i++) {
-      const original = files[i];
-
-      // 1차 검증: 확장자 + 절대 상한 (50MB)
-      const baseCheck = validateFile(
-        original,
-        ALLOWED_IMAGE_EXTENSIONS,
-        HARD_MAX_BYTES,
-      );
-      if (!baseCheck.ok) {
-        failures.push(`${original.name}: ${baseCheck.reason}`);
-        setUploadProgress({ done: i + 1, total: files.length });
-        continue;
-      }
+    for (let i = 0; i < validFiles.length; i++) {
+      const original = validFiles[i];
 
       // MAX_IMAGE_SIZE(10MB) 초과면 자동 압축
       let toUpload = original;
@@ -181,10 +284,10 @@ export default function AdminGalleryPage() {
           const result = await compressImage(original, MAX_IMAGE_SIZE);
           toUpload = result.file;
         } catch (e) {
-          failures.push(
-            `${original.name}: ${e instanceof Error ? e.message : "압축 실패"}`,
-          );
-          setUploadProgress({ done: i + 1, total: files.length });
+          const reason = e instanceof Error ? e.message : "압축 실패";
+          failures.push(`${original.name}: ${reason}`);
+          console.error("[gallery upload] compress fail", original.name, e);
+          setUploadProgress({ done: i + 1, total: validFiles.length });
           continue;
         }
       }
@@ -197,8 +300,9 @@ export default function AdminGalleryPage() {
         .upload(path, toUpload, { contentType: toUpload.type });
 
       if (uploadError) {
-        failures.push(`${original.name}: ${uploadError.message}`);
-        setUploadProgress({ done: i + 1, total: files.length });
+        failures.push(`${original.name}: 스토리지 업로드 실패 (${uploadError.message})`);
+        console.error("[gallery upload] storage fail", original.name, uploadError);
+        setUploadProgress({ done: i + 1, total: validFiles.length });
         continue;
       }
 
@@ -213,14 +317,17 @@ export default function AdminGalleryPage() {
       });
 
       if (dbError) {
-        failures.push(`${original.name}: ${dbError.message}`);
-        setUploadProgress({ done: i + 1, total: files.length });
+        failures.push(`${original.name}: DB 저장 실패 (${dbError.message})`);
+        console.error("[gallery upload] db fail", original.name, dbError);
+        // 스토리지 고아 파일 정리
+        await supabase.storage.from("gallery").remove([path]).catch(() => {});
+        setUploadProgress({ done: i + 1, total: validFiles.length });
         continue;
       }
 
       if (firstUploadedUrl === null) firstUploadedUrl = urlData.publicUrl;
       successCount++;
-      setUploadProgress({ done: i + 1, total: files.length });
+      setUploadProgress({ done: i + 1, total: validFiles.length });
     }
 
     // 빈 앨범에 처음 업로드된 사진이 있으면 thumbnail 설정
@@ -235,25 +342,59 @@ export default function AdminGalleryPage() {
     setUploadProgress(null);
 
     if (failures.length > 0) {
+      setUploadFailures((prev) => ({ ...prev, [albumId]: failures }));
+    } else {
+      setUploadFailures((prev) => {
+        const next = { ...prev };
+        delete next[albumId];
+        return next;
+      });
+    }
+
+    // 결과 요약 — 화면에도 남고, 알림으로도 안내
+    if (failures.length > 0) {
       alert(
-        `${successCount}장 업로드 완료, ${failures.length}장 실패:\n\n` +
-          failures.slice(0, 10).join("\n") +
-          (failures.length > 10 ? `\n…외 ${failures.length - 10}장` : ""),
+        `${successCount}장 업로드 완료, ${failures.length}장 실패.\n` +
+          `자세한 내용은 앨범 아래 빨간 박스에 표시됩니다 (콘솔에도 기록).`,
       );
-    } else if (files.length > 1) {
+    } else if (validFiles.length > 1) {
       alert(`${successCount}장 업로드 완료`);
     }
 
-    loadAlbums();
+    // 펼쳐진 앨범이면 이미지 캐시 갱신, 아니면 카운트만 갱신
+    if (expandedAlbums.has(albumId)) {
+      await refreshAlbumImages(albumId);
+    } else {
+      setImageCounts((prev) => ({
+        ...prev,
+        [albumId]: (prev[albumId] ?? 0) + successCount,
+      }));
+    }
+    // 썸네일이 새로 설정된 경우 앨범 목록도 다시 로드
+    if (existingCount === 0 && firstUploadedUrl) {
+      loadAlbums();
+    }
   }
 
-  async function deleteImage(imageId: string, imageUrl: string) {
-    const path = new URL(imageUrl).pathname.split("/gallery/")[1];
-    if (path) {
-      await supabase.storage.from("gallery").remove([path]);
+  async function deleteImage(imageId: string, imageUrl: string, albumId: string) {
+    try {
+      const path = new URL(imageUrl).pathname.split("/gallery/")[1];
+      if (path) {
+        await supabase.storage.from("gallery").remove([path]);
+      }
+    } catch {
+      /* URL 파싱 실패 — 무시하고 DB 삭제 진행 */
     }
     await supabase.from("gallery_images").delete().eq("id", imageId);
-    loadAlbums();
+    await refreshAlbumImages(albumId);
+  }
+
+  function dismissFailures(albumId: string) {
+    setUploadFailures((prev) => {
+      const next = { ...prev };
+      delete next[albumId];
+      return next;
+    });
   }
 
   if (loading) {
@@ -348,90 +489,148 @@ export default function AdminGalleryPage() {
         </form>
       )}
 
-      <div className="space-y-6">
-        {albums.map((album) => (
-          <div
-            key={album.id}
-            className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6"
-          >
-            <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="min-w-0">
-                <h3 className="truncate font-bold text-gray-900">{album.title}</h3>
-                <p className="text-sm text-gray-500">
-                  {album.category} &middot; {album.date} &middot;{" "}
-                  {album.images.length}장
-                  {authorMap[album.id]?.name ? ` · 작성: ${authorMap[album.id]?.name}` : ""}
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => togglePublic(album.id, album.is_public)}
-                  className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium ${
-                    album.is_public
-                      ? "bg-green-50 text-green-700"
-                      : "bg-gray-100 text-gray-500"
-                  }`}
-                  title={album.is_public ? "공개 중" : "비공개"}
-                >
-                  {album.is_public ? <Eye size={14} /> : <EyeOff size={14} />}
-                  {album.is_public ? "공개" : "비공개"}
-                </button>
-                <button
-                  onClick={() => {
-                    fileInputRef.current?.setAttribute("data-album-id", album.id);
-                    fileInputRef.current?.click();
-                  }}
-                  disabled={uploading}
-                  className="flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-100 disabled:opacity-50"
-                >
-                  <Upload size={14} />
-                  {uploading
-                    ? uploadProgress
-                      ? `업로드 ${uploadProgress.done}/${uploadProgress.total}`
-                      : "업로드 중..."
-                    : `사진 추가 (여러 장 가능, 최대 ${MAX_UPLOAD_FILES}장)`}
-                </button>
-                {canDelete(me, authorMap[album.id]?.id) && (
-                  <button
-                    onClick={() => deleteAlbum(album.id)}
-                    className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100"
-                  >
-                    <Trash2 size={14} />
-                    삭제
-                  </button>
-                )}
-              </div>
-            </div>
+      <div className="space-y-4">
+        {albums.map((album) => {
+          const isExpanded = expandedAlbums.has(album.id);
+          const isAlbumLoading = albumLoadingIds.has(album.id);
+          const images = albumImages[album.id] ?? [];
+          const count = imageCounts[album.id] ?? 0;
+          const failures = uploadFailures[album.id];
 
-            {album.images.length > 0 ? (
-              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 md:grid-cols-8">
-                {album.images.map((img) => (
-                  <div key={img.id} className="group relative aspect-square">
-                    <Image
-                      src={img.image_url}
-                      alt=""
-                      fill
-                      className="rounded-lg object-cover"
-                      sizes="100px"
-                    />
-                    {canDelete(me, authorMap[album.id]?.id) && (
-                      <button
-                        onClick={() => deleteImage(img.id, img.image_url)}
-                        className="absolute right-1 top-1 hidden rounded-full bg-red-500 p-1 text-white group-hover:block"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    )}
+          return (
+            <div
+              key={album.id}
+              className="rounded-xl border border-gray-200 bg-white p-4 sm:p-6"
+            >
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <button
+                  onClick={() => toggleExpand(album.id)}
+                  className="flex min-w-0 flex-1 items-center gap-3 text-left"
+                >
+                  {isExpanded ? (
+                    <ChevronDown size={18} className="shrink-0 text-gray-400" />
+                  ) : (
+                    <ChevronRight size={18} className="shrink-0 text-gray-400" />
+                  )}
+                  {album.thumbnail_url && (
+                    <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-gray-100">
+                      <Image
+                        src={album.thumbnail_url}
+                        alt=""
+                        fill
+                        className="object-cover"
+                        sizes="48px"
+                      />
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <h3 className="truncate font-bold text-gray-900">{album.title}</h3>
+                    <p className="text-sm text-gray-500">
+                      {album.category} &middot; {album.date} &middot; {count}장
+                      {authorMap[album.id]?.name ? ` · 작성: ${authorMap[album.id]?.name}` : ""}
+                    </p>
                   </div>
-                ))}
+                </button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={() => togglePublic(album.id, album.is_public)}
+                    className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium ${
+                      album.is_public
+                        ? "bg-green-50 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                    }`}
+                    title={album.is_public ? "공개 중" : "비공개"}
+                  >
+                    {album.is_public ? <Eye size={14} /> : <EyeOff size={14} />}
+                    {album.is_public ? "공개" : "비공개"}
+                  </button>
+                  <button
+                    onClick={() => {
+                      fileInputRef.current?.setAttribute("data-album-id", album.id);
+                      fileInputRef.current?.click();
+                    }}
+                    disabled={uploading}
+                    className="flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-100 disabled:opacity-50"
+                  >
+                    <Upload size={14} />
+                    {uploading
+                      ? uploadProgress
+                        ? `업로드 ${uploadProgress.done}/${uploadProgress.total}`
+                        : "업로드 중..."
+                      : `사진 추가 (최대 ${MAX_UPLOAD_FILES}장)`}
+                  </button>
+                  {canDelete(me, authorMap[album.id]?.id) && (
+                    <button
+                      onClick={() => deleteAlbum(album.id)}
+                      className="flex items-center gap-1 rounded-lg bg-red-50 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-100"
+                    >
+                      <Trash2 size={14} />
+                      삭제
+                    </button>
+                  )}
+                </div>
               </div>
-            ) : (
-              <p className="py-4 text-center text-sm text-gray-400">
-                사진을 추가해 주세요
-              </p>
-            )}
-          </div>
-        ))}
+
+              {failures && failures.length > 0 && (
+                <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm font-medium text-red-700">
+                      <AlertCircle size={16} />
+                      업로드 실패 {failures.length}장
+                    </div>
+                    <button
+                      onClick={() => dismissFailures(album.id)}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      닫기
+                    </button>
+                  </div>
+                  <ul className="max-h-40 overflow-y-auto space-y-1 text-xs text-red-700">
+                    {failures.map((line, idx) => (
+                      <li key={idx} className="break-all">• {line}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {isExpanded && (
+                <div className="mt-4">
+                  {isAlbumLoading ? (
+                    <p className="py-4 text-center text-sm text-gray-400">
+                      이미지 불러오는 중...
+                    </p>
+                  ) : images.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 md:grid-cols-8">
+                      {images.map((img) => (
+                        <div key={img.id} className="group relative aspect-square">
+                          <Image
+                            src={img.image_url}
+                            alt=""
+                            fill
+                            className="rounded-lg object-cover"
+                            sizes="100px"
+                          />
+                          {canDelete(me, authorMap[album.id]?.id) && (
+                            <button
+                              onClick={() => deleteImage(img.id, img.image_url, album.id)}
+                              className="absolute right-1 top-1 hidden rounded-full bg-red-500 p-1 text-white group-hover:block"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="py-4 text-center text-sm text-gray-400">
+                      사진을 추가해 주세요
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
 
         {albums.length === 0 && (
           <p className="py-12 text-center text-gray-400">
