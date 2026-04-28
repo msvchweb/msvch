@@ -25,6 +25,11 @@ export const metadata: Metadata = {
     siteName: "명성비전교회",
     images: [{ url: "/og-image.png", width: 1200, height: 630 }],
   },
+  verification: {
+    other: {
+      "naver-site-verification": "f4b2e36539dce9f78e02756bea7be70f110297b7",
+    },
+  },
 };
 
 export default function RootLayout({
