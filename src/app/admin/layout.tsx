@@ -13,6 +13,7 @@ const baseNav: AdminNavItem[] = [
   { label: "설교 요약", href: "/admin/sermons", icon: "sermons" },
   { label: "쇼츠", href: "/admin/shorts", icon: "shorts" },
   { label: "문의 내역", href: "/admin/inquiries", icon: "inquiries" },
+  { label: "새가족 등록", href: "/admin/new-families", icon: "newFamily" },
 ];
 
 const masterOnlyNav: AdminNavItem[] = [

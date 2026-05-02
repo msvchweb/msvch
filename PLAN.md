@@ -1,468 +1,514 @@
-# 자체 캘린더 (Google Calendar 대체) 구현 계획
+# 새가족 등록 폼 구현 계획
+
+> 작성일: 2026-05-02
+> 범위: 웹 전용 (모바일 앱은 백엔드 무수정 호환을 전제로 설계)
+> 전제: Next.js 16.2.2 App Router + Supabase + 기존 admin/RLS 패턴 그대로 유지
 
 ## 진행 상태
 
-- [x] PLAN 작성 (v2 — 별도 구독 테이블 + RRULE v2 보류 확정)
-- [x] Step 1: 마이그레이션 022 (events 테이블 + `notify` 컬럼 + RLS + 작성자 트리거 확장)
-- [x] Step 2: 마이그레이션 023 (alimtalk_sent + event_subscribers)
-- [x] Step 3: 타입 + DTO 정의 (`src/types/calendar.ts` 갱신, `src/types/subscribers.ts` 신규)
-- [x] Step 4: 데이터 lib (`src/lib/events.ts` 신규)
-- [x] Step 5: Validation (`CalendarEventSchema` 갱신 + `EventSubscriberSchema` 신규)
-- [x] Step 6: API 라우트 갱신 (GET/POST/PATCH/DELETE `/api/calendar*`)
-- [x] Step 7: 입력 폼 단순화 + 수정 기능 (admin)
-- [x] Step 8: 공개 캘린더 hover popover (클라이언트 컴포넌트 분리)
-- [x] Step 9: 홈 `UpcomingEvents` 정리 (htmlLink → 내부 링크)
-- [x] Step 10: 알림톡 골격 (`src/lib/alimtalk.ts`)
-- [x] Step 11: 알림톡 cron 엔드포인트 (`/api/admin/cron/alimtalk-events`)
-- [x] Step 12: 구독자 관리 API (`/api/admin/event-subscribers`)
-- [x] Step 13: 구독자 관리 admin 페이지 (`/admin/event-subscribers`)
-- [x] Step 14: `vercel.json` cron 설정
-- [x] Step 15: Google Calendar 데이터 1회 import 스크립트
-- [x] Step 16: `src/lib/google-calendar.ts` 삭제 + 환경변수 정리 가이드
-- [x] 최종 typecheck + lint
-- [x] 문서 갱신 (API_SPEC.md / ARCHIT.md / DB_SCHEMA.md)
-- [x] 커밋 + 푸시
+- [x] PLAN 작성
+- [x] Step 1: 마이그레이션 024 (`new_family_registrations` 테이블 + RLS + 트리거)
+- [x] Step 2: 타입 + 라벨 매핑 (`src/types/new-family.ts`)
+- [x] Step 3: Validation (`NewFamilyRegistrationSchema`, `NewFamilyUpdateSchema`)
+- [x] Step 4: 공개 제출 API (`POST /api/new-family`)
+- [x] Step 5: 관리자 API (`GET/PATCH/DELETE /api/admin/new-families/*`)
+- [x] Step 6: 공개 페이지 (`/new-family` + `NewFamilyForm`)
+- [x] Step 7: 개인정보 처리방침 본문 분리
+- [x] Step 8: 관리자 페이지 (`/admin/new-families`) + AdminNav 메뉴 추가
+- [x] Step 9: 진입점 노출 (`교회소개` 메뉴 + 풋터 `바로가기`)
+- [x] typecheck + build 검증
+- [x] research.md 보고서
+- [x] 문서 최신화 (DB_SCHEMA.md / API_SPEC.md / ARCHIT.md)
+- [ ] 마이그레이션 024 운영 DB 적용 (사용자 측 작업 — Supabase SQL Editor)
 
 ---
 
 ## 목표
 
-1. **종료시간 생략 가능** — 보통 시작시간만 정함 (`end_time NULL` = 미정/오픈엔드)
-2. **공개 캘린더 hover** — 점이 있는 날짜 위에 마우스 올리면 그 날의 일정 팝오버
-3. **알림톡 준비** — 카카오 비즈 승인 시 즉시 동작 가능한 cron 골격
-4. **Google Calendar 의존 제거** — 자체 DB 단일 소스
-5. **모바일 앱 호환** — `/api/calendar` 응답 DTO를 안정적으로 유지하여 추후 RN 앱이 백엔드 수정 없이 사용 가능
+1. **자유로운 새가족 신청 접수** — 9문항 + 개인정보 동의를 거친 익명 제출
+2. **관리자 워크플로우** — 신규/연락완료/교구배정/완료 4단계 상태 관리 + 메모 + 삭제
+3. **개인정보 적법성** — 동의 시각 컬럼 보관, 보호법 30조 준수 본문 게재, "침례교가 아니므로 침례 → 세례" 기관 정합화
+4. **모바일 앱 호환** — `/api/new-family`, `/api/admin/new-families/*` DTO 가 추후 RN 앱에서 그대로 재사용 가능. Bearer 토큰 인증 자동 지원
+5. **중복 추상화 회피** — 기존 `chat_inquiries`(006) / `event_subscribers`(023) 패턴을 답습. 새 헬퍼/추상화 도입 0건
 
 ---
 
 ## 설계 원칙
 
-1. **DTO 안정성** — `CalendarEvent` 의 외형(`id/title/start/end/isAllDay/location/description`)은 유지. `htmlLink` 만 제거(외부 링크 → 내부 상세 링크 또는 popover로 대체).
-2. **단일 일정 우선** — v1 은 단일 날짜 일정만. 다일(`endDate`)/반복(`rrule`)은 컬럼만 미리 두고 v2 로 미룸. YAGNI.
-3. **시간 모델**:
-   - `date NOT NULL` — 날짜 (필수)
-   - `start_time` nullable — null 이면 종일
-   - `end_time` nullable — null 이면 미정/오픈엔드
-4. **권한 모델은 020/021 패턴 재사용** — `record_content_author('event')` 트리거 + `is_admin_or_master() OR is_content_author('event', id)` DELETE
-5. **알림톡은 단방향 추상화** — `sendAlimtalk(template, to, vars)` 인터페이스만. 미설정 환경변수 시 noop. 카카오 비즈 승인 후 환경변수만 채우면 동작.
-6. **타입 엄격** — `any/unknown` 금지. Zod 로 런타임 검증.
-7. **외부 라이브러리 회피** — 캘린더 그리드/팝오버/RRULE 모두 내부 구현 (메모리 선호도).
-8. **시키지 않은 것은 손대지 않음** — 반복 일정 UI, 다일 일정 UI, 알림톡 실 발송은 v1 범위 밖.
+1. **DTO 안정성** — 클라이언트 응답은 camelCase DTO 로 일관 (snake_case 컬럼명 노출 금지). API 라우트 내부에서 `toDto()` 1회 변환. 모바일 앱은 DTO 모양만 의존하면 됨.
+2. **3계층 검증** — (a) 클라이언트 폼 즉시 피드백, (b) 서버 zod 스키마 + 기타 옵션 룰, (c) DB CHECK + RLS. 어느 한 층이 우회되어도 다음 층이 막음.
+3. **익명 INSERT, 권한 SELECT** — `chat_inquiries` 와 동일한 RLS 패턴. INSERT 정책 `with check (true)`, SELECT 는 `is_staff()`. 신청자는 회원이 아님.
+4. **service_role 로 서버 INSERT** — 익명 제출이지만 안정성을 위해 API 라우트에서 service_role 키를 사용 (`/api/chat/inquiry` 와 동일). 클라이언트가 RLS 정책을 우회할 수 있는 경로는 없음.
+5. **권한 모델은 015/019 헬퍼 재사용** — `is_staff()`, `is_admin_or_master()` 그대로 호출. 신규 함수 0개.
+6. **외부 라이브러리 회피** — 폼은 React 표준 input + zod. 기존 메모리 선호도(외부 lib 회피) 준수.
+7. **타입 엄격** — `any` / `unknown` 금지 (DB row 만 명시 인터페이스 → DTO 변환). enum 은 `as const` 배열 + `Record<EnumKey, Label>` 라벨.
+8. **시키지 않은 것은 손대지 않음** — `/new-family` 라우트의 진입점(네비게이션·풋터·홈) 노출은 **의도적으로 하지 않음**. 사용자가 위치를 정해줄 때 별도 작업.
 
 ---
 
 ## 현재 코드베이스 분석
 
-### Google Calendar 의존 매트릭스
+### 답습할 기존 패턴
 
-| 파일 | 용도 | v1 처리 |
-|------|------|---------|
-| `src/lib/google-calendar.ts` | API 호출 + JWT (267줄) | **deprecated** — `events.ts` 가 대체. 마이그레이션 1회용 import 후 삭제. |
-| `src/types/calendar.ts` | `CalendarEvent`, `CalendarEventInput` | **갱신** — `htmlLink` 제거, `end: string \| null` 허용 |
-| `src/app/api/calendar/route.ts` | GET 목록 / POST 생성 | **갱신** — `events.ts` 호출 |
-| `src/app/api/calendar/[id]/route.ts` | DELETE | **갱신** — `events.ts` 호출. **PATCH 신규** 추가 |
-| `src/app/(public)/calendar/page.tsx` | 공개 페이지 (월 그리드 + 카드 목록) | **갱신** — htmlLink 의존 제거, 호버 popover 추가 (클라이언트 컴포넌트 분리) |
-| `src/app/admin/calendar/page.tsx` | 관리자 입력/삭제 | **갱신** — endTime 옵셔널, endDate 제거, "종일" 토글 정리, 수정 기능 추가 |
-| `src/components/home/UpcomingEvents.tsx` | 홈 위젯 | **갱신** — htmlLink → `/calendar` 또는 단건 페이지 |
-| `src/app/page.tsx` | 홈에서 `getUpcomingEvents()` 호출 | 시그니처 동일 → 무수정 |
-| 환경변수 `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`, `GOOGLE_SA_CLIENT_EMAIL`, `GOOGLE_SA_PRIVATE_KEY` | | 데이터 마이그레이션 후 **제거 가능** |
+| 패턴 | 참조 파일 | 본 작업에서의 적용 |
+|------|----------|-------------------|
+| 익명 INSERT + admin SELECT 테이블 | `supabase/migrations/006_chat_inquiries.sql` | 마이그레이션 024 RLS |
+| service_role 기반 익명 제출 라우트 | `src/app/api/chat/inquiry/route.ts` | `src/app/api/new-family/route.ts` |
+| API 라우트 권한 검증 | `src/lib/admin-auth.ts:requireAdmin` | `/api/admin/new-families/*` |
+| 듀얼 인증 (cookie + Bearer) | `src/lib/supabase/api.ts:createApiClient` | admin API — 모바일 자동 호환 |
+| 영속 데이터 admin 페이지 | `src/app/admin/event-subscribers/page.tsx` | `src/app/admin/new-families/page.tsx` (필터 pill + 펼침 행) |
+| useEffect set-state-in-effect 회피 | `event-subscribers/page.tsx` 의 inline fetch + cancelled flag | `admin/new-families/page.tsx` |
+| zod 검증 집약 | `src/lib/validation.ts` | `NewFamilyRegistrationSchema`, `NewFamilyUpdateSchema` 추가 |
+| AdminNav 아이콘 키 시스템 | `src/app/admin/AdminNav.tsx` | `newFamily` 키 + `UserPlus` 매핑 |
+| 공개 페이지 셸 | `src/app/(public)/notice/page.tsx`, `Container`, `PageHeader` | `(public)/new-family/page.tsx` |
+| 개인정보 본문 정합화 | `src/components/layout/Footer.tsx` 의 `msvch01@naver.com`, `02-534-0691` | `privacy-policy.ts` |
 
-### 기존 패턴 (재사용)
+### 기존 RLS 헬퍼 (재사용)
 
-- 마이그레이션 020 의 `record_content_author()` SECURITY DEFINER 트리거 → `'event'` content_type 추가
-- 마이그레이션 021 의 `is_admin_or_master() OR is_content_author(type, id)` DELETE 정책 패턴
-- `src/lib/notices.ts`, `src/lib/gallery.ts` 의 server-side data fn 패턴 (`createClient` from `@/lib/supabase/server`)
-- `src/app/admin/notices/page.tsx` 의 작성자 표시 (`fetchAuthorRecordMap`) + `canDelete` 가드
-- Zod 스키마는 `src/lib/validation.ts` 한 파일에 집약
+| 함수 | 정의 위치 | 본 작업 사용처 |
+|------|----------|---------------|
+| `public.is_staff()` | 마이그레이션 015 | SELECT/UPDATE 정책 |
+| `public.is_admin_or_master()` | 마이그레이션 019 | DELETE 정책 |
+
+신규 RLS 헬퍼 도입 없음.
 
 ---
 
 ## 변경 파일 목록
 
-| 파일 | 작업 | 비고 |
-|------|------|------|
-| `supabase/migrations/022_events.sql` | **신규** | events 테이블 + RLS + 작성자 트리거 확장 |
-| `supabase/migrations/023_alimtalk_sent.sql` | **신규** | 알림톡 발송 추적 (카카오 비즈 준비) |
-| `src/types/calendar.ts` | **갱신** | DTO 정리 (`end: string \| null`, `htmlLink` 제거, `recurrence` 추가) |
-| `src/lib/events.ts` | **신규** | 자체 DB 기반 데이터 함수 (`getUpcomingEvents`, `getAllEvents`, `createEvent`, `updateEvent`, `deleteEvent`) |
-| `src/lib/google-calendar.ts` | **삭제** | 마이그레이션 import 후 |
-| `src/lib/alimtalk.ts` | **신규** | 알림톡 추상화 (noop 폴백) |
-| `src/lib/validation.ts` | **갱신** | `CalendarEventSchema` 갱신 (endTime 옵셔널, endDate 제거) |
-| `src/app/api/calendar/route.ts` | **갱신** | events.ts 호출, `requireStaff` 정합 |
-| `src/app/api/calendar/[id]/route.ts` | **갱신** | DELETE + **PATCH 신규** |
-| `src/app/api/admin/cron/alimtalk-events/route.ts` | **신규** | Vercel Cron 엔드포인트 (시크릿 헤더 인증) |
-| `src/app/(public)/calendar/page.tsx` | **갱신 (서버 컴포넌트 슬림화)** | 데이터 로드만, UI 는 클라이언트 컴포넌트로 위임 |
-| `src/app/(public)/calendar/CalendarView.tsx` | **신규** | 클라이언트 — 월 그리드 + 호버 popover |
-| `src/app/admin/calendar/page.tsx` | **갱신** | 폼 단순화 + 수정 기능 + 작성자 가드 |
-| `src/components/home/UpcomingEvents.tsx` | **갱신** | htmlLink 제거, 내부 `/calendar` 링크 |
-| `scripts/migrate-google-calendar.ts` | **신규** | 1회용 — 기존 GCal → events 테이블 |
-| `vercel.json` | **신규** | Vercel Cron 설정 |
-| `API_SPEC.md` / `ARCHIT.md` / `DB_SCHEMA.md` | **갱신** | 자체 캘린더 + 알림톡 반영 |
+### 신규
 
-총: 신규 9, 갱신 9, 삭제 1, 문서 3.
+| 파일 | 역할 |
+|------|------|
+| `supabase/migrations/024_new_family_registrations.sql` | 테이블 + RLS + `updated_at` 트리거 |
+| `src/types/new-family.ts` | DTO + enum + 라벨 매핑 (폼·관리자 공용) |
+| `src/app/api/new-family/route.ts` | `POST` — 공개 익명 제출 (service_role) |
+| `src/app/api/admin/new-families/route.ts` | `GET` 목록 + 공용 `toDto()` |
+| `src/app/api/admin/new-families/[id]/route.ts` | `PATCH` 상태/메모, `DELETE` |
+| `src/app/(public)/new-family/page.tsx` | 페이지 셸 (서버 컴포넌트) |
+| `src/app/(public)/new-family/NewFamilyForm.tsx` | 폼 (클라이언트 컴포넌트) |
+| `src/app/(public)/new-family/privacy-policy.ts` | 개인정보 처리방침 정적 상수 |
+| `src/app/admin/new-families/page.tsx` | 관리자 페이지 |
+
+### 수정
+
+| 파일 | 변경 |
+|------|------|
+| `src/lib/validation.ts` | `NewFamilyRegistrationSchema`, `NewFamilyUpdateSchema` 추가 |
+| `src/app/admin/AdminNav.tsx` | `AdminIconKey` 에 `newFamily` 추가 + `UserPlus` 매핑 |
+| `src/app/admin/layout.tsx` | `baseNav` 에 "새가족 등록" 메뉴 항목 추가 |
+| `src/components/layout/nav-config.ts` | `교회소개` 서브메뉴에 "새가족 등록" 추가 (인사말 다음) |
+| `src/components/layout/Footer.tsx` | `바로가기` 섹션에 "새가족 등록" 추가 |
 
 ---
 
-## Step 1: 마이그레이션 022 (`events`)
+## Step 1 — 마이그레이션 024
 
-### `supabase/migrations/022_events.sql`
+### `supabase/migrations/024_new_family_registrations.sql`
+
+DB 가 진실의 원천. 길이 제약과 enum 값 무결성은 CHECK 로 한 번 더 못박는다.
 
 ```sql
--- 022: 자체 캘린더 — Google Calendar 대체
---
--- 설계:
---   - 단일 날짜 일정 (v1). end_date / rrule 컬럼은 미리 두지만 사용은 v2.
---   - start_time / end_time 모두 nullable.
---     · start_time NULL = 종일 일정
---     · end_time NULL   = 종료시간 미정/오픈엔드 (가장 흔한 입력 패턴)
---   - 작성자 추적은 020 의 record_content_author() 트리거 재사용 ('event' 추가).
---   - 삭제 권한은 021 패턴 — 작성자 본인 OR admin OR master.
-
-CREATE TABLE IF NOT EXISTS public.events (
-  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  title       text NOT NULL CHECK (length(title) BETWEEN 1 AND 200),
-  description text CHECK (length(description) <= 5000),
-  location    text CHECK (length(location) <= 200),
-  date        date NOT NULL,
-  start_time  time,
-  end_time    time,
-  end_date    date,                   -- v2 다일 일정용 (v1 미사용, NULL)
-  rrule       text,                   -- v2 반복 일정용 (v1 미사용, NULL)
-  created_by  uuid REFERENCES auth.users(id) ON DELETE SET NULL,
-  created_at  timestamptz DEFAULT now(),
-  updated_at  timestamptz DEFAULT now(),
-  CONSTRAINT events_end_date_after_start CHECK (
-    end_date IS NULL OR end_date >= date
-  ),
-  CONSTRAINT events_end_time_after_start CHECK (
-    end_time IS NULL OR start_time IS NULL OR end_time > start_time
-  )
+CREATE TABLE IF NOT EXISTS public.new_family_registrations (
+  id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  -- 1. 방문 경로 (복수 선택)
+  visit_paths             text[] NOT NULL DEFAULT '{}',
+  visit_paths_etc         text,
+  -- 2. 예수님 영접 여부
+  faith_status            text NOT NULL CHECK (faith_status IN ('accepted','not_yet','unsure')),
+  -- 3-7. 인적사항
+  name                    text NOT NULL CHECK (length(name) BETWEEN 1 AND 50),
+  gender                  text NOT NULL CHECK (gender IN ('male','female')),
+  birth                   text NOT NULL CHECK (length(birth) BETWEEN 1 AND 40),
+  phone                   text NOT NULL CHECK (length(phone) BETWEEN 9 AND 20),
+  region                  text CHECK (region IS NULL OR length(region) <= 100),
+  -- 8. 신앙생활 여부
+  church_history          text NOT NULL CHECK (church_history IN (
+    'never','attended_no_baptism','baptized_inactive','baptized_active','etc'
+  )),
+  church_history_etc      text,
+  -- 9. 자유 메시지
+  message                 text CHECK (message IS NULL OR length(message) <= 2000),
+  -- 개인정보 동의
+  privacy_consent         boolean NOT NULL CHECK (privacy_consent = true),
+  privacy_consented_at    timestamptz NOT NULL DEFAULT now(),
+  -- 처리 상태
+  status                  text NOT NULL DEFAULT 'new' CHECK (status IN ('new','contacted','assigned','done')),
+  admin_note              text CHECK (admin_note IS NULL OR length(admin_note) <= 2000),
+  created_at              timestamptz NOT NULL DEFAULT now(),
+  updated_at              timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX IF NOT EXISTS idx_events_date ON public.events (date);
+CREATE INDEX IF NOT EXISTS idx_new_family_registrations_status
+  ON public.new_family_registrations (status);
+CREATE INDEX IF NOT EXISTS idx_new_family_registrations_created_at
+  ON public.new_family_registrations (created_at DESC);
 
-ALTER TABLE public.events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.new_family_registrations ENABLE ROW LEVEL SECURITY;
 
--- SELECT: 누구나 (캘린더는 공개)
-CREATE POLICY "Anyone can read events" ON public.events
-  FOR SELECT USING (true);
+-- 누구나 INSERT (공개 폼)
+CREATE POLICY "Anyone can submit new family" ON public.new_family_registrations
+  FOR INSERT WITH CHECK (true);
 
--- INSERT/UPDATE: staff
-CREATE POLICY "Staff can insert events" ON public.events
-  FOR INSERT WITH CHECK (public.is_staff());
-CREATE POLICY "Staff can update events" ON public.events
-  FOR UPDATE USING (public.is_staff());
+-- staff 만 SELECT
+CREATE POLICY "Staff can read new family" ON public.new_family_registrations
+  FOR SELECT USING (public.is_staff());
 
--- DELETE: 작성자 OR admin/master (021 패턴)
-CREATE POLICY "Author/admin/master can delete events" ON public.events
-  FOR DELETE USING (
-    public.is_admin_or_master()
-    OR public.is_content_author('event', id)
-  );
+-- staff 만 UPDATE
+CREATE POLICY "Staff can update new family" ON public.new_family_registrations
+  FOR UPDATE USING (public.is_staff()) WITH CHECK (public.is_staff());
 
--- updated_at 자동 갱신
-CREATE OR REPLACE FUNCTION public.events_set_updated_at()
+-- admin/master 만 DELETE
+CREATE POLICY "Admin can delete new family" ON public.new_family_registrations
+  FOR DELETE USING (public.is_admin_or_master());
+
+-- updated_at 자동 갱신 트리거
+CREATE OR REPLACE FUNCTION public.new_family_registrations_set_updated_at()
 RETURNS trigger AS $$
 BEGIN
   NEW.updated_at := now();
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-CREATE TRIGGER events_updated_at
-  BEFORE UPDATE ON public.events
-  FOR EACH ROW EXECUTE FUNCTION public.events_set_updated_at();
 
--- 작성자 추적 (020 재사용)
--- content_authors CHECK 제약에 'event' 가 누락되어 있으므로 확장
-ALTER TABLE public.content_authors DROP CONSTRAINT IF EXISTS content_authors_content_type_check;
-ALTER TABLE public.content_authors ADD CONSTRAINT content_authors_content_type_check
-  CHECK (content_type IN ('notice', 'weekly', 'gallery_album', 'event'));
-
-DROP TRIGGER IF EXISTS record_event_author ON public.events;
-CREATE TRIGGER record_event_author
-  AFTER INSERT ON public.events
-  FOR EACH ROW EXECUTE FUNCTION public.record_content_author('event');
+CREATE TRIGGER new_family_registrations_updated_at
+  BEFORE UPDATE ON public.new_family_registrations
+  FOR EACH ROW EXECUTE FUNCTION public.new_family_registrations_set_updated_at();
 ```
+
+**왜 이 컬럼 구성인가:**
+- `visit_paths`(text[]) + `visit_paths_etc`(text) — 복수 선택 + 기타. 정규화 테이블 분리는 과설계.
+- `birth`(text) — "010101" 또는 "음력 010101" 자유 텍스트 허용. date 타입은 음력/연도 추정 정보를 잃음.
+- `phone`(text) — 9~20자. `event_subscribers`(023) 와 동일한 정책. 사용자 친숙도 우선해 `010-XXXX-XXXX` 표시 형태로 저장.
+- `privacy_consent` CHECK 필수 true — false 가 들어오면 DB 단에서 거부.
+- `privacy_consented_at` 별도 — 향후 보존기간 산정·증빙용.
+- `status` enum — 새가족부 워크플로우 4단계.
 
 ---
 
-## Step 2: 타입 + DTO 정리
+## Step 2 — 타입 + 라벨 매핑
 
-### `src/types/calendar.ts`
+### `src/types/new-family.ts`
+
+DB row 와 무관하게 **클라이언트가 의존할 안정 인터페이스**. 모바일 앱이 그대로 임포트해도 무방하도록 enum 라벨까지 포함.
 
 ```ts
-/**
- * 캘린더 이벤트 — 플랫폼 공용 DTO.
- * 웹/모바일 동일 스펙. 이 형태가 안정이면 데이터 소스(자체 DB / 외부)와 무관하게 클라이언트 무수정.
- */
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  description: string | null;
-  location: string | null;
-  /** ISO 8601 datetime (시간 지정) 또는 YYYY-MM-DD (종일) */
-  start: string;
-  /**
-   * ISO 8601 datetime 또는 YYYY-MM-DD 또는 null.
-   * - null = 종료 시간 미정/오픈엔드 ("저녁 6시부터" 같은 케이스)
-   * - 종일 + end null = 단일 종일 일정
-   */
-  end: string | null;
-  isAllDay: boolean;
-  /** RFC 5545 RRULE — v2 예정, v1 은 항상 null */
-  recurrence: string | null;
+export type NewFamilyVisitPath =
+  | "website" | "youtube" | "recommendation" | "visited_first" | "etc";
+
+export type NewFamilyFaithStatus = "accepted" | "not_yet" | "unsure";
+export type NewFamilyGender = "male" | "female";
+export type NewFamilyChurchHistory =
+  | "never" | "attended_no_baptism" | "baptized_inactive" | "baptized_active" | "etc";
+export type NewFamilyStatus = "new" | "contacted" | "assigned" | "done";
+
+/** 공개 폼 → 서버 전송 페이로드 */
+export interface NewFamilyRegistrationInput {
+  visitPaths: NewFamilyVisitPath[];
+  visitPathsEtc?: string;
+  faithStatus: NewFamilyFaithStatus;
+  name: string;
+  gender: NewFamilyGender;
+  birth: string;
+  phone: string;
+  region?: string;
+  churchHistory: NewFamilyChurchHistory;
+  churchHistoryEtc?: string;
+  message?: string;
+  privacyConsent: true;
 }
 
-/** 이벤트 생성/수정 요청 — 단일 날짜 v1 */
-export interface CalendarEventInput {
-  title: string;
-  description?: string;
-  location?: string;
-  /** YYYY-MM-DD (필수) */
-  date: string;
-  /** HH:mm — 미지정 = 종일 */
-  startTime?: string;
-  /** HH:mm — 미지정 = 미정/오픈엔드 */
-  endTime?: string;
+/** admin UI / DB row → DTO (camelCase) */
+export interface NewFamilyRegistration {
+  id: string;
+  visitPaths: NewFamilyVisitPath[];
+  visitPathsEtc: string | null;
+  faithStatus: NewFamilyFaithStatus;
+  name: string;
+  gender: NewFamilyGender;
+  birth: string;
+  phone: string;
+  region: string | null;
+  churchHistory: NewFamilyChurchHistory;
+  churchHistoryEtc: string | null;
+  message: string | null;
+  privacyConsent: boolean;
+  privacyConsentedAt: string;
+  status: NewFamilyStatus;
+  adminNote: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
+
+/** 한국어 라벨 — 폼·관리자 공유 */
+export const VISIT_PATH_LABELS: Record<NewFamilyVisitPath, string> = {
+  website: "웹사이트 검색을 통해서",
+  youtube: "유튜브 검색을 통해서",
+  recommendation: "지인의 추천에 의해서",
+  visited_first: "직접 방문해 본 후에 새가족으로 등록하고 싶어서",
+  etc: "기타",
+};
+
+// FAITH_STATUS_LABELS / GENDER_LABELS / CHURCH_HISTORY_LABELS / STATUS_LABELS 동일 패턴
 ```
+
+**모바일 호환 포인트:**
+- 모바일은 `NewFamilyRegistrationInput` 그대로 직렬화해서 `POST /api/new-family` 보내면 됨.
+- `NewFamilyRegistration` 은 `GET /api/admin/new-families` 응답 그대로.
+- 침례→세례 라벨 변경은 라벨 객체 한 줄만 고치면 됨.
 
 ---
 
-## Step 3: 데이터 lib
+## Step 3 — Validation
 
-### `src/lib/events.ts` (신규)
+### `src/lib/validation.ts` 에 추가
+
+기존 파일 하단(`EventSubscriberSchema` 위)에 삽입.
 
 ```ts
-import { createClient } from "@/lib/supabase/server";
-import type { CalendarEvent, CalendarEventInput } from "@/types/calendar";
+/** 새가족 등록 폼 (공개 페이지 → POST /api/new-family) */
+export const NewFamilyRegistrationSchema = z.object({
+  visitPaths: z
+    .array(z.enum(["website","youtube","recommendation","visited_first","etc"]))
+    .max(5),
+  visitPathsEtc: z.string().max(200).optional(),
+  faithStatus: z.enum(["accepted","not_yet","unsure"]),
+  name: z.string().min(1, "이름을 입력하세요").max(50),
+  gender: z.enum(["male","female"]),
+  birth: z.string().min(1, "생년월일을 입력하세요").max(40),
+  phone: z.string().min(1, "연락처를 입력하세요").max(20),
+  region: z.string().max(100).optional(),
+  churchHistory: z.enum(["never","attended_no_baptism","baptized_inactive","baptized_active","etc"]),
+  churchHistoryEtc: z.string().max(200).optional(),
+  message: z.string().max(2000).optional(),
+  privacyConsent: z.literal(true, {
+    message: "개인정보 수집 및 이용에 동의해야 합니다.",
+  }),
+});
 
-/** DB row → 플랫폼 공용 DTO 변환 */
-interface EventRow {
-  id: string;
-  title: string;
-  description: string | null;
-  location: string | null;
-  date: string;             // YYYY-MM-DD
-  start_time: string | null; // HH:mm:ss
-  end_time: string | null;
-  rrule: string | null;
-}
+/** PATCH /api/admin/new-families/[id] */
+export const NewFamilyUpdateSchema = z.object({
+  status: z.enum(["new","contacted","assigned","done"]).optional(),
+  adminNote: z.string().max(2000).optional(),
+});
+```
 
-function toCalendarEvent(row: EventRow): CalendarEvent {
-  const isAllDay = row.start_time === null;
-  if (isAllDay) {
-    return {
-      id: row.id,
-      title: row.title,
-      description: row.description,
-      location: row.location,
-      start: row.date,
-      end: null,
-      isAllDay: true,
-      recurrence: row.rrule,
-    };
+`z.literal(true)` 로 `privacyConsent: false` 자동 거부. `etc` 선택 시 기타 입력 강제는 라우트 핸들러에서 추가 검증 (zod refine 으로도 가능하지만 핸들러 단에서 명시적인 게 가독성↑).
+
+---
+
+## Step 4 — 공개 제출 API
+
+### `src/app/api/new-family/route.ts`
+
+`/api/chat/inquiry` 와 동일한 골격: zod → service_role → INSERT.
+
+```ts
+import { NextRequest, NextResponse } from "next/server";
+import { createClient } from "@supabase/supabase-js";
+import { NewFamilyRegistrationSchema } from "@/lib/validation";
+
+export const dynamic = "force-dynamic";
+
+export async function POST(request: NextRequest) {
+  let body: unknown;
+  try { body = await request.json(); } catch {
+    return NextResponse.json({ error: "잘못된 요청입니다." }, { status: 400 });
   }
-  // ISO 8601 KST 변환 — DB는 time(HH:mm:ss), 클라이언트가 KST 기준 해석하도록
-  const startIso = `${row.date}T${row.start_time}+09:00`;
-  const endIso = row.end_time
-    ? `${row.date}T${row.end_time}+09:00`
-    : null;
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    location: row.location,
-    start: startIso,
-    end: endIso,
-    isAllDay: false,
-    recurrence: row.rrule,
-  };
-}
 
-/** KST 기준 오늘 (YYYY-MM-DD) */
-function todayKST(): string {
-  return new Date(
-    new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
-  )
-    .toISOString()
-    .split("T")[0];
-}
+  const parsed = NewFamilyRegistrationSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message ?? "입력값이 올바르지 않습니다." },
+      { status: 400 },
+    );
+  }
+  const data = parsed.data;
 
-function addDaysKST(baseDate: string, days: number): string {
-  const d = new Date(baseDate + "T00:00:00+09:00");
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split("T")[0];
-}
+  // etc 선택 시 직접 입력 강제
+  if (data.visitPaths.includes("etc") && !data.visitPathsEtc?.trim()) {
+    return NextResponse.json(
+      { error: "방문 경로 '기타'는 직접 입력 내용이 필요합니다." },
+      { status: 400 },
+    );
+  }
+  if (data.churchHistory === "etc" && !data.churchHistoryEtc?.trim()) {
+    return NextResponse.json(
+      { error: "신앙생활 '기타'는 직접 입력 내용이 필요합니다." },
+      { status: 400 },
+    );
+  }
 
-/** 다가오는 이벤트 (오늘 ~ +daysAhead) */
-export async function getUpcomingEvents(
-  maxResults = 20,
-  daysAhead = 60,
-): Promise<CalendarEvent[]> {
-  const supabase = await createClient();
-  const today = todayKST();
-  const end = addDaysKST(today, daysAhead);
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  );
 
-  const { data } = await supabase
-    .from("events")
-    .select("id, title, description, location, date, start_time, end_time, rrule")
-    .gte("date", today)
-    .lte("date", end)
-    .order("date", { ascending: true })
-    .order("start_time", { ascending: true, nullsFirst: true })
-    .limit(maxResults);
+  const { error } = await supabase.from("new_family_registrations").insert({
+    visit_paths: data.visitPaths,
+    visit_paths_etc: data.visitPaths.includes("etc")
+      ? data.visitPathsEtc?.trim() ?? null : null,
+    faith_status: data.faithStatus,
+    name: data.name.trim(),
+    gender: data.gender,
+    birth: data.birth.trim(),
+    phone: data.phone.trim(),
+    region: data.region?.trim() || null,
+    church_history: data.churchHistory,
+    church_history_etc: data.churchHistory === "etc"
+      ? data.churchHistoryEtc?.trim() ?? null : null,
+    message: data.message?.trim() || null,
+    privacy_consent: true, // 서버에서 강제 (zod literal 통과한 경우만 도달)
+  });
 
-  return ((data ?? []) as EventRow[]).map(toCalendarEvent);
-}
-
-/** 관리자용 — 과거 30일 + 미래 90일 */
-export async function getAllEvents(maxResults = 50): Promise<CalendarEvent[]> {
-  const supabase = await createClient();
-  const today = todayKST();
-  const past = addDaysKST(today, -30);
-  const future = addDaysKST(today, 90);
-
-  const { data } = await supabase
-    .from("events")
-    .select("id, title, description, location, date, start_time, end_time, rrule")
-    .gte("date", past)
-    .lte("date", future)
-    .order("date", { ascending: true })
-    .order("start_time", { ascending: true, nullsFirst: true })
-    .limit(maxResults);
-
-  return ((data ?? []) as EventRow[]).map(toCalendarEvent);
-}
-
-/** 단건 조회 */
-export async function getEventById(id: string): Promise<CalendarEvent | null> {
-  const supabase = await createClient();
-  const { data } = await supabase
-    .from("events")
-    .select("id, title, description, location, date, start_time, end_time, rrule")
-    .eq("id", id)
-    .maybeSingle<EventRow>();
-  return data ? toCalendarEvent(data) : null;
+  if (error) {
+    console.error("new-family insert error", error);
+    return NextResponse.json(
+      { error: "저장에 실패했습니다. 잠시 후 다시 시도해 주세요." },
+      { status: 500 },
+    );
+  }
+  return NextResponse.json({ ok: true });
 }
 ```
 
-> 생성/수정/삭제는 API 라우트에서 직접 `supabase.from("events").insert/.update/.delete()` 호출. RLS 가 권한 가드.
+**모바일 호환 포인트:**
+- 인증 헤더 불필요(익명 INSERT).
+- 응답 `{ ok: true }` / `{ error: string }` 단순 형태 — 모바일에서도 동일하게 처리.
 
 ---
 
-## Step 4: API 라우트
+## Step 5 — 관리자 API
 
-### `src/app/api/calendar/route.ts`
+### `src/app/api/admin/new-families/route.ts`
+
+`requireAdmin(request)` 으로 cookie/Bearer 양쪽 인증. RLS 가 한 번 더 검증.
 
 ```ts
 import { NextResponse, type NextRequest } from "next/server";
-import { getUpcomingEvents } from "@/lib/events";
 import { createApiClient } from "@/lib/supabase/api";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
-import { parseLimit, CalendarEventSchema } from "@/lib/validation";
+import type {
+  NewFamilyRegistration, NewFamilyVisitPath, NewFamilyFaithStatus,
+  NewFamilyGender, NewFamilyChurchHistory, NewFamilyStatus,
+} from "@/types/new-family";
 
-export const dynamic = "force-dynamic"; // 자체 DB → ISR 불필요
+export const dynamic = "force-dynamic";
 
-export async function GET(req: NextRequest) {
-  const { searchParams } = req.nextUrl;
-  const limit = parseLimit(searchParams.get("limit"), 20);
-  const rawDays = parseInt(searchParams.get("days") ?? "60", 10);
-  const daysAhead = Math.min(
-    isNaN(rawDays) || rawDays < 1 ? 60 : rawDays,
-    365,
-  );
-  const events = await getUpcomingEvents(limit, daysAhead);
-  return NextResponse.json(events);
+interface NewFamilyRow {
+  id: string;
+  visit_paths: NewFamilyVisitPath[];
+  visit_paths_etc: string | null;
+  faith_status: NewFamilyFaithStatus;
+  name: string;
+  gender: NewFamilyGender;
+  birth: string;
+  phone: string;
+  region: string | null;
+  church_history: NewFamilyChurchHistory;
+  church_history_etc: string | null;
+  message: string | null;
+  privacy_consent: boolean;
+  privacy_consented_at: string;
+  status: NewFamilyStatus;
+  admin_note: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
-export async function POST(request: NextRequest) {
-  try {
-    const { userId } = await requireAdmin(request);
-    const parsed = CalendarEventSchema.safeParse(await request.json());
-    if (!parsed.success) {
-      return NextResponse.json(
-        { error: parsed.error.issues[0].message },
-        { status: 400 },
-      );
-    }
+// snake_case → camelCase 1회 변환
+export function toDto(row: NewFamilyRow): NewFamilyRegistration {
+  return {
+    id: row.id,
+    visitPaths: row.visit_paths ?? [],
+    visitPathsEtc: row.visit_paths_etc,
+    faithStatus: row.faith_status,
+    name: row.name,
+    gender: row.gender,
+    birth: row.birth,
+    phone: row.phone,
+    region: row.region,
+    churchHistory: row.church_history,
+    churchHistoryEtc: row.church_history_etc,
+    message: row.message,
+    privacyConsent: row.privacy_consent,
+    privacyConsentedAt: row.privacy_consented_at,
+    status: row.status,
+    adminNote: row.admin_note,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
 
+const SELECT_COLS = "id, visit_paths, visit_paths_etc, faith_status, name, gender, birth, phone, region, church_history, church_history_etc, message, privacy_consent, privacy_consented_at, status, admin_note, created_at, updated_at";
+
+export async function GET(request: NextRequest) {
+  try {
+    await requireAdmin(request);
     const supabase = await createApiClient(request);
     const { data, error } = await supabase
-      .from("events")
-      .insert({
-        title: parsed.data.title,
-        description: parsed.data.description ?? null,
-        location: parsed.data.location ?? null,
-        date: parsed.data.date,
-        start_time: parsed.data.startTime ?? null,
-        end_time: parsed.data.endTime ?? null,
-        created_by: userId,
-      })
-      .select("id, title, description, location, date, start_time, end_time, rrule")
-      .single();
-
-    if (error || !data) {
-      console.error("Event create error:", error);
-      return NextResponse.json(
-        { error: "일정 생성에 실패했습니다." },
-        { status: 500 },
-      );
+      .from("new_family_registrations")
+      .select(SELECT_COLS)
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("new-families list error", error);
+      return NextResponse.json({ error: "조회 실패" }, { status: 500 });
     }
-    return NextResponse.json(data, { status: 201 });
+    return NextResponse.json(((data ?? []) as NewFamilyRow[]).map(toDto));
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    console.error("Event create error:", err);
-    return NextResponse.json(
-      { error: "일정 생성에 실패했습니다." },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "조회 실패" }, { status: 500 });
   }
 }
 ```
 
-### `src/app/api/calendar/[id]/route.ts` (PATCH 신규 + DELETE 갱신)
+### `src/app/api/admin/new-families/[id]/route.ts`
+
+PATCH 는 부분 업데이트, DELETE 는 RLS 가 admin/master 차단.
 
 ```ts
 import { NextResponse, type NextRequest } from "next/server";
 import { createApiClient } from "@/lib/supabase/api";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
-import { CalendarEventSchema } from "@/lib/validation";
+import { NewFamilyUpdateSchema } from "@/lib/validation";
+import { toDto } from "../route";
 
+export const dynamic = "force-dynamic";
+
+const SELECT_COLS = /* 위와 동일 */;
 type Params = Promise<{ id: string }>;
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Params },
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Params }) {
   try {
-    const { id } = await params;
     await requireAdmin(request);
-    const parsed = CalendarEventSchema.partial().safeParse(await request.json());
+    const { id } = await params;
+    const parsed = NewFamilyUpdateSchema.safeParse(await request.json());
     if (!parsed.success) {
       return NextResponse.json(
-        { error: parsed.error.issues[0].message },
+        { error: parsed.error.issues[0]?.message ?? "잘못된 요청" },
         { status: 400 },
       );
     }
+    const update: Record<string, unknown> = {};
+    if (parsed.data.status !== undefined) update.status = parsed.data.status;
+    if (parsed.data.adminNote !== undefined) {
+      update.admin_note = parsed.data.adminNote.trim() || null;
+    }
+    if (Object.keys(update).length === 0) {
+      return NextResponse.json({ error: "수정할 내용이 없습니다." }, { status: 400 });
+    }
 
     const supabase = await createApiClient(request);
-    const patch: Record<string, string | null> = {};
-    if (parsed.data.title !== undefined) patch.title = parsed.data.title;
-    if (parsed.data.description !== undefined) patch.description = parsed.data.description ?? null;
-    if (parsed.data.location !== undefined) patch.location = parsed.data.location ?? null;
-    if (parsed.data.date !== undefined) patch.date = parsed.data.date;
-    if (parsed.data.startTime !== undefined) patch.start_time = parsed.data.startTime ?? null;
-    if (parsed.data.endTime !== undefined) patch.end_time = parsed.data.endTime ?? null;
-
-    const { error } = await supabase.from("events").update(patch).eq("id", id);
-    if (error) {
-      console.error("Event update error:", error);
+    const { data, error } = await supabase
+      .from("new_family_registrations")
+      .update(update).eq("id", id)
+      .select(SELECT_COLS).single();
+    if (error || !data) {
       return NextResponse.json({ error: "수정 실패" }, { status: 500 });
     }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json(toDto(data as Parameters<typeof toDto>[0]));
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -471,19 +517,14 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Params },
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Params }) {
   try {
-    const { id } = await params;
     await requireAdmin(request);
-
+    const { id } = await params;
     const supabase = await createApiClient(request);
-    // RLS 가 작성자/admin/master 만 통과시킴 — 비-작성자는 0 row 반환
-    const { error } = await supabase.from("events").delete().eq("id", id);
+    const { error } = await supabase
+      .from("new_family_registrations").delete().eq("id", id);
     if (error) {
-      console.error("Event delete error:", error);
       return NextResponse.json({ error: "삭제 실패" }, { status: 500 });
     }
     return NextResponse.json({ ok: true });
@@ -496,472 +537,420 @@ export async function DELETE(
 }
 ```
 
-### Zod 스키마 (`src/lib/validation.ts`)
-
-```ts
-export const CalendarEventSchema = z.object({
-  title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
-  description: z.string().max(5000).optional(),
-  location: z.string().max(200).optional(),
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식: YYYY-MM-DD"),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm").optional(),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm").optional(),
-}).refine(
-  (d) => !d.endTime || d.startTime, // endTime 만 있고 startTime 없으면 거부
-  { message: "종료시간만 단독 입력은 불가합니다 (시작시간 필요).", path: ["endTime"] },
-);
-```
+**모바일 호환 포인트:**
+- `createApiClient(request)` 가 `Authorization: Bearer <jwt>` 자동 인식 → 모바일 앱은 Supabase JS 의 `session.access_token` 만 헤더에 실으면 동일 라우트 사용.
+- 응답 DTO 가 camelCase 로 통일돼 RN UI 가 그대로 렌더링.
 
 ---
 
-## Step 5: 입력 폼 단순화 (admin)
+## Step 6 — 공개 페이지
 
-`src/app/admin/calendar/page.tsx` 폼 영역만 발췌 (전체 갱신):
+### `src/app/(public)/new-family/page.tsx`
+
+서버 컴포넌트는 메타데이터 + 셸만. 폼은 클라이언트로 분리.
 
 ```tsx
-const [date, setDate] = useState("");
-const [startTime, setStartTime] = useState("");
-const [endTime, setEndTime] = useState("");
-const [isAllDay, setIsAllDay] = useState<boolean>(false);
-// ... 기존 title, description, location ...
+import type { Metadata } from "next";
+import { Container } from "@/components/ui/Container";
+import { PageHeader } from "@/components/ui/PageHeader";
+import { NewFamilyForm } from "./NewFamilyForm";
 
-async function handleSubmit(e: React.FormEvent) {
-  e.preventDefault();
-  if (!title.trim() || !date) {
-    alert("제목과 날짜는 필수입니다.");
-    return;
-  }
-  if (!isAllDay && !startTime) {
-    alert("시작 시간을 입력하거나 '종일'을 체크하세요.");
-    return;
-  }
-  setSubmitting(true);
-  const body = {
-    title: title.trim(),
-    description: description.trim() || undefined,
-    location: location.trim() || undefined,
-    date,
-    startTime: isAllDay ? undefined : startTime,
-    endTime: isAllDay || !endTime ? undefined : endTime,
-  };
-  const res = await fetch("/api/calendar", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  // ...
+export const metadata: Metadata = {
+  title: "새가족 등록",
+  description: "명성비전교회 새가족 등록 페이지입니다. 환영합니다.",
+};
+
+export default function NewFamilyPage() {
+  return (
+    <>
+      <PageHeader
+        title="새가족 등록"
+        description="명성비전교회를 찾아주신 여러분을 환영합니다."
+      />
+      <Container className="py-10">
+        <div className="mx-auto max-w-2xl">
+          <NewFamilyForm />
+        </div>
+      </Container>
+    </>
+  );
 }
 ```
 
-폼 UI:
+빌드 결과: `○ /new-family (Static)` — 정적 생성됨.
 
-```tsx
-<div className="grid gap-4 sm:grid-cols-2">
-  <div className="sm:col-span-2">
-    <label>제목 *</label>
-    <input value={title} onChange={(e) => setTitle(e.target.value)} required />
-  </div>
+### `src/app/(public)/new-family/NewFamilyForm.tsx`
 
-  <div>
-    <label>날짜 *</label>
-    <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
-  </div>
-
-  <div className="flex items-end">
-    <label className="flex items-center gap-2 text-sm">
-      <input type="checkbox" checked={isAllDay} onChange={(e) => setIsAllDay(e.target.checked)} />
-      종일
-    </label>
-  </div>
-
-  {!isAllDay && (
-    <>
-      <div>
-        <label>시작 시간 *</label>
-        <input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} required />
-      </div>
-      <div>
-        <label>종료 시간 (선택)</label>
-        <input type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} placeholder="미입력 가능" />
-      </div>
-    </>
-  )}
-
-  {/* location, description ... */}
-</div>
-```
-
-추가: 행 클릭으로 수정 모드 진입 + `canDelete(me, authorMap[id]?.id)` 가드 + `fetchAuthorRecordMap('event', ids)` 작성자 표시.
-
----
-
-## Step 6: 공개 캘린더 hover popover
-
-### 분리 전략
-- `src/app/(public)/calendar/page.tsx` (Server Component): events 로드만 → `<CalendarView events={...} />` 위임
-- `src/app/(public)/calendar/CalendarView.tsx` (Client Component): 월 그리드 + 호버 popover + 카드 목록
-
-### `CalendarView.tsx` 핵심 (호버 부분만 발췌)
+폼 핵심부.
 
 ```tsx
 "use client";
 import { useState } from "react";
-import type { CalendarEvent } from "@/types/calendar";
+import { Loader2, CheckCircle2 } from "lucide-react";
+import {
+  type NewFamilyVisitPath, type NewFamilyFaithStatus,
+  type NewFamilyGender, type NewFamilyChurchHistory,
+  VISIT_PATH_LABELS, FAITH_STATUS_LABELS, CHURCH_HISTORY_LABELS,
+} from "@/types/new-family";
+import { PRIVACY_POLICY_TEXT } from "./privacy-policy";
 
-function MonthGrid({
-  year,
-  month,
-  eventsByDate,
-}: {
-  year: number;
-  month: number;
-  eventsByDate: Map<string, CalendarEvent[]>;
-}) {
-  const days = buildMonthGrid(year, month);
-  const [hoveredDate, setHoveredDate] = useState<string | null>(null);
+type SubmitState = "idle" | "submitting" | "done";
 
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
-      {/* ... 월 타이틀, 요일 헤더 ... */}
-      <div className="grid grid-cols-7">
-        {days.map((day) => {
-          const dayEvents = eventsByDate.get(day.dateStr) ?? [];
-          const hasEvents = dayEvents.length > 0;
-          return (
-            <div
-              key={day.dateStr}
-              className="relative flex h-12 items-center justify-center border-b border-r border-gray-50 sm:h-14"
-              onMouseEnter={() => hasEvents && setHoveredDate(day.dateStr)}
-              onMouseLeave={() => setHoveredDate(null)}
-              onClick={() => hasEvents && setHoveredDate(d => d === day.dateStr ? null : day.dateStr)}
-            >
-              <span>{day.date}</span>
-              {hasEvents && (
-                <span className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-church-gold" />
-              )}
-              {hoveredDate === day.dateStr && hasEvents && (
-                <DayPopover events={dayEvents} dateStr={day.dateStr} />
-              )}
-            </div>
-          );
-        })}
+export function NewFamilyForm() {
+  const [consent, setConsent] = useState(false);
+  const [visitPaths, setVisitPaths] = useState<NewFamilyVisitPath[]>([]);
+  const [visitPathsEtc, setVisitPathsEtc] = useState("");
+  const [faithStatus, setFaithStatus] = useState<NewFamilyFaithStatus | "">("");
+  const [name, setName] = useState("");
+  const [gender, setGender] = useState<NewFamilyGender | "">("");
+  const [birth, setBirth] = useState("");
+  // 전화번호: 사용자 친숙도를 위해 3분할
+  const [phone1, setPhone1] = useState("010");
+  const [phone2, setPhone2] = useState("");
+  const [phone3, setPhone3] = useState("");
+  const [region, setRegion] = useState("");
+  const [churchHistory, setChurchHistory] = useState<NewFamilyChurchHistory | "">("");
+  const [churchHistoryEtc, setChurchHistoryEtc] = useState("");
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [state, setState] = useState<SubmitState>("idle");
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    if (!consent) { setError("개인정보 수집 및 이용에 동의해 주세요."); return; }
+    if (visitPaths.length === 0) { setError("방문 경로를 한 가지 이상 선택해 주세요."); return; }
+    if (visitPaths.includes("etc") && !visitPathsEtc.trim()) {
+      setError("방문 경로 '기타'에 직접 입력해 주세요."); return;
+    }
+    // ... 나머지 필수 검증 ...
+    const phone = `${phone1}-${phone2}-${phone3}`;
+    if (!/^010-\d{3,4}-\d{4}$/.test(phone)) {
+      setError("연락처를 010-XXXX-XXXX 형식으로 입력해 주세요."); return;
+    }
+
+    setState("submitting");
+    const res = await fetch("/api/new-family", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        visitPaths,
+        visitPathsEtc: visitPaths.includes("etc") ? visitPathsEtc.trim() : undefined,
+        faithStatus, name: name.trim(), gender, birth: birth.trim(), phone,
+        region: region.trim() || undefined,
+        churchHistory,
+        churchHistoryEtc: churchHistory === "etc" ? churchHistoryEtc.trim() : undefined,
+        message: message.trim() || undefined,
+        privacyConsent: true,
+      }),
+    });
+    const data = (await res.json()) as { ok?: boolean; error?: string };
+    if (!res.ok || !data.ok) {
+      setError(data.error ?? "등록에 실패했습니다.");
+      setState("idle"); return;
+    }
+    setState("done");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  if (state === "done") {
+    return (
+      <div className="rounded-2xl border border-green-100 bg-white p-10 text-center shadow-sm">
+        <CheckCircle2 size={56} className="mx-auto mb-4 text-green-500" />
+        <h2 className="text-xl font-semibold text-gray-900">등록이 완료되었습니다.</h2>
+        <p className="mt-3 text-sm leading-relaxed text-gray-600">
+          새가족부에서 곧 입력하신 연락처로 안내드리겠습니다.<br />
+          명성비전교회를 찾아주셔서 감사합니다.
+        </p>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
-function DayPopover({ events, dateStr }: { events: CalendarEvent[]; dateStr: string }) {
   return (
-    <div
-      role="tooltip"
-      className="absolute bottom-full left-1/2 z-20 mb-2 w-64 -translate-x-1/2 rounded-xl border border-gray-200 bg-white p-3 text-left shadow-xl"
-      onMouseEnter={(e) => e.stopPropagation()}
-    >
-      <p className="mb-2 text-xs font-semibold text-gray-500">{formatHeaderDate(dateStr)}</p>
-      <ul className="space-y-1.5">
-        {events.map((ev) => (
-          <li key={ev.id} className="text-sm">
-            <span className="font-medium text-gray-900">{ev.title}</span>
-            {!ev.isAllDay && (
-              <span className="ml-1.5 text-xs text-gray-400">
-                {formatTime(ev.start)}{ev.end ? `~${formatTime(ev.end)}` : ""}
-              </span>
-            )}
-            {ev.location && (
-              <span className="ml-1.5 text-xs text-gray-400">· {ev.location}</span>
-            )}
-          </li>
-        ))}
-      </ul>
-      <span
-        className="absolute -bottom-1 left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-b border-r border-gray-200 bg-white"
-        aria-hidden="true"
-      />
-    </div>
+    <form onSubmit={handleSubmit} noValidate className="space-y-8">
+      <Section title="개인정보 수집 및 이용 동의" required>
+        <div className="h-56 overflow-y-auto whitespace-pre-wrap rounded-lg border border-gray-200 bg-gray-50 p-4 text-xs leading-relaxed text-gray-600">
+          {PRIVACY_POLICY_TEXT}
+        </div>
+        <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-gray-700">
+          <input type="checkbox" checked={consent}
+            onChange={(e) => setConsent(e.target.checked)} />
+          <span><strong>[필수]</strong> 개인정보 수집 및 이용에 동의합니다.</span>
+        </label>
+      </Section>
+
+      {/* 1. 방문 경로 (체크박스 복수) — VISIT_PATH_LABELS 매핑 */}
+      {/* 2. 영접 여부 (라디오) — FAITH_STATUS_LABELS */}
+      {/* 3. 이름 (text) */}
+      {/* 4. 성별 (라디오) */}
+      {/* 5. 생년월일 (text — 음력 포함 자유 형식) */}
+      {/* 6. 연락처 (3분할 input + 정규식 검증) */}
+      {/* 7. 거주 지역 (text, 선택) */}
+      {/* 8. 신앙생활 여부 (라디오) — CHURCH_HISTORY_LABELS, 'etc' 시 직접입력 */}
+      {/* 9. 메시지 (textarea, 선택) */}
+
+      {error && (
+        <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+      <button type="submit" disabled={state === "submitting"}
+        className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-6 py-3 text-base font-medium text-white shadow-sm hover:bg-primary-700 disabled:opacity-50">
+        {state === "submitting" && <Loader2 size={18} className="animate-spin" />}
+        등록 신청
+      </button>
+    </form>
   );
 }
 ```
 
-**모바일 처리**: `onMouseEnter` 는 모바일 미동작. `onClick` 토글로 같은 동작 제공. `pointer: coarse` 미디어 쿼리로 분기 가능하나 v1 은 클릭 토글만으로 충분.
+**전화번호 분할 입력의 안전장치:**
+```tsx
+onChange={(e) => setPhone1(e.target.value.replace(/\D/g, "").slice(0, 3))}
+```
+숫자 외 입력 자동 제거 + 길이 자동 잘림.
 
 ---
 
-## Step 7: `UpcomingEvents` 정리
+## Step 7 — 개인정보 처리방침 본문 분리
+
+### `src/app/(public)/new-family/privacy-policy.ts`
+
+폼·관리자·향후 PDF 출력에서도 재사용 가능하도록 정적 상수.
+
+```ts
+export const PRIVACY_POLICY_TEXT = `본 방침은 「개인정보 보호법」 제30조에 따라 명성비전교회(이하 "교회")가 운영하는 웹사이트 https://msvch.vercel.app (이하 "사이트")에서 처리하는 개인정보의 보호 및 권익 보호와 고충 처리 절차를 규정함을 목적으로 합니다.
+
+제1조 (개인정보의 처리 목적)
+... (생략) — 본문 내 모든 "침례"는 "세례"로 대체
+
+제4조 (개인정보 처리의 위탁)
+- Vercel Inc. : 사이트 호스팅·시스템 운영
+- 카카오톡 : 알림톡·문자 발송
+... 
+
+제10조 (개인정보 보호책임자)
+- 개인정보 보호책임자 : 담임 목사
+- 연락처 : msvch01@naver.com / 02-534-0691
+...
+제12조 (개인정보 처리방침 변경)
+이 방침은 2026년 5월 2일부터 적용됩니다. ...`;
+```
+
+**원문 대비 변경점:**
+- 사이트 URL: `yulinuri.org` → `https://msvch.vercel.app`
+- 위탁업체: ㈜아임웹 → Vercel Inc.
+- 보호책임자 연락처: 푸터의 `msvch01@naver.com` / `02-534-0691` 로 통일
+- "침례" → "세례" 전수 치환 (요청)
+- 시행일: 2026-05-02 (오늘)
+- 수집 항목 6조 — 실제 수집 항목과 일치하도록 정리
+
+---
+
+## Step 8 — 관리자 페이지 + Nav 메뉴
+
+### `src/app/admin/AdminNav.tsx` 수정
+
+```ts
+import { /* 기존 */, UserPlus, type LucideIcon } from "lucide-react";
+
+export type AdminIconKey =
+  | "dashboard" | "notices" | "weeklies" | "masters" | "gallery"
+  | "calendar" | "sermons" | "shorts" | "inquiries" | "members"
+  | "subscribers" | "newFamily";
+
+const ICONS: Record<AdminIconKey, LucideIcon> = {
+  /* 기존 */, newFamily: UserPlus,
+};
+```
+
+### `src/app/admin/layout.tsx` 의 `baseNav` 수정
+
+```ts
+const baseNav: AdminNavItem[] = [
+  // 기존 항목들
+  { label: "문의 내역", href: "/admin/inquiries", icon: "inquiries" },
+  { label: "새가족 등록", href: "/admin/new-families", icon: "newFamily" },
+];
+```
+
+### `src/app/admin/new-families/page.tsx`
+
+`event-subscribers/page.tsx` 의 인라인 fetch + cancelled flag 패턴.
 
 ```tsx
-// htmlLink 제거 → 내부 /calendar 로 이동
-<Link
-  key={event.id}
-  href="/calendar"
-  className="..."
->
-  ...
-</Link>
-```
+"use client";
+import { useEffect, useState } from "react";
+import { Trash2, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  type NewFamilyRegistration, type NewFamilyStatus,
+  VISIT_PATH_LABELS, FAITH_STATUS_LABELS, GENDER_LABELS,
+  CHURCH_HISTORY_LABELS, STATUS_LABELS,
+} from "@/types/new-family";
 
-(추후 단건 상세 페이지 `/calendar/[id]` 만들면 그쪽으로 변경)
+const STATUS_KEYS: NewFamilyStatus[] = ["new", "contacted", "assigned", "done"];
 
----
+const STATUS_BADGE: Record<NewFamilyStatus, string> = {
+  new: "bg-rose-50 text-rose-700",
+  contacted: "bg-amber-50 text-amber-700",
+  assigned: "bg-blue-50 text-blue-700",
+  done: "bg-gray-100 text-gray-600",
+};
 
-## Step 8: Google Calendar 데이터 1회 import
+export default function AdminNewFamiliesPage() {
+  const [items, setItems] = useState<NewFamilyRegistration[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<NewFamilyStatus | "all">("all");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-### `scripts/migrate-google-calendar.ts`
+  // set-state-in-effect 회피: cancelled 플래그 + .finally
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin/new-families", { credentials: "same-origin" })
+      .then((r) => (r.ok ? (r.json() as Promise<NewFamilyRegistration[]>) : null))
+      .then((data) => { if (!cancelled && data) setItems(data); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
 
-```ts
-/**
- * Google Calendar → Supabase events 테이블 1회 마이그레이션.
- * 실행: npx tsx scripts/migrate-google-calendar.ts
- *
- * 환경변수 필요: GOOGLE_CALENDAR_ID, GOOGLE_CALENDAR_API_KEY,
- *               NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
- */
-import { createClient } from "@supabase/supabase-js";
-import { getAllEvents } from "../src/lib/google-calendar"; // 삭제 직전에 1회만 사용
-
-async function main() {
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  );
-
-  const events = await getAllEvents(500);
-  console.log(`Fetched ${events.length} events from Google Calendar`);
-
-  for (const ev of events) {
-    const isAllDay = ev.isAllDay;
-    const dateStr = isAllDay ? ev.start : ev.start.split("T")[0];
-    const startTime = isAllDay ? null : ev.start.split("T")[1].slice(0, 5);
-    const endTime = isAllDay || !ev.end ? null
-      : ev.end.split("T")[1].slice(0, 5);
-
-    const { error } = await supabase.from("events").insert({
-      title: ev.title,
-      description: ev.description,
-      location: ev.location,
-      date: dateStr,
-      start_time: startTime,
-      end_time: endTime,
+  async function changeStatus(id: string, status: NewFamilyStatus) {
+    const res = await fetch(`/api/admin/new-families/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
     });
-    if (error) console.error(`Failed: ${ev.title}`, error);
-    else console.log(`Imported: ${ev.title} (${dateStr})`);
-  }
-}
-
-main().catch(console.error);
-```
-
-실행 후 `src/lib/google-calendar.ts` 삭제 + 환경변수 정리.
-
----
-
-## Step 9: 알림톡 골격 (카카오 비즈 준비)
-
-### `supabase/migrations/023_alimtalk_sent.sql`
-
-```sql
--- 알림톡 발송 추적 — 중복 발송 방지
-CREATE TABLE IF NOT EXISTS public.alimtalk_sent (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  template     text NOT NULL,        -- 카카오 템플릿 코드
-  event_id     uuid REFERENCES public.events(id) ON DELETE CASCADE,
-  recipient    text NOT NULL,        -- 전화번호 (E.164 또는 010-)
-  sent_at      timestamptz DEFAULT now(),
-  status       text NOT NULL,        -- 'sent' | 'failed'
-  error        text,
-  UNIQUE (template, event_id, recipient)
-);
-
-ALTER TABLE public.alimtalk_sent ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Staff can view alimtalk log" ON public.alimtalk_sent
-  FOR SELECT USING (public.is_staff());
--- INSERT/UPDATE 는 service_role 만 (cron 라우트가 서비스 키 사용)
-```
-
-### `src/lib/alimtalk.ts`
-
-```ts
-/**
- * 알림톡 추상화 — 카카오 비즈 승인 후 환경변수 채우면 동작.
- *
- * 미설정 환경에서는 noop (콘솔 경고만, 에러 throw 없음).
- * 모바일 앱은 이 모듈을 직접 호출하지 않음 — 서버 cron 만 사용.
- */
-const ENABLED = !!(
-  process.env.KAKAO_BIZ_API_KEY && process.env.KAKAO_BIZ_SENDER_KEY
-);
-
-export interface AlimtalkResult {
-  ok: boolean;
-  error?: string;
-}
-
-export async function sendAlimtalk(
-  template: string,
-  to: string,
-  vars: Record<string, string>,
-): Promise<AlimtalkResult> {
-  if (!ENABLED) {
-    console.warn(`[alimtalk] noop — env not set. would send template=${template} to=${to}`);
-    return { ok: true };
-  }
-  // 카카오 비즈 승인 후 실제 호출 구현
-  // 예: NHN Cloud / Aligo / Solapi 등 중계사 API 호출
-  // const res = await fetch(VENDOR_URL, { ... });
-  return { ok: false, error: "not implemented" };
-}
-```
-
-### Vercel Cron 엔드포인트
-
-`src/app/api/admin/cron/alimtalk-events/route.ts`:
-
-```ts
-import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { sendAlimtalk } from "@/lib/alimtalk";
-import { timingSafeEqual } from "crypto";
-
-export const dynamic = "force-dynamic";
-
-export async function GET(request: NextRequest) {
-  // 시크릿 검증 (Vercel Cron 헤더 또는 자체 시크릿)
-  const secret = request.headers.get("x-cron-secret");
-  const expected = process.env.CRON_SECRET ?? "";
-  if (
-    !secret ||
-    !expected ||
-    secret.length !== expected.length ||
-    !timingSafeEqual(Buffer.from(secret), Buffer.from(expected))
-  ) {
-    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    if (!res.ok) { alert("상태 변경 실패"); return; }
+    const updated = (await res.json()) as NewFamilyRegistration;
+    setItems((prev) => prev.map((i) => (i.id === id ? updated : i)));
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  async function saveNote(id: string, note: string) { /* PATCH adminNote, 동일 패턴 */ }
+  async function remove(id: string) { /* confirm → DELETE → 로컬 필터 */ }
+
+  const filtered = items.filter((i) => filter === "all" || i.status === filter);
+  const counts = {
+    all: items.length,
+    new: items.filter((i) => i.status === "new").length,
+    contacted: items.filter((i) => i.status === "contacted").length,
+    assigned: items.filter((i) => i.status === "assigned").length,
+    done: items.filter((i) => i.status === "done").length,
+  };
+
+  return (
+    <div>
+      <h1>새가족 등록</h1>
+      {/* 필터 pill (전체 + 4개 상태) */}
+      <div className="mb-5 flex flex-wrap gap-2">
+        <FilterPill label={`전체 ${counts.all}`} active={filter === "all"} onClick={() => setFilter("all")} />
+        {STATUS_KEYS.map((s) => (
+          <FilterPill key={s} label={`${STATUS_LABELS[s]} ${counts[s]}`}
+            active={filter === s} onClick={() => setFilter(s)} />
+        ))}
+      </div>
+      {/* 리스트: 행 클릭 → 펼침. 펼침 영역에 상세/상태버튼/메모/삭제 */}
+    </div>
   );
-
-  // D-1 (내일) 일정 조회
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dateStr = tomorrow.toISOString().split("T")[0];
-
-  const { data: events } = await supabase
-    .from("events")
-    .select("id, title, date, start_time, location")
-    .eq("date", dateStr);
-
-  // TODO: 수신자 목록 조회 — 별도 'event_subscribers' 테이블 또는 staff role 일괄
-  // v1 에서는 자리만 잡고 실제 발송 비활성
-
-  return NextResponse.json({
-    checked: events?.length ?? 0,
-    note: "alimtalk send disabled until KAKAO_BIZ_* env set",
-  });
 }
 ```
 
-### `vercel.json` 신규
+**UX 결정:**
+- 행 헤더는 [상태 뱃지 | 이름 | 성별·생년 | 등록 시각]. 클릭으로 펼침.
+- 펼침 영역에 9문항 전체 + 상태 4버튼 + 메모 textarea + 저장/삭제.
+- 상태 변경/메모 저장 시 **전체 재조회 없이** 응답 DTO 로 로컬 state 만 갱신 (네트워크 1회).
+- 메모는 dirty(변경됨) 상태일 때만 "저장" 버튼 활성화.
 
-```json
+---
+
+## Step 9 — 진입점 노출
+
+방문자가 `/new-family` 라우트에 도달할 수 있는 경로 2곳 추가.
+
+### `src/components/layout/nav-config.ts` — 데스크톱/모바일 공통 상단 메뉴
+
+`교회소개` 드롭다운의 "인사말" 다음에 추가. 새가족이 가장 먼저 찾는 항목이라 상단 위치.
+
+```ts
 {
-  "crons": [
-    {
-      "path": "/api/admin/cron/alimtalk-events",
-      "schedule": "0 21 * * *"
-    }
-  ]
-}
+  label: "교회소개",
+  href: "/greetings",
+  children: [
+    { label: "인사말", href: "/greetings" },
+    { label: "새가족 등록", href: "/new-family" },  // 추가
+    { label: "공지사항", href: "/notice", badgeKey: "notices" },
+    // ...
+  ],
+},
 ```
 
-(매일 21시 UTC = KST 06시. 카카오 비즈 정책상 발송 가능 시간 내. 승인 전까지는 noop)
+### `src/components/layout/Footer.tsx` — 풋터 `바로가기`
+
+```tsx
+{[
+  { href: "/notice", label: "공지사항" },
+  { href: "/sermons", label: "설교 영상" },
+  { href: "/gallery", label: "갤러리" },
+  { href: "/new-family", label: "새가족 등록" },  // 추가
+  { href: "/map", label: "오시는 길" },
+].map(...)}
+```
+
+홈 카드/배너 노출은 디자인 결정 사항이라 v2 로 보류.
 
 ---
 
-## Step 10: 환경변수 정리 가이드
+## 모바일 앱 호환성 — 백엔드 무수정 보장
 
-마이그레이션 + import 완료 후 Vercel 에서 제거 가능:
-- `GOOGLE_CALENDAR_ID`
-- `GOOGLE_CALENDAR_API_KEY`
-- `GOOGLE_SA_CLIENT_EMAIL`
-- `GOOGLE_SA_PRIVATE_KEY`
+추후 RN 앱이 본 백엔드를 **수정 없이** 사용 가능한 이유:
 
-추후 추가:
-- `CRON_SECRET` — Vercel Cron 헤더 인증
-- `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY` — 카카오 비즈 승인 후
+| 측면 | 보장 메커니즘 |
+|------|--------------|
+| 인증 | `createApiClient` 가 `Authorization: Bearer` 자동 인식 → RN 의 `supabase.auth.getSession().access_token` 헤더로 모든 admin 라우트 호출 가능 |
+| 응답 형태 | `toDto()` 가 snake_case → camelCase 변환을 1곳에 집중. DB 컬럼명을 노출하지 않으므로 향후 컬럼 rename 도 DTO 만 유지하면 무영향 |
+| 입력 형태 | `NewFamilyRegistrationInput` / `NewFamilyUpdateSchema` 가 인터페이스 계약. RN 도 동일 페이로드 직렬화 |
+| RLS | `is_staff()` / `is_admin_or_master()` 헬퍼가 JWT 의 `auth.uid()` 만 의존 → 클라이언트 종류 무관 |
+| 라벨 | `*_LABELS` 객체를 RN 도 임포트 가능 (TypeScript only — 번들 1KB 미만). 서버에서 enum value 만 받고 라벨은 클라이언트 단 책임 |
+| 익명 제출 | `/api/new-family` 는 토큰 불필요 → RN 비로그인 화면에서도 동일 호출 |
+| 전화번호 형식 | `010-XXXX-XXXX` 표시 형태로 저장 (DB 저장 형식 안정) → RN 도 동일 정규식 사용 |
 
----
-
-## 모바일 앱 호환성
-
-| 엔드포인트 | 변경 | 모바일 영향 |
-|-----------|------|------------|
-| `GET /api/calendar` | DTO 에 `recurrence` 추가, `htmlLink` 제거, `end: string \| null` | **하위 호환 깨짐** — `htmlLink` 사용 시. 모바일 앱 출시 전이므로 OK |
-| `POST /api/calendar` | `endDate` 제거, `endTime` 옵셔널 | 모바일 앱 미출시 — OK |
-| `PATCH /api/calendar/[id]` | **신규** | 옵션 추가 |
-| `DELETE /api/calendar/[id]` | 동일 | 무영향 |
-| 인증 | `requireAdmin(request)` 동일 | 쿠키/Bearer 모두 동작 |
-
-DTO 안정성: 자체 DB 로 옮긴 후에도 `CalendarEvent` 형태가 같으므로 추후 데이터 소스 변경(샤딩/캐시 추가 등)에도 클라이언트 무수정.
-
----
-
-## 테스트 시나리오 (수동)
-
-### 관리자 입력 폼
-| # | 입력 | 기대 |
-|---|------|------|
-| 1 | 제목 + 날짜만 + 종일 체크 | 종일 일정 생성 |
-| 2 | 제목 + 날짜 + 시작시간 (종료 비움) | DB 에 `start_time` 저장, `end_time NULL`, 카드에 "오후 2:00~" |
-| 3 | 제목 + 날짜 + 시작 + 종료 | "오후 2:00 ~ 4:00" |
-| 4 | 종료시간만 입력 (시작 비움) | Zod 거부 alert |
-
-### 공개 캘린더
-| # | 액션 | 기대 |
-|---|------|------|
-| 5 | 점이 있는 날짜에 마우스 hover | 팝오버에 그 날 일정 목록 표시 |
-| 6 | 점 없는 날짜 hover | 팝오버 미노출 |
-| 7 | 모바일 터치 (점 있는 날짜) | 팝오버 토글 (한 번 더 탭하면 닫힘) |
-| 8 | 점 표시 | "일정이 있는 날" 범례 그대로 |
-
-### 권한
-| # | 역할 | 액션 | 기대 |
-|---|------|------|------|
-| 9 | staff (작성자) | 본인 일정 삭제 | 성공 |
-| 10 | staff (비-작성자) | 다른 staff 의 일정 삭제 | UI 버튼 숨김 + RLS 차단 |
-| 11 | admin / master | 임의 일정 삭제 | 성공 |
-
-### 알림톡 (카카오 비즈 미설정)
-| # | 액션 | 기대 |
-|---|------|------|
-| 12 | Vercel Cron 트리거 (시크릿 헤더 OK) | 200 + `{ checked, note: "...disabled..." }` |
-| 13 | 잘못된 시크릿 | 401 |
-
-### TypeScript / Lint
-```bash
-npx tsc --noEmit
-npx eslint src/lib/events.ts src/lib/alimtalk.ts src/app/api/calendar src/app/\(public\)/calendar src/app/admin/calendar
+**RN 가이드 (참고):**
+```ts
+// RN 측 예시
+const session = (await supabase.auth.getSession()).data.session;
+const res = await fetch(`${API_URL}/api/admin/new-families`, {
+  headers: { Authorization: `Bearer ${session?.access_token}` },
+});
+const list: NewFamilyRegistration[] = await res.json();
 ```
 
 ---
 
-## 롤아웃 순서
+## 검증 체크리스트
 
-1. **마이그레이션 022 작성** → 사용자가 Supabase 에 수동 적용
-2. **import 스크립트 실행** (`npx tsx scripts/migrate-google-calendar.ts`) — 기존 GCal 데이터 이전
-3. **코드 PR** — 위 변경 일괄 커밋, Vercel 배포
-4. **확인** — 실기기로 4가지 시나리오 검증
-5. **GCal 환경변수 제거** (Vercel 대시보드)
-6. **`src/lib/google-calendar.ts` 삭제** (별도 PR, history 보존)
-7. **알림톡 단계** — 카카오 비즈 승인 후 환경변수만 채우면 cron 자동 동작
+```
+$ npm run typecheck    # ✅ 통과
+$ npm run build        # ✅ 통과 (○ /new-family Static, ƒ /admin/new-families Dynamic)
+$ npx eslint <new files>  # ✅ 0 error / 0 warning
+```
+
+수동 테스트 시나리오 (마이그레이션 적용 후):
+1. 비로그인으로 `/new-family` 진입 → 폼 노출 확인
+2. 동의 미체크로 제출 → 클라이언트 검증 차단
+3. `etc` 선택 후 직접입력 미입력 → 차단
+4. 정상 제출 → "등록이 완료되었습니다" 화면 + DB row 1건 추가
+5. master 계정으로 `/admin/new-families` 접속 → 목록 표시
+6. 상태 4단계 변경 → 뱃지 색 변화 + 카운트 갱신
+7. 메모 입력 후 저장 → 새로고침해도 유지
+8. 삭제 → confirm → 행 제거
 
 ---
 
-## 명시적으로 v1 범위 밖
+## 후속 작업 (사용자 측)
 
-- **반복 일정 (RRULE)** — `rrule` 컬럼만 두고 v2 별도 PR. 매주 주일예배 같은 패턴은 당분간 매주 수동 입력.
-- **다일 일정 (`end_date`)** — 컬럼만 두고 v2.
-- **단건 상세 페이지 `/calendar/[id]`** — 팝오버로 충분, 필요 시 후속.
-- **알림톡 실 발송** — 카카오 비즈 승인 + 수신자 목록 설계 후.
-- **iCal export 구독** — Google Calendar 구독 기능 대체. 수요 발생 시 `/api/calendar/feed.ics` 추가.
-- **푸시 알림 / 캘린더 동기화** — 모바일 앱 단계.
+| 작업 | 비고 |
+|------|------|
+| 마이그레이션 024 적용 | Supabase SQL Editor 에 `024_new_family_registrations.sql` 실행. `TODO.md` 의 016/021/022/023 흐름과 동일 |
+| `/new-family` 진입점 | 위치 결정 후 별도 PR (네비 `교회소개` 메뉴, 풋터 "바로가기", 홈 카드 등). AGENTS.md 의 "시키지 않은 것은 하지 않는다" 원칙으로 본 작업 범위에서 제외 |
+| 카톡/이메일 알림 | `chat/inquiry` 의 Resend 패턴 답습 가능. 운영 측 요청 시 추가 |
+| Rate limit | 챗봇의 `chat_rate_limit`(008) 패턴 참고. 신청 빈도 모니터링 후 필요 시 도입 |
+| 자동 파기 | 보유기간 정책 운영 후 cron 으로 자동 삭제 (v2) |

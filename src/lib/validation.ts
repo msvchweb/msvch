@@ -380,6 +380,55 @@ export function normalizeKoreanPhone(raw: string): string | null {
   return `${local.slice(0, 3)}-${local.slice(3, 7)}-${local.slice(7)}`;
 }
 
+/** 새가족 등록 폼 (공개 페이지 → POST /api/new-family) */
+export const NewFamilyRegistrationSchema = z.object({
+  visitPaths: z
+    .array(
+      z.enum([
+        "website",
+        "youtube",
+        "recommendation",
+        "visited_first",
+        "etc",
+      ]),
+    )
+    .max(5),
+  visitPathsEtc: z.string().max(200).optional(),
+  faithStatus: z.enum(["accepted", "not_yet", "unsure"]),
+  name: z
+    .string()
+    .min(1, "이름을 입력하세요")
+    .max(50, "이름은 50자까지"),
+  gender: z.enum(["male", "female"]),
+  birth: z
+    .string()
+    .min(1, "생년월일을 입력하세요")
+    .max(40, "생년월일은 40자까지"),
+  phone: z
+    .string()
+    .min(1, "연락처를 입력하세요")
+    .max(20, "연락처 형식 오류"),
+  region: z.string().max(100).optional(),
+  churchHistory: z.enum([
+    "never",
+    "attended_no_baptism",
+    "baptized_inactive",
+    "baptized_active",
+    "etc",
+  ]),
+  churchHistoryEtc: z.string().max(200).optional(),
+  message: z.string().max(2000).optional(),
+  privacyConsent: z.literal(true, {
+    message: "개인정보 수집 및 이용에 동의해야 합니다.",
+  }),
+});
+
+/** PATCH /api/admin/new-families/[id] — 처리 상태/메모 수정 */
+export const NewFamilyUpdateSchema = z.object({
+  status: z.enum(["new", "contacted", "assigned", "done"]).optional(),
+  adminNote: z.string().max(2000).optional(),
+});
+
 /** 일정 알림 수신자 등록/수정 */
 export const EventSubscriberSchema = z.object({
   name: z.string().min(1, "이름을 입력하세요").max(100, "이름은 100자까지"),

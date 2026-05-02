@@ -479,6 +479,72 @@ interface CalendarEvent {
 
 ---
 
+### `new_family_registrations`
+
+새가족 등록 폼 (공개 페이지 → admin 처리). `chat_inquiries`(006) 와 동일한 익명 INSERT + staff SELECT 패턴. 마이그레이션 024.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `visit_paths` | `text[] NOT NULL DEFAULT '{}'` | 방문 경로 (복수). `'website'` \| `'youtube'` \| `'recommendation'` \| `'visited_first'` \| `'etc'` |
+| `visit_paths_etc` | `text` | 기타 방문 경로 직접 입력 (visit_paths 에 'etc' 포함 시) |
+| `faith_status` | `text NOT NULL CHECK` | 영접 여부. `'accepted'` \| `'not_yet'` \| `'unsure'` |
+| `name` | `text NOT NULL` (1~50자) | 이름 |
+| `gender` | `text NOT NULL CHECK` | `'male'` \| `'female'` |
+| `birth` | `text NOT NULL` (1~40자) | 자유 텍스트 (`"010101"`, `"음력 010101"` 등) |
+| `phone` | `text NOT NULL` (9~20자) | `010-XXXX-XXXX` |
+| `region` | `text` (≤100자) | 거주 지역 (선택) |
+| `church_history` | `text NOT NULL CHECK` | 신앙생활 여부. `'never'` \| `'attended_no_baptism'` \| `'baptized_inactive'` \| `'baptized_active'` \| `'etc'` |
+| `church_history_etc` | `text` | 기타 신앙생활 직접 입력 |
+| `message` | `text` (≤2000자) | 자유 메시지 (선택) |
+| `privacy_consent` | `boolean NOT NULL CHECK (= true)` | 개인정보 동의 (false 자동 거부) |
+| `privacy_consented_at` | `timestamptz NOT NULL DEFAULT now()` | 동의 시각 (보존기간 산정 근거) |
+| `status` | `text NOT NULL DEFAULT 'new' CHECK` | 처리 상태. `'new'` \| `'contacted'` \| `'assigned'` \| `'done'` |
+| `admin_note` | `text` (≤2000자) | 관리자 메모 |
+| `created_at` | `timestamptz DEFAULT now()` | |
+| `updated_at` | `timestamptz DEFAULT now()` | 자동 갱신 트리거 |
+
+**RLS 정책**:
+- INSERT: 누구나 (`with check (true)`) — 공개 폼
+- SELECT: staff (`is_staff()`)
+- UPDATE: staff (status / admin_note 변경)
+- DELETE: admin/master (`is_admin_or_master()`)
+
+**인덱스**: `idx_new_family_registrations_status`, `idx_new_family_registrations_created_at`
+
+**TypeScript 타입** (`src/types/new-family.ts`):
+```ts
+type NewFamilyVisitPath = "website" | "youtube" | "recommendation" | "visited_first" | "etc";
+type NewFamilyFaithStatus = "accepted" | "not_yet" | "unsure";
+type NewFamilyGender = "male" | "female";
+type NewFamilyChurchHistory =
+  | "never" | "attended_no_baptism" | "baptized_inactive" | "baptized_active" | "etc";
+type NewFamilyStatus = "new" | "contacted" | "assigned" | "done";
+
+interface NewFamilyRegistration {
+  id: string;
+  visitPaths: NewFamilyVisitPath[];
+  visitPathsEtc: string | null;
+  faithStatus: NewFamilyFaithStatus;
+  name: string;
+  gender: NewFamilyGender;
+  birth: string;
+  phone: string;
+  region: string | null;
+  churchHistory: NewFamilyChurchHistory;
+  churchHistoryEtc: string | null;
+  message: string | null;
+  privacyConsent: boolean;
+  privacyConsentedAt: string;
+  status: NewFamilyStatus;
+  adminNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+---
+
 ### `content_authors`
 
 컨텐츠 작성자 추적 shadow 테이블 (마이그레이션 020). 베이스 테이블에 author 컬럼을 추가하지 않으므로 공개 응답에 작성자 정보가 절대 노출되지 않음.
@@ -662,3 +728,4 @@ interface ShortsClip {
 | `021_content_delete_policies.sql` | notices/weeklies/gallery_albums/gallery_images DELETE 정책 분리 — 작성자 OR admin OR master 만 |
 | `022_events.sql` | 자체 캘린더 events 테이블 + 작성자 트리거 + 021 패턴 DELETE 정책 + content_authors CHECK 에 'event' 추가 |
 | `023_alimtalk_subscribers.sql` | event_subscribers + alimtalk_sent (카카오 비즈 알림톡 인프라) |
+| `024_new_family_registrations.sql` | new_family_registrations 테이블 (공개 새가족 등록 폼 — 누구나 INSERT, staff SELECT/UPDATE, admin/master DELETE) |

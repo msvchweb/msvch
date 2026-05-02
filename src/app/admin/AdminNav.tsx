@@ -14,6 +14,7 @@ import {
   Database,
   Users,
   Bell,
+  UserPlus,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,8 @@ export type AdminIconKey =
   | "shorts"
   | "inquiries"
   | "members"
-  | "subscribers";
+  | "subscribers"
+  | "newFamily";
 
 const ICONS: Record<AdminIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -43,6 +45,7 @@ const ICONS: Record<AdminIconKey, LucideIcon> = {
   inquiries: MessageSquare,
   members: Users,
   subscribers: Bell,
+  newFamily: UserPlus,
 };
 
 export interface AdminNavItem {

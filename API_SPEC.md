@@ -530,6 +530,102 @@ GET /api/calendar?days=30           → 이번 달
 
 ---
 
+### POST `/api/new-family`
+
+공개 새가족 등록 폼 제출. `chat_inquiries` 와 동일한 익명 INSERT 패턴 (RLS `with check (true)` + 서버측 service_role).
+
+- **인증**: 불필요 (공개)
+- **요청 본문** (Zod 검증: `NewFamilyRegistrationSchema` + 추가 룰):
+
+```ts
+{
+  visitPaths: ("website" | "youtube" | "recommendation" | "visited_first" | "etc")[];
+  visitPathsEtc?: string;          // visitPaths 에 'etc' 포함 시 필수 (서버 추가 검증)
+  faithStatus: "accepted" | "not_yet" | "unsure";
+  name: string;                     // 1~50자
+  gender: "male" | "female";
+  birth: string;                    // 1~40자, 자유 텍스트 (음력 표기 허용)
+  phone: string;                    // 9~20자, 010-XXXX-XXXX 권장
+  region?: string;                  // ≤100자
+  churchHistory: "never" | "attended_no_baptism" | "baptized_inactive" | "baptized_active" | "etc";
+  churchHistoryEtc?: string;        // churchHistory === 'etc' 일 때 필수
+  message?: string;                 // ≤2000자
+  privacyConsent: true;             // 반드시 true (literal). false 자동 거부.
+}
+```
+
+- **응답 (200)**: `{ ok: true }`
+- **에러 응답**:
+  - `400` — `{ error: "..." }` (zod 첫 issue 메시지 / "기타" 직접 입력 누락)
+  - `500` — `{ error: "저장에 실패했습니다. 잠시 후 다시 시도해 주세요." }`
+
+- **부작용**: `new_family_registrations` 행 생성. `privacy_consent: true`, `privacy_consented_at: now()` 서버에서 강제 기록.
+
+---
+
+### GET `/api/admin/new-families`
+
+관리자용 새가족 등록 목록.
+
+- **인증**: staff/admin/master (`requireAdmin()`) — cookie 또는 `Authorization: Bearer <jwt>`
+- **응답 (200)**: `NewFamilyRegistration[]` (camelCase, `created_at DESC`)
+
+```ts
+interface NewFamilyRegistration {
+  id: string;
+  visitPaths: NewFamilyVisitPath[];
+  visitPathsEtc: string | null;
+  faithStatus: NewFamilyFaithStatus;
+  name: string;
+  gender: NewFamilyGender;
+  birth: string;
+  phone: string;
+  region: string | null;
+  churchHistory: NewFamilyChurchHistory;
+  churchHistoryEtc: string | null;
+  message: string | null;
+  privacyConsent: boolean;
+  privacyConsentedAt: string;       // ISO 8601
+  status: NewFamilyStatus;
+  adminNote: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+- **에러**: `401`, `403`, `500`
+
+---
+
+### PATCH `/api/admin/new-families/[id]`
+
+처리 상태 또는 관리자 메모 변경 (부분 업데이트).
+
+- **인증**: staff (`requireAdmin()`) + RLS `is_staff()`
+- **요청 본문** (Zod: `NewFamilyUpdateSchema`):
+
+```ts
+{
+  status?: "new" | "contacted" | "assigned" | "done";
+  adminNote?: string;               // ≤2000자, 빈 문자열은 NULL 로 정규화
+}
+```
+
+- **응답 (200)**: 갱신된 `NewFamilyRegistration` DTO
+- **에러**: `400` (수정 내용 없음 / zod), `401`, `403`, `500`
+
+---
+
+### DELETE `/api/admin/new-families/[id]`
+
+새가족 등록 삭제. RLS 정책상 **admin 또는 master** 만 통과.
+
+- **인증**: staff (`requireAdmin()`) — 추가로 RLS 가 admin/master 검증
+- **응답 (200)**: `{ ok: true }`
+- **에러**: `401`, `403`, `500`
+
+---
+
 ## 입력 검증
 
 모든 API 라우트의 입력 검증은 `src/lib/validation.ts`에 정의된 Zod 스키마로 수행.
@@ -549,6 +645,8 @@ GET /api/calendar?days=30           → 이번 달
 | PATCH `/api/calendar/[id]` | `CalendarEventPatchSchema` | partial + 동일 refine |
 | POST `/api/admin/event-subscribers` | `EventSubscriberSchema` | 휴대폰 자동 정규화 |
 | PATCH `/api/admin/event-subscribers/[id]` | `EventSubscriberSchema.partial()` | |
+| POST `/api/new-family` | `NewFamilyRegistrationSchema` | `privacyConsent: z.literal(true)`. 'etc' 직접입력 추가 검증 |
+| PATCH `/api/admin/new-families/[id]` | `NewFamilyUpdateSchema` | status 또는 adminNote 부분 업데이트 |
 | GET `/api/home/hero-slides` | `parseLimit()` | limit 기본 5, 상한 100 |
 
 ---

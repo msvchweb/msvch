@@ -82,6 +82,7 @@ export function Footer() {
                 { href: "/notice", label: "공지사항" },
                 { href: "/sermons", label: "설교 영상" },
                 { href: "/gallery", label: "갤러리" },
+                { href: "/new-family", label: "새가족 등록" },
                 { href: "/map", label: "오시는 길" },
               ].map((link) => (
                 <li key={link.href}>

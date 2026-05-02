@@ -38,6 +38,7 @@ src/
 │   │   ├── greetings/           # 인사말
 │   │   ├── map/                 # 찾아오시는 길
 │   │   ├── menu/                # 더보기 메뉴 (탭바 연동)
+│   │   ├── new-family/          # 새가족 등록 (공개 폼 → /api/new-family)
 │   │   ├── notice/              # 공지사항
 │   │   ├── sermons/             # 말씀영상
 │   │   ├── staff/               # 섬기는 이들
@@ -65,6 +66,7 @@ src/
 │   │   ├── event-subscribers/   # 일정 알림톡 구독자 관리 (admin/master)
 │   │   ├── shorts/              # 쇼츠 관리 (생성/검수/승인)
 │   │   ├── inquiries/           # 챗봇 문의 내역 (열람/삭제)
+│   │   ├── new-families/        # 새가족 등록 (목록/상태변경/메모/삭제)
 │   │   ├── members/             # 회원관리 (master 단독, role 변경)
 │   │   ├── masters/             # 주보 마스터 (올해표어/목장/섬기는이/후원/공동체기도)
 │   │   └── weeklies/
@@ -74,6 +76,8 @@ src/
 │       │   ├── cron/
 │       │   │   └── alimtalk-events/ # Vercel Cron — D-1 일정 알림톡 발송
 │       │   ├── event-subscribers/   # 일정 알림 수신자 CRUD (master)
+│       │   │   └── [id]/
+│       │   ├── new-families/        # 새가족 등록 GET 목록 + [id] PATCH/DELETE
 │       │   │   └── [id]/
 │       │   ├── members/             # PATCH (master 전용 role 변경)
 │       │   └── revalidate/          # 세션 인증 ISR 무효화
@@ -87,6 +91,7 @@ src/
 │       │   └── hero-slides/     # 홈 히어로 슬라이드 (공지→HeroSlide[], 모바일 호환)
 │       ├── me/                  # 현재 사용자 인증/권한 (쿠키 OR Bearer)
 │       ├── new-content/         # 콘텐츠 최신일자 스냅샷 (레드닷 배지)
+│       ├── new-family/          # POST — 공개 새가족 등록 폼 제출 (service_role)
 │       ├── og/                  # OG 이미지 생성 (Edge)
 │       ├── revalidate/          # ISR 캐시 무효화 (시크릿)
 │       ├── sermon-summary/      # Gemini 설교 요약
@@ -168,6 +173,7 @@ src/
 │   ├── calendar.ts              # CalendarEvent (자체 DB 기반 DTO)
 │   ├── subscribers.ts           # EventSubscriber, AlimtalkSentRow
 │   ├── gallery.ts
+│   ├── new-family.ts            # NewFamilyRegistration + enum + 라벨 매핑
 │   ├── notice.ts
 │   ├── shorts.ts                # ShortsJob, ShortsClip, ShortsSettings
 │   ├── supabase.ts
@@ -274,6 +280,20 @@ GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
     │               └── Supabase (업로드 + DB 저장)
     │
     └── POST /api/shorts/trigger ← Admin UI "쇼츠 생성" 버튼
+
+새가족 등록 (마이그레이션 024 이후):
+    공개 폼 /new-family ──→ POST /api/new-family
+        │   (zod NewFamilyRegistrationSchema + 'etc' 직접입력 추가 검증)
+        │
+        ▼
+    service_role INSERT ──→ new_family_registrations (privacy_consent=true 강제)
+        │
+        ├── 관리자 /admin/new-families
+        │     ├── GET  /api/admin/new-families      → NewFamilyRegistration[]
+        │     ├── PATCH /api/admin/new-families/:id  → status / adminNote
+        │     └── DELETE /api/admin/new-families/:id (admin/master 만)
+        │
+        └── 모바일 앱 (장래) ── createApiClient 의 Bearer 인증으로 동일 라우트 사용
 ```
 
 ---
@@ -470,6 +490,52 @@ src/lib/alimtalk.ts — sendAlimtalk(payload)
 - 알림톡 추상화 격리 — 카카오 비즈 승인 + 환경변수만 채우면 즉시 동작
 - `alimtalk_sent` UNIQUE(template, event_id, recipient) 로 중복 발송 방지
 - 'noop' 상태도 기록 — 카카오 비즈 승인 후 재실행 시 이미 noop 처리된 건은 재발송 안 됨 (의도적 안전장치). 신규 발송 정책 필요 시 별도 마이그레이션으로 정리.
+
+---
+
+## 새가족 등록 아키텍처
+
+마이그레이션 024 이후. 익명 INSERT + staff SELECT 패턴 (`chat_inquiries` 와 동일).
+
+### 데이터 모델
+- `new_family_registrations` — 9문항 + 개인정보 동의 + 처리 상태 + 관리자 메모.
+- `privacy_consent boolean NOT NULL CHECK (= true)` — 동의 없는 데이터 DB 단 거부.
+- `privacy_consented_at timestamptz` — 보존기간 산정 근거.
+- `status` enum 4단계: `new` → `contacted` → `assigned` → `done`.
+
+### 권한 모델 (RLS)
+- INSERT: 누구나 (`with check (true)`) — 공개 폼
+- SELECT: `is_staff()` (마이그레이션 015)
+- UPDATE: `is_staff()` (status / admin_note 변경)
+- DELETE: `is_admin_or_master()` (마이그레이션 019)
+
+### 라우트 매트릭스
+
+| 라우트 | 인증 | 용도 |
+|--------|------|------|
+| `/new-family` (공개 페이지) | 없음 | 폼 렌더 (서버 컴포넌트 셸 + `NewFamilyForm` 클라이언트) |
+| `POST /api/new-family` | 없음 (service_role) | 익명 제출 — zod + 'etc' 직접입력 검증 |
+| `/admin/new-families` (페이지) | `requireAdmin` | 목록 + 필터 + 펼침 + 상태/메모 변경 |
+| `GET /api/admin/new-families` | `requireAdmin` | 전체 목록 (created_at DESC) |
+| `PATCH /api/admin/new-families/[id]` | `requireAdmin` | status / adminNote 부분 업데이트 |
+| `DELETE /api/admin/new-families/[id]` | `requireAdmin` + RLS | admin/master 만 통과 |
+
+### 검증 3계층
+1. 클라이언트 폼 — `NewFamilyForm.handleSubmit` 즉시 피드백 (필수 항목 / 'etc' 직접입력 / 010-XXXX-XXXX 정규식)
+2. 서버 zod — `NewFamilyRegistrationSchema` (`privacyConsent: z.literal(true)`) + 라우트 추가 룰
+3. DB CHECK — enum 값, 길이 제약, `privacy_consent = true`
+
+### 모바일 앱 호환 포인트
+- 응답 DTO 는 `NewFamilyRegistration` (camelCase). DB 컬럼명 비노출 → 향후 컬럼 rename 시 `toDto()` 만 유지하면 됨.
+- 입력 페이로드는 `NewFamilyRegistrationInput` 인터페이스 그대로.
+- admin API 는 `createApiClient(request)` 가 cookie 또는 `Authorization: Bearer <jwt>` 자동 분기 → RN 앱에서 동일 라우트 호출 가능.
+- 익명 제출 라우트는 토큰 불필요 → RN 비로그인 화면도 동일 호출.
+- enum 라벨(`*_LABELS`)은 `src/types/new-family.ts` 에 정적 객체로 보관 → RN 도 임포트 가능.
+
+### 진입점
+- 데스크톱 nav `교회소개` 드롭다운 — "인사말" 다음
+- 풋터 `바로가기` 섹션
+- (홈 카드/배너는 디자인 결정 사항, v2)
 
 ---
 

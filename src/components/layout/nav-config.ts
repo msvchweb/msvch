@@ -14,6 +14,7 @@ export const navItems: NavItem[] = [
     href: "/greetings",
     children: [
       { label: "인사말", href: "/greetings" },
+      { label: "새가족 등록", href: "/new-family" },
       { label: "공지사항", href: "/notice", badgeKey: "notices" },
       { label: "예배안내", href: "/worship" },
       { label: "교회일정", href: "/calendar" },
