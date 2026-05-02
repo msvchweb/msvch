@@ -445,3 +445,70 @@ export const EventSubscriberSchema = z.object({
   notifyDDay: z.boolean().optional(),
   note: z.string().max(500).optional(),
 });
+
+// ──────────────────────────────────────────────
+//  소모임 게시판 (마이그레이션 025)
+// ──────────────────────────────────────────────
+
+export const BoardCreateSchema = z.object({
+  title: z.string().min(1, "제목을 입력하세요").max(100, "제목은 100자까지"),
+  description: z.string().max(500).optional(),
+  initialMemberIds: z.array(z.string().uuid()).max(500).optional(),
+});
+
+export const BoardUpdateSchema = z.object({
+  title: z.string().min(1).max(100).optional(),
+  description: z.string().max(500).optional(),
+  isVisible: z.boolean().optional(),
+});
+
+export const BoardMembersReplaceSchema = z.object({
+  profileIds: z.array(z.string().uuid()).max(500),
+});
+
+/** board-images Storage public URL 만 허용 — 외부 URL 끼워넣기 차단 */
+const BOARD_IMAGE_URL_FRAGMENT =
+  "/storage/v1/object/public/board-images/";
+
+export const BoardPostSchema = z.object({
+  title: z.string().min(1, "제목을 입력하세요").max(150, "제목은 150자까지"),
+  content: z
+    .string()
+    .min(1, "내용을 입력하세요")
+    .max(10000, "내용은 10,000자까지"),
+  images: z
+    .array(
+      z
+        .string()
+        .url()
+        .refine(
+          (u) => u.includes(BOARD_IMAGE_URL_FRAGMENT),
+          "허용되지 않은 이미지 URL",
+        ),
+    )
+    .max(10, "이미지는 최대 10장")
+    .default([]),
+});
+
+export const BoardPostPatchSchema = BoardPostSchema.partial();
+
+export const BoardCommentSchema = z.object({
+  content: z.string().min(1, "댓글을 입력하세요").max(1000, "댓글은 1,000자까지"),
+});
+
+/** cursor 파싱 — `${ISO_DATETIME}|${id}` 형태 */
+export function parseBoardCursor(
+  raw: string | null,
+): { createdAt: string; id: string } | null {
+  if (!raw) return null;
+  const idx = raw.lastIndexOf("|");
+  if (idx < 0) return null;
+  const createdAt = raw.slice(0, idx);
+  const id = raw.slice(idx + 1);
+  if (!createdAt || !id) return null;
+  return { createdAt, id };
+}
+
+export function buildBoardCursor(createdAt: string, id: string): string {
+  return `${createdAt}|${id}`;
+}

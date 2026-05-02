@@ -53,7 +53,8 @@ src/
 │   │   └── callback/            # OAuth 리디렉트 콜백 (exchangeCodeForSession)
 │   │
 │   ├── (member)/                # 회원 전용 (미들웨어 보호)
-│   │   ├── groups/
+│   │   ├── boards/              # 소모임 게시판 (목록/상세/글쓰기/댓글)
+│   │   ├── groups/              # (legacy 정적 토론 — 거의 미사용)
 │   │   └── profile/
 │   │
 │   ├── admin/                   # 관리자 전용 (미들웨어 보호 — staff/admin/master)
@@ -67,6 +68,7 @@ src/
 │   │   ├── shorts/              # 쇼츠 관리 (생성/검수/승인)
 │   │   ├── inquiries/           # 챗봇 문의 내역 (열람/삭제)
 │   │   ├── new-families/        # 새가족 등록 (목록/상태변경/메모/삭제)
+│   │   ├── boards/              # 소모임 게시판 (신설/숨김/멤버관리)
 │   │   ├── members/             # 회원관리 (master 단독, role 변경)
 │   │   ├── masters/             # 주보 마스터 (올해표어/목장/섬기는이/후원/공동체기도)
 │   │   └── weeklies/
@@ -79,6 +81,9 @@ src/
 │       │   │   └── [id]/
 │       │   ├── new-families/        # 새가족 등록 GET 목록 + [id] PATCH/DELETE
 │       │   │   └── [id]/
+│       │   ├── boards/              # 소모임 게시판 admin (GET/POST + [id] PATCH/DELETE + members PUT)
+│       │   │   └── [id]/
+│       │   │       └── members/
 │       │   ├── members/             # PATCH (master 전용 role 변경)
 │       │   └── revalidate/          # 세션 인증 ISR 무효화
 │       ├── calendar/            # 교회 일정 CRUD (자체 DB, 모바일 호환)
@@ -92,6 +97,8 @@ src/
 │       ├── me/                  # 현재 사용자 인증/권한 (쿠키 OR Bearer)
 │       ├── new-content/         # 콘텐츠 최신일자 스냅샷 (레드닷 배지)
 │       ├── new-family/          # POST — 공개 새가족 등록 폼 제출 (service_role)
+│       ├── boards/              # 소모임 게시판 멤버 API (모바일 호환)
+│       │   └── [id]/posts/[postId]/comments/[cid]/  # 글/댓글 CRUD, cursor 페이지네이션
 │       ├── og/                  # OG 이미지 생성 (Edge)
 │       ├── revalidate/          # ISR 캐시 무효화 (시크릿)
 │       ├── sermon-summary/      # Gemini 설교 요약
@@ -208,7 +215,7 @@ src/
 ### Admin 네비게이션
 - `admin/layout.tsx` — PC(`lg+`): 좌측 사이드바, 모바일: 상단 sticky 가로 스크롤 pill 탭
 - `AdminNav.tsx` — `AdminSidebar` + `AdminMobileTabs` (활성 상태 표시, 아이콘은 문자열 키로 직렬화 가능)
-- 메뉴: 대시보드, 공지사항, 주보, 주보 마스터, 갤러리, 교회일정, 일정 구독자, 설교 요약, 쇼츠, 문의 내역, 회원관리(master 전용)
+- 메뉴: 대시보드, 공지사항, 주보, 주보 마스터, 갤러리, 교회일정, 일정 구독자, 설교 요약, 쇼츠, 문의 내역, 새가족 등록, 소모임 게시판, 회원관리(master 전용)
 
 ---
 
@@ -325,7 +332,7 @@ NextResponse.redirect(`${origin}${next}`)  → 원래 가려던 경로로 복귀
 브라우저 요청
     │
     ▼
-middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*)
+middleware.ts ── 경로 매칭 (/groups/*, /admin/*, /profile/*, /boards/*)
     │
     ├── 비보호 경로 → 통과
     ├── 미인증 → /login?next=<원경로> 리다이렉트
@@ -536,6 +543,119 @@ src/lib/alimtalk.ts — sendAlimtalk(payload)
 - 데스크톱 nav `교회소개` 드롭다운 — "인사말" 다음
 - 풋터 `바로가기` 섹션
 - (홈 카드/배너는 디자인 결정 사항, v2)
+
+---
+
+## 소모임 게시판 아키텍처
+
+마이그레이션 025 이후. 소모임(목장/선교회/임시 행사)이 운영진에 신청 → admin 이 제목 입력해 신설 + 멤버 임의 지정. 용도 끝나면 `is_visible=false` 로 숨김 처리.
+
+### 데이터 모델
+- `boards` — 게시판 (제목 + 가시 토글)
+- `board_members` — M:N 매핑 (admin 이 직접 관리)
+- `board_posts` — 글 (제목 + 본문 + 이미지[] + author_id/author_name 직접 컬럼)
+- `board_comments` — 댓글 (작성자 직접 컬럼)
+- Storage: `board-images` 버킷 (5MB, jpg/png/webp/gif)
+
+### 권한 모델 (RLS)
+- 헬퍼: `is_board_member(board_id)`, `can_view_board(board_id)` (admin/master 분기 포함)
+- SELECT: `can_view_board()` — 멤버 OR admin/master, 숨김 게시판은 admin/master 만
+- INSERT (글/댓글): 멤버 본인만 (`author_id = auth.uid()` 강제)
+- UPDATE (글): 본인 + 멤버 자격 유지 시
+- DELETE: `is_admin_or_master() OR author_id = auth.uid()` (021 패턴)
+- 멤버 추가/제거: admin/master 단독
+
+### 라우트 매트릭스
+
+| 라우트 | 인증 | 용도 |
+|--------|------|------|
+| `/boards` | 멤버 | 내 게시판 목록 |
+| `/boards/[boardId]` | 멤버 | 글 목록 + 작성 폼 |
+| `/boards/[boardId]/[postId]` | 멤버 | 글 상세 + 댓글 |
+| `/admin/boards` | staff | 게시판 신설/숨김/삭제 |
+| `/admin/boards/[id]/members` | staff | 멤버 검색/추가/저장 |
+| `GET /api/boards` | 인증 | 내가 볼 수 있는 게시판 |
+| `GET/POST /api/boards/[id]/posts` | 멤버 | 글 목록(cursor) / 작성 |
+| `GET/PATCH/DELETE /api/boards/[id]/posts/[postId]` | 멤버 | 상세 / 수정 / 삭제 |
+| `POST /api/boards/[id]/posts/[postId]/comments` | 멤버 | 댓글 작성 |
+| `DELETE /api/boards/[id]/posts/[postId]/comments/[cid]` | 멤버 | 댓글 삭제 |
+| `GET/POST /api/admin/boards` | staff | 목록 / 신설 |
+| `PATCH/DELETE /api/admin/boards/[id]` | staff | 수정 / 영구 삭제 |
+| `GET/PUT /api/admin/boards/[id]/members` | staff | 멤버 조회 / 일괄 교체 |
+
+### 모바일 호환성 (백엔드 무수정 재사용)
+
+설계 원칙 7가지 모두 v1 부터 적용:
+
+1. **인증 단일 진입점** — 모든 라우트가 `createApiClient(request)` 사용 → Bearer/쿠키 자동 분기
+2. **camelCase DTO** — `toBoardDto`, `toBoardPostDto`, `toBoardCommentDto` 가 snake_case 차단
+3. **ISO 8601 날짜** — Supabase timestamptz 자동
+4. **에러 통일** — `{ error: string }` + 표준 상태코드 (400/401/403/404/500)
+5. **권한 서버 계산** — `canDelete` 가 응답에 포함, 모바일이 RLS 재현 불필요
+6. **클라이언트 직접 Storage 업로드** — `@supabase/supabase-js` (RN 동일) + Storage RLS 가 멤버 게이트
+7. **cursor 페이지네이션** — `${ISO}|${id}` 형식, offset 미사용 (동시 INSERT 누락 방지)
+
+### 데이터 흐름
+
+```
+admin/boards 페이지
+    │
+    ├─ POST /api/admin/boards { title, description?, initialMemberIds? }
+    │     → boards INSERT + board_members INSERT (옵션)
+    │
+    ├─ PATCH /api/admin/boards/[id] { isVisible?: false }  (숨김 처리)
+    └─ DELETE /api/admin/boards/[id]                       (영구 삭제 — CASCADE)
+
+admin/boards/[id]/members 페이지
+    │
+    ├─ supabase.from("profiles").or("name.ilike.%q%,email.ilike.%q%")  (검색)
+    └─ PUT /api/admin/boards/[id]/members { profileIds: [...] }       (일괄 교체)
+
+(member)/boards 페이지 (RSC)
+    │
+    └─ listVisibleBoards(supabase) → Board[]   ← RLS 가 멤버+가시 필터
+
+(member)/boards/[boardId] 페이지 (RSC + 클라이언트)
+    │
+    ├─ getBoardById(supabase, boardId)      ← RLS 가 게이트
+    ├─ listPosts(supabase, boardId, ...)    ← cursor 페이지네이션
+    └─ BoardPostList (클라이언트)
+          │
+          ├─ "더 보기" → fetch /api/boards/{id}/posts?cursor=...&limit=20
+          └─ "글쓰기" → BoardPostForm
+                │
+                ├─ supabase.storage.from("board-images").upload(`${boardId}/${userId}/${ts}.${ext}`)
+                │     → 5MB 초과 시 compressImage() 자동 압축
+                │     → Storage RLS 가 멤버 검증
+                ├─ getPublicUrl() → URL
+                └─ POST /api/boards/{id}/posts { title, content, images: [URL] }
+                      → board_posts INSERT (author_id = auth.uid())
+                      → RLS 가 멤버 + URL 화이트리스트(board-images) 검증
+
+(member)/boards/[boardId]/[postId] 페이지 (RSC + 클라이언트)
+    │
+    ├─ getPostWithComments(supabase, postId, viewerId, isAdminOrMaster)
+    │     → { post: BoardPost, comments: BoardComment[] }
+    │     → canDelete 서버 계산
+    │
+    └─ BoardPostDetail (클라이언트)
+          │
+          ├─ POST /api/boards/{id}/posts/{postId}/comments { content }
+          ├─ DELETE /api/boards/{id}/posts/{postId}            (본인 OR admin)
+          └─ DELETE /api/boards/{id}/posts/{postId}/comments/{cid}
+```
+
+### 작성자 추적 — 020 shadow 패턴 미사용 결정
+
+다른 컨텐츠(notices/weeklies/gallery_albums/events) 는 `content_authors` shadow 테이블을 써서
+**공개 응답에 작성자 정보가 새지 않도록** 막았다. 본 시스템은 멤버에게 작성자 표시가 **필수**이므로:
+
+- `board_posts.author_id` + `author_name` 직접 컬럼
+- `author_name` 은 작성 시점 닉네임 스냅샷 — 닉네임 변경/탈퇴(`auth.users` 삭제) 후에도 보존
+- `author_id ON DELETE SET NULL` — 탈퇴 시 글은 살고 작성자 매칭만 끊김
+- `content_authors.content_type` 에 `'board_post'` 추가하지 **않음**
+
+→ 결과: 멤버 조회 시 즉시 작성자 표시, JOIN 불필요, 탈퇴 후에도 "이름 (탈퇴)" 식 표시 자연스러움.
 
 ---
 

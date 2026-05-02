@@ -15,6 +15,7 @@ import {
   Users,
   Bell,
   UserPlus,
+  Layers,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,8 @@ export type AdminIconKey =
   | "inquiries"
   | "members"
   | "subscribers"
-  | "newFamily";
+  | "newFamily"
+  | "boards";
 
 const ICONS: Record<AdminIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -46,17 +48,27 @@ const ICONS: Record<AdminIconKey, LucideIcon> = {
   members: Users,
   subscribers: Bell,
   newFamily: UserPlus,
+  boards: Layers,
 };
 
 export interface AdminNavItem {
   label: string;
   href: string;
   icon: AdminIconKey;
+  /** 그룹 메뉴: 이 경로들 중 하나라도 매칭되면 active. 미지정 시 href 기준 */
+  matchPaths?: string[];
 }
 
-function isActive(pathname: string, href: string): boolean {
-  if (href === "/admin") return pathname === "/admin";
-  return pathname === href || pathname.startsWith(href + "/");
+function pathMatches(pathname: string, target: string): boolean {
+  if (target === "/admin") return pathname === "/admin";
+  return pathname === target || pathname.startsWith(target + "/");
+}
+
+function isActive(pathname: string, item: AdminNavItem): boolean {
+  if (item.matchPaths && item.matchPaths.length > 0) {
+    return item.matchPaths.some((p) => pathMatches(pathname, p));
+  }
+  return pathMatches(pathname, item.href);
 }
 
 /** 데스크톱 사이드바 — lg 이상에서만 표시 */
@@ -70,7 +82,7 @@ export function AdminSidebar({ items }: { items: AdminNavItem[] }) {
       <nav className="space-y-1">
         {items.map((item) => {
           const Icon = ICONS[item.icon];
-          const active = isActive(pathname, item.href);
+          const active = isActive(pathname, item);
           return (
             <Link
               key={item.href}
@@ -103,7 +115,7 @@ export function AdminMobileTabs({ items }: { items: AdminNavItem[] }) {
       <div className="flex gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const Icon = ICONS[item.icon];
-          const active = isActive(pathname, item.href);
+          const active = isActive(pathname, item);
           return (
             <Link
               key={item.href}

@@ -626,6 +626,252 @@ interface NewFamilyRegistration {
 
 ---
 
+## 소모임 게시판 (마이그레이션 025)
+
+ad-hoc 멤버 모델 — admin 이 제목 입력으로 신설하고 멤버를 임의 지정. `is_visible=false` 로 숨김 가능.
+**모든 엔드포인트가 `createApiClient(request)` 사용 — 쿠키(웹) 또는 `Authorization: Bearer`(모바일) 자동 분기.**
+응답 DTO 는 모두 camelCase, 페이지네이션은 cursor 기반.
+
+### 공용 DTO
+
+```ts
+interface Board {
+  id: string;
+  title: string;
+  description: string | null;
+  isVisible: boolean;
+  memberCount: number;
+  postCount: number;
+  createdAt: string;        // ISO 8601
+  updatedAt: string;
+}
+
+interface BoardMember {
+  profileId: string;
+  name: string;
+  email: string | null;
+  avatarUrl: string | null;
+  addedAt: string;
+}
+
+interface BoardPost {
+  id: string;
+  boardId: string;
+  authorId: string | null;
+  authorName: string;       // 작성 시점 닉네임 스냅샷
+  title: string;
+  content: string;
+  images: string[];         // Supabase Storage public URL
+  commentCount: number;
+  canDelete: boolean;       // 서버 계산: admin/master OR 본인
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface BoardComment {
+  id: string;
+  postId: string;
+  authorId: string | null;
+  authorName: string;
+  content: string;
+  canDelete: boolean;
+  createdAt: string;
+}
+
+interface CursorPage<T> {
+  items: T[];
+  nextCursor: string | null;  // null = 끝. 다음 호출 ?cursor=<값>
+}
+```
+
+---
+
+### GET `/api/admin/boards`
+
+전체 게시판 목록 (admin 은 RLS 상 숨김 포함 모두 노출).
+
+- **인증**: staff (`requireAdmin()`)
+- **응답 (200)**: `Board[]` (created_at DESC)
+- **에러**: `401`, `403`, `500`
+
+### POST `/api/admin/boards`
+
+게시판 신설. 옵션으로 초기 멤버 동시 등록.
+
+- **인증**: staff
+- **요청 본문** (`BoardCreateSchema`):
+
+```ts
+{
+  title: string;            // 1~100
+  description?: string;     // ≤500
+  initialMemberIds?: string[]; // ≤500개 (UUID)
+}
+```
+
+- **응답 (201)**: `Board`
+- **에러**: `400`, `401`, `403`, `500`
+
+### PATCH `/api/admin/boards/[id]`
+
+제목/설명/숨김 부분 업데이트.
+
+- **인증**: staff
+- **요청 본문** (`BoardUpdateSchema`):
+
+```ts
+{
+  title?: string;
+  description?: string;
+  isVisible?: boolean;
+}
+```
+
+- **응답 (200)**: `{ ok: true }`
+- **에러**: `400`, `401`, `403`, `500`
+
+### DELETE `/api/admin/boards/[id]`
+
+영구 삭제. CASCADE 로 board_members/posts/comments 모두 사라짐. Storage 파일은 별도 정리 필요(v2 cron).
+
+- **인증**: staff (RLS 가 admin/master 검증)
+- **응답 (200)**: `{ ok: true }`
+- **에러**: `401`, `403`, `500`
+
+### GET `/api/admin/boards/[id]/members`
+
+게시판 멤버 목록.
+
+- **인증**: staff
+- **응답 (200)**: `BoardMember[]` (added_at ASC)
+
+### PUT `/api/admin/boards/[id]/members`
+
+멤버 명단 일괄 교체. 기존과 새 명단을 비교해 추가/제거 자동 계산.
+
+- **인증**: staff (RLS 가 admin/master 검증)
+- **요청 본문** (`BoardMembersReplaceSchema`):
+
+```ts
+{
+  profileIds: string[]; // ≤500개 (UUID). 빈 배열이면 전체 멤버 제거
+}
+```
+
+- **응답 (200)**: `{ ok: true; added: number; removed: number }`
+- **에러**: `400`, `401`, `403`, `500`
+
+---
+
+### GET `/api/boards`
+
+내가 볼 수 있는 게시판 목록 (멤버 OR admin/master + is_visible=true; admin/master 는 숨김도 보임).
+
+- **인증**: 로그인 필수
+- **응답 (200)**: `Board[]`
+- **에러**: `401`
+
+### GET `/api/boards/[id]/posts`
+
+게시판 글 목록 — cursor 페이지네이션.
+
+- **인증**: 로그인 필수 (RLS 가 멤버 게이트)
+- **쿼리 파라미터**:
+  - `limit` — 기본 20, 상한 100 (`parseLimit()`)
+  - `cursor` — `${ISO_DATETIME}|${id}` 형식. 첫 호출 시 미지정
+- **응답 (200)**: `CursorPage<BoardPost>`
+- **에러**: `401`
+
+```
+GET /api/boards/{id}/posts                        → 첫 페이지 (최신 20개)
+GET /api/boards/{id}/posts?cursor=...&limit=20   → 다음 페이지
+```
+
+### POST `/api/boards/[id]/posts`
+
+새 글 작성. 서버가 `author_id = auth.uid()` 강제.
+
+- **인증**: 로그인 필수 (RLS 가 멤버 게이트)
+- **요청 본문** (`BoardPostSchema`):
+
+```ts
+{
+  title: string;        // 1~150
+  content: string;      // 1~10,000
+  images?: string[];    // ≤10. 반드시 board-images 버킷 public URL
+}
+```
+
+- **응답 (201)**: `BoardPost`
+- **에러**: `400`, `401`, `403`(비멤버 — RLS 차단)
+
+### GET `/api/boards/[id]/posts/[postId]`
+
+글 + 댓글 일괄 조회.
+
+- **인증**: 로그인 필수
+- **응답 (200)**: `{ post: BoardPost; comments: BoardComment[] }`
+- **에러**: `401`, `404`
+
+### PATCH `/api/boards/[id]/posts/[postId]`
+
+본인 글 수정 (RLS 가 author 검증).
+
+- **인증**: 로그인 필수
+- **요청 본문**: `Partial<BoardPostSchema>` — 보낸 필드만 갱신
+- **응답 (200)**: `BoardPost`
+- **에러**: `400`, `401`, `403`(비작성자)
+
+### DELETE `/api/boards/[id]/posts/[postId]`
+
+글 삭제. RLS 가 admin/master OR author 검증.
+
+- **인증**: 로그인 필수
+- **응답 (200)**: `{ ok: true }`
+- **에러**: `401`, `500`
+
+### POST `/api/boards/[id]/posts/[postId]/comments`
+
+댓글 작성.
+
+- **인증**: 로그인 필수 (RLS 가 멤버 게이트)
+- **요청 본문** (`BoardCommentSchema`):
+
+```ts
+{
+  content: string; // 1~1,000
+}
+```
+
+- **응답 (201)**: `BoardComment`
+- **에러**: `400`, `401`, `403`(비멤버)
+
+### DELETE `/api/boards/[id]/posts/[postId]/comments/[cid]`
+
+댓글 삭제. RLS 가 admin/master OR author 검증.
+
+- **인증**: 로그인 필수
+- **응답 (200)**: `{ ok: true }`
+- **에러**: `401`, `500`
+
+### 이미지 업로드 (클라이언트 → Supabase Storage 직접)
+
+API 라우트가 아닌 **Supabase Storage 직접 업로드** 패턴 — 웹/모바일 동일.
+
+```ts
+// 웹 (현재 코드)
+const path = `${boardId}/${userId}/${Date.now()}-${random}.${ext}`;
+await supabase.storage.from("board-images").upload(path, file, { contentType });
+const { data } = supabase.storage.from("board-images").getPublicUrl(path);
+// → 그 다음 POST /api/boards/{id}/posts body.images = [data.publicUrl]
+```
+
+Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. board_posts INSERT 시 RLS 가 다시 검증해 타 게시판 끼워넣기 방지.
+
+**제한 (앱 레벨)**: 5MB 압축, jpg/png/webp/gif, 한 글당 최대 10장.
+
+---
+
 ## 입력 검증
 
 모든 API 라우트의 입력 검증은 `src/lib/validation.ts`에 정의된 Zod 스키마로 수행.
@@ -648,6 +894,13 @@ interface NewFamilyRegistration {
 | POST `/api/new-family` | `NewFamilyRegistrationSchema` | `privacyConsent: z.literal(true)`. 'etc' 직접입력 추가 검증 |
 | PATCH `/api/admin/new-families/[id]` | `NewFamilyUpdateSchema` | status 또는 adminNote 부분 업데이트 |
 | GET `/api/home/hero-slides` | `parseLimit()` | limit 기본 5, 상한 100 |
+| POST `/api/admin/boards` | `BoardCreateSchema` | 소모임 게시판 신설 |
+| PATCH `/api/admin/boards/[id]` | `BoardUpdateSchema` | 제목/설명/isVisible 부분 업데이트 |
+| PUT `/api/admin/boards/[id]/members` | `BoardMembersReplaceSchema` | 멤버 일괄 교체 |
+| GET `/api/boards/[id]/posts` | `parseBoardCursor()` + `parseLimit()` | cursor 페이지네이션 |
+| POST `/api/boards/[id]/posts` | `BoardPostSchema` | 글 작성 (이미지 URL board-images 버킷 강제) |
+| PATCH `/api/boards/[id]/posts/[postId]` | `BoardPostPatchSchema` | 본인 글 수정 |
+| POST `/api/boards/[id]/posts/[postId]/comments` | `BoardCommentSchema` | 댓글 작성 |
 
 ---
 

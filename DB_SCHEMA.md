@@ -545,6 +545,102 @@ interface NewFamilyRegistration {
 
 ---
 
+### `boards`
+
+소모임 게시판 (마이그레이션 025). admin 이 제목만 입력해 신설하고 멤버를 임의 지정. 용도 끝나면 `is_visible=false` 로 숨김.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `title` | `text NOT NULL` (1~100자) | 게시판 제목 |
+| `description` | `text` (≤500자) | 설명 (선택) |
+| `is_visible` | `boolean NOT NULL DEFAULT true` | false = 숨김 (멤버에게도 안 보임, admin/master 만 노출) |
+| `created_by` | `uuid` | `auth.users.id` ON DELETE SET NULL |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+| `updated_at` | `timestamptz NOT NULL DEFAULT now()` | 자동 갱신 트리거 |
+
+**RLS 정책**:
+- SELECT: `can_view_board(id)` — 멤버 OR admin/master, 숨김 게시판은 admin/master 만
+- INSERT/UPDATE/DELETE: `is_admin_or_master()`
+
+**인덱스**: `idx_boards_visible_created (is_visible, created_at DESC)`
+
+---
+
+### `board_members`
+
+게시판 ↔ 회원 M:N 매핑. admin/master 가 직접 추가/제거 (`PUT /api/admin/boards/[id]/members` 일괄 교체).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `board_id` | `uuid NOT NULL` | `boards.id` ON DELETE CASCADE |
+| `profile_id` | `uuid NOT NULL` | `profiles.id` ON DELETE CASCADE |
+| `added_at` | `timestamptz NOT NULL DEFAULT now()` | 추가 시각 |
+| `added_by` | `uuid` | `auth.users.id` ON DELETE SET NULL — 누가 추가했는지 |
+| **PK** | `(board_id, profile_id)` | |
+
+**RLS 정책**:
+- SELECT: 본인 (`profile_id = auth.uid()`) OR admin/master
+- INSERT/DELETE: admin/master 단독 (`is_admin_or_master()`)
+
+**인덱스**: `idx_board_members_profile (profile_id)`
+
+---
+
+### `board_posts`
+
+게시판 글. 작성자 정보를 직접 컬럼에 보관 (shadow 패턴 미사용 — 멤버에게 노출이 정상이므로 020 패턴과 분리).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | |
+| `board_id` | `uuid NOT NULL` | `boards.id` ON DELETE CASCADE |
+| `author_id` | `uuid` | `auth.users.id` ON DELETE SET NULL (탈퇴해도 글 보존) |
+| `author_name` | `text NOT NULL` | 작성 시점 닉네임 스냅샷 |
+| `title` | `text NOT NULL` (1~150자) | |
+| `content` | `text NOT NULL` (1~10,000자) | 본문 (HTML/Markdown 미사용 — `whitespace-pre-wrap` 텍스트) |
+| `images` | `text[] NOT NULL DEFAULT '{}'` | Supabase Storage `board-images` public URL 배열 |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+| `updated_at` | `timestamptz NOT NULL DEFAULT now()` | 자동 갱신 트리거 |
+
+**RLS 정책**:
+- SELECT: `can_view_board(board_id)`
+- INSERT: `is_board_member(board_id) AND author_id = auth.uid()` (서버에서 jwt.sub 강제)
+- UPDATE: `author_id = auth.uid() AND is_board_member(board_id)` (본인 + 멤버 자격 유지 시만)
+- DELETE: `is_admin_or_master() OR author_id = auth.uid()` (021 패턴)
+
+**인덱스**:
+- `idx_board_posts_board_created (board_id, created_at DESC)` — 게시판별 최신순 + cursor 페이지네이션
+- `idx_board_posts_author (author_id)`
+
+---
+
+### `board_comments`
+
+게시판 댓글. 작성자 직접 컬럼.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | |
+| `post_id` | `uuid NOT NULL` | `board_posts.id` ON DELETE CASCADE |
+| `author_id` | `uuid` | `auth.users.id` ON DELETE SET NULL |
+| `author_name` | `text NOT NULL` | 작성 시점 닉네임 스냅샷 |
+| `content` | `text NOT NULL` (1~1,000자) | |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+
+**RLS 정책**:
+- SELECT: `EXISTS(board_posts JOIN — can_view_board(bp.board_id))`
+- INSERT: `EXISTS(board_posts JOIN — is_board_member(bp.board_id))` AND `author_id = auth.uid()`
+- DELETE: `is_admin_or_master() OR author_id = auth.uid()`
+
+**인덱스**: `idx_board_comments_post_created (post_id, created_at)`
+
+**권한 헬퍼 함수** (025):
+- `public.is_board_member(p_board_id uuid)` — 사용자가 해당 게시판 멤버인지
+- `public.can_view_board(p_board_id uuid)` — 멤버 OR admin/master + is_visible=true (admin 은 숨김도 통과)
+
+---
+
 ### `content_authors`
 
 컨텐츠 작성자 추적 shadow 테이블 (마이그레이션 020). 베이스 테이블에 author 컬럼을 추가하지 않으므로 공개 응답에 작성자 정보가 절대 노출되지 않음.
@@ -686,6 +782,7 @@ interface ShortsClip {
 | `weeklies` | public | 주보 PDF |
 | `shorts` | public | 쇼츠 mp4 (임시, 발행 후 삭제 가능) |
 | `blog-images` | public | 네이버 블로그 동기화 이미지 + 관리자 UI 히어로 이미지 (notices/churchschool_posts 첨부, 홈 히어로 슬라이더 소스) |
+| `board-images` | public | 소모임 게시판 글 첨부 이미지 (마이그레이션 025). 5MB 제한, jpg/png/webp/gif. 멤버만 업로드/삭제 |
 
 각 버킷 정책: 누구나 읽기, admin만 업로드/삭제. `shorts` 버킷은 service_role도 업로드/삭제 가능 (GitHub Actions용).
 `blog-images`는 service_role(네이버 블로그 sync 스크립트) + staff(`is_staff()`, 마이그레이션 016)이 업로드/수정/삭제 가능.
@@ -729,3 +826,4 @@ interface ShortsClip {
 | `022_events.sql` | 자체 캘린더 events 테이블 + 작성자 트리거 + 021 패턴 DELETE 정책 + content_authors CHECK 에 'event' 추가 |
 | `023_alimtalk_subscribers.sql` | event_subscribers + alimtalk_sent (카카오 비즈 알림톡 인프라) |
 | `024_new_family_registrations.sql` | new_family_registrations 테이블 (공개 새가족 등록 폼 — 누구나 INSERT, staff SELECT/UPDATE, admin/master DELETE) |
+| `025_boards.sql` | 소모임 게시판 시스템 — boards/board_members/board_posts/board_comments + is_board_member/can_view_board 헬퍼 + storage 버킷 board-images. ad-hoc 멤버 모델 (admin 이 제목 입력해 신설 + 멤버 임의 지정 + is_visible 토글로 숨김) |

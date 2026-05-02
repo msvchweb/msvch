@@ -51,6 +51,10 @@ export async function middleware(request: NextRequest) {
     return loginRedirect(request);
   }
 
+  if (path.startsWith("/boards") && !user) {
+    return loginRedirect(request);
+  }
+
   // Protect admin pages
   if (path.startsWith("/admin")) {
     if (!user) {
@@ -72,5 +76,10 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/groups/:path*", "/admin/:path*", "/profile/:path*"],
+  matcher: [
+    "/groups/:path*",
+    "/admin/:path*",
+    "/profile/:path*",
+    "/boards/:path*",
+  ],
 };
