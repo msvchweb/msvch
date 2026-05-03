@@ -2,8 +2,21 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
-import { Menu, X, ChevronDown, Shield } from "lucide-react";
+import { createPortal } from "react-dom";
+import {
+  Menu,
+  X,
+  ChevronDown,
+  Shield,
+  Church,
+  PlayCircle,
+  ImageIcon,
+  GraduationCap,
+  HandHeart,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
 import { navItems } from "./nav-config";
 import { useNewContent } from "@/lib/new-content-provider";
@@ -11,6 +24,15 @@ import { useMe } from "@/lib/use-me";
 import { AuthButton } from "./AuthButton";
 import { cn } from "@/lib/utils";
 import type { ContentKey } from "@/app/api/new-content/route";
+
+/** 모바일 오버레이 상단 nav 항목별 아이콘 — 시각적 구분용 */
+const navIconMap: Record<string, LucideIcon> = {
+  "/greetings": Church,
+  "/sermons": PlayCircle,
+  "/gallery": ImageIcon,
+  "/churchschool": GraduationCap,
+  "/volunteer-center": HandHeart,
+};
 
 function RedDot() {
   return (
@@ -40,17 +62,46 @@ function hasBadge(
 }
 
 export function Header() {
+  const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const { dots } = useNewContent();
   const { isStaff } = useMe();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // 오버레이 열릴 때: body scroll lock + ESC 닫기
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [mobileOpen]);
+
+  // 라우트 변경 시 오버레이 자동 닫기 (Link onClick 누락 대비)
+  useEffect(() => {
+    setMobileOpen(false);
+    setOpenSubmenu(null);
+  }, [pathname]);
+
+  const closeMenu = () => setMobileOpen(false);
 
   return (
     <header
@@ -166,75 +217,181 @@ export function Header() {
         </div>
       </div>
 
-      {/* Mobile menu */}
-      {mobileOpen && (
-        <nav className="animate-slide-down border-t border-gray-100 bg-white px-4 pb-6 pt-4 lg:hidden">
-          {/* 인증/관리자 영역 — 메뉴 최상단, divider 로 본 nav 와 분리 */}
-          <div className="mb-2 border-b border-gray-100 pb-2">
-            {isStaff && (
-              <Link
-                href="/admin"
-                onClick={() => setMobileOpen(false)}
-                className="flex w-full items-center gap-2 py-3 text-[0.95rem] font-medium text-primary-700"
-              >
-                <Shield size={16} />
-                관리자 페이지
-              </Link>
-            )}
-            <AuthButton variant="menu" onAction={() => setMobileOpen(false)} />
+      {/* Mobile full-screen overlay — body 로 portal (header 의 backdrop-filter 가 fixed containing block 을 만드는 문제 회피) */}
+      {mobileOpen && mounted && createPortal(
+        <div
+          className="animate-slide-down fixed inset-0 z-[100] flex flex-col bg-white lg:hidden"
+          role="dialog"
+          aria-modal="true"
+          aria-label="메뉴"
+          style={{ paddingTop: "env(safe-area-inset-top)" }}
+        >
+          {/* 상단 바 — 로고 + 닫기 */}
+          <div className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 px-4">
+            <Link href="/" onClick={closeMenu} className="flex items-center gap-2">
+              <Image
+                src="/images/banner.avif"
+                alt="명성비전교회"
+                width={164}
+                height={40}
+                className="h-10 w-auto"
+              />
+            </Link>
+            <button
+              type="button"
+              onClick={closeMenu}
+              aria-label="메뉴 닫기"
+              className="flex h-10 w-10 items-center justify-center rounded-xl text-gray-600 transition-colors hover:bg-gray-100"
+            >
+              <X size={22} />
+            </button>
           </div>
 
-          {navItems.map((item) => (
-            <div key={item.href} className="border-b border-gray-50 last:border-0">
-              {item.children ? (
-                <>
-                  <button
-                    onClick={() =>
-                      setOpenSubmenu(openSubmenu === item.href ? null : item.href)
-                    }
-                    className="flex w-full items-center justify-between py-3 text-[0.95rem] font-medium text-gray-800"
-                  >
-                    <span className="flex items-center">
-                      {item.label}
-                      {hasBadge(item, dots) && <RedDot />}
-                    </span>
-                    <ChevronDown
-                      size={16}
-                      className={cn(
-                        "text-gray-400 transition-transform duration-200",
-                        openSubmenu === item.href && "rotate-180 text-primary-600"
-                      )}
-                    />
-                  </button>
-                  {openSubmenu === item.href && (
-                    <div className="mb-3 ml-1 space-y-0.5 border-l-2 border-primary-100 pl-4">
-                      {item.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className="flex items-center rounded-md py-2 text-sm text-gray-500 transition-colors hover:text-primary-600"
-                          onClick={() => setMobileOpen(false)}
-                        >
-                          {child.label}
-                          {child.badgeKey && dots[child.badgeKey] && <RedDot />}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
+          {/* 스크롤 영역 */}
+          <div
+            className="flex-1 overflow-y-auto px-4 pb-8 pt-4"
+            style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 2rem)" }}
+          >
+            {/* 인증/관리자 카드 */}
+            <div className="mb-6 rounded-2xl bg-gray-50 p-2">
+              {isStaff && (
                 <Link
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  className="flex w-full items-center py-3 text-[0.95rem] font-medium text-gray-800"
+                  href="/admin"
+                  onClick={closeMenu}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-[0.95rem] font-medium text-primary-700 transition-colors hover:bg-white"
                 >
-                  {item.label}
-                  {item.badgeKey && dots[item.badgeKey] && <RedDot />}
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary-100 text-primary-600">
+                    <Shield size={18} />
+                  </div>
+                  관리자 페이지
                 </Link>
               )}
+              <div className="px-3">
+                <AuthButton variant="menu" onAction={closeMenu} />
+              </div>
             </div>
-          ))}
-        </nav>
+
+            {/* 메뉴 — 아이콘 + 라벨, 자식 있으면 아코디언 */}
+            <nav aria-label="주요 메뉴" className="space-y-1">
+              {navItems.map((item) => {
+                const Icon = navIconMap[item.href];
+                const isActive =
+                  pathname === item.href || pathname.startsWith(item.href + "/");
+                const isExpanded = openSubmenu === item.href;
+                const itemHasBadge = hasBadge(item, dots);
+
+                if (item.children) {
+                  return (
+                    <div key={item.href}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setOpenSubmenu(isExpanded ? null : item.href)
+                        }
+                        aria-expanded={isExpanded}
+                        className={cn(
+                          "flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors",
+                          isActive
+                            ? "bg-primary-50"
+                            : "hover:bg-gray-50 active:bg-gray-100"
+                        )}
+                      >
+                        {Icon && (
+                          <div
+                            className={cn(
+                              "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                              isActive
+                                ? "bg-primary-100 text-primary-700"
+                                : "bg-gray-100 text-gray-600"
+                            )}
+                          >
+                            <Icon size={20} />
+                          </div>
+                        )}
+                        <span
+                          className={cn(
+                            "flex-1 text-[0.95rem] font-semibold",
+                            isActive ? "text-primary-700" : "text-gray-900"
+                          )}
+                        >
+                          {item.label}
+                          {itemHasBadge && <RedDot />}
+                        </span>
+                        <ChevronDown
+                          size={18}
+                          className={cn(
+                            "shrink-0 text-gray-400 transition-transform duration-200",
+                            isExpanded && "rotate-180 text-primary-600"
+                          )}
+                        />
+                      </button>
+                      {isExpanded && (
+                        <div className="mt-1 ml-[52px] space-y-0.5 border-l border-gray-200 pl-3">
+                          {item.children.map((child) => {
+                            const isChildActive = pathname === child.href;
+                            return (
+                              <Link
+                                key={child.href}
+                                href={child.href}
+                                onClick={closeMenu}
+                                className={cn(
+                                  "flex items-center rounded-lg px-3 py-2.5 text-sm transition-colors",
+                                  isChildActive
+                                    ? "bg-primary-50 font-medium text-primary-700"
+                                    : "text-gray-600 hover:bg-gray-50"
+                                )}
+                              >
+                                {child.label}
+                                {child.badgeKey && dots[child.badgeKey] && <RedDot />}
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={closeMenu}
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-xl px-3 py-3 transition-colors",
+                      isActive
+                        ? "bg-primary-50"
+                        : "hover:bg-gray-50 active:bg-gray-100"
+                    )}
+                  >
+                    {Icon && (
+                      <div
+                        className={cn(
+                          "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
+                          isActive
+                            ? "bg-primary-100 text-primary-700"
+                            : "bg-gray-100 text-gray-600"
+                        )}
+                      >
+                        <Icon size={20} />
+                      </div>
+                    )}
+                    <span
+                      className={cn(
+                        "flex-1 text-[0.95rem] font-semibold",
+                        isActive ? "text-primary-700" : "text-gray-900"
+                      )}
+                    >
+                      {item.label}
+                      {itemHasBadge && <RedDot />}
+                    </span>
+                  </Link>
+                );
+              })}
+            </nav>
+          </div>
+        </div>,
+        document.body,
       )}
     </header>
   );
