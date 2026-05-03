@@ -20,6 +20,9 @@ import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
 /** 압축 전 절대 상한 — 브라우저 OOM 방지 */
 const HARD_MAX_BYTES = 50 * 1024 * 1024;
 
+/** 관리자 갤러리 1페이지당 앨범 수 — 초기 로딩 부담 완화 */
+const PAGE_SIZE = 20;
+
 const CATEGORIES = ["예배", "교회학교", "교회행사", "봉사센터", "새가족"] as const;
 
 const SUB_CATEGORIES: Record<string, string[]> = {
@@ -48,6 +51,8 @@ export default function AdminGalleryPage() {
   const [albumLoadingIds, setAlbumLoadingIds] = useState<Set<string>>(new Set());
   const [authorMap, setAuthorMap] = useState<Record<string, ContentAuthor>>({});
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState<string>(CATEGORIES[0]);
@@ -61,11 +66,12 @@ export default function AdminGalleryPage() {
   const supabase = createClient();
 
   const loadAlbums = useCallback(async () => {
-    // 앨범만 가져오기 — 이미지는 lazy fetch
+    // 첫 페이지만 가져오기 — 이미지는 lazy fetch, 나머지 앨범은 "더보기"로
     const { data: albumsData } = await supabase
       .from("gallery_albums")
       .select("*")
-      .order("date", { ascending: false });
+      .order("date", { ascending: false })
+      .range(0, PAGE_SIZE - 1);
 
     if (!albumsData) {
       setLoading(false);
@@ -99,6 +105,7 @@ export default function AdminGalleryPage() {
 
     setAlbums(result);
     setImageCounts(counts);
+    setHasMore(albumsData.length === PAGE_SIZE);
     const map = await fetchAuthorRecordMap(
       supabase,
       "gallery_album",
@@ -107,6 +114,61 @@ export default function AdminGalleryPage() {
     setAuthorMap(map);
     setLoading(false);
   }, [supabase]);
+
+  async function loadMoreAlbums() {
+    if (loadingMore || !hasMore) return;
+    setLoadingMore(true);
+    try {
+      const offset = albums.length;
+      const { data: albumsData } = await supabase
+        .from("gallery_albums")
+        .select("*")
+        .order("date", { ascending: false })
+        .range(offset, offset + PAGE_SIZE - 1);
+
+      if (!albumsData || albumsData.length === 0) {
+        setHasMore(false);
+        return;
+      }
+
+      const albumIds = albumsData.map((a) => a.id as string);
+      const { data: countRows } = await supabase
+        .from("gallery_images")
+        .select("album_id")
+        .in("album_id", albumIds);
+
+      const counts: Record<string, number> = {};
+      for (const row of countRows ?? []) {
+        const id = row.album_id as string;
+        counts[id] = (counts[id] ?? 0) + 1;
+      }
+
+      const more: GalleryAlbum[] = albumsData.map((album) => ({
+        id: album.id as string,
+        title: album.title as string,
+        category: album.category as string | null,
+        tags: (album.tags as string[] | null) ?? [],
+        date: album.date as string | null,
+        thumbnail_url: album.thumbnail_url as string | null,
+        is_public: album.is_public as boolean,
+        created_at: album.created_at as string,
+        images: [],
+      }));
+
+      const map = await fetchAuthorRecordMap(
+        supabase,
+        "gallery_album",
+        more.map((a) => a.id),
+      );
+
+      setAlbums((prev) => [...prev, ...more]);
+      setImageCounts((prev) => ({ ...prev, ...counts }));
+      setAuthorMap((prev) => ({ ...prev, ...map }));
+      setHasMore(albumsData.length === PAGE_SIZE);
+    } finally {
+      setLoadingMore(false);
+    }
+  }
 
   useEffect(() => {
     loadAlbums();
@@ -636,6 +698,18 @@ export default function AdminGalleryPage() {
           <p className="py-12 text-center text-gray-400">
             아직 앨범이 없습니다. 새 앨범을 만들어 보세요.
           </p>
+        )}
+
+        {hasMore && albums.length > 0 && (
+          <div className="pt-2 text-center">
+            <button
+              onClick={loadMoreAlbums}
+              disabled={loadingMore}
+              className="rounded-lg border border-gray-300 bg-white px-6 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              {loadingMore ? "불러오는 중..." : "더보기"}
+            </button>
+          </div>
         )}
       </div>
 
