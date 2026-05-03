@@ -104,35 +104,3 @@ export function AdminSidebar({ items }: { items: AdminNavItem[] }) {
   );
 }
 
-/** 모바일 상단 가로 스크롤 탭 — lg 미만에서만 표시 */
-export function AdminMobileTabs({ items }: { items: AdminNavItem[] }) {
-  const pathname = usePathname();
-  return (
-    <nav
-      aria-label="관리자 메뉴"
-      className="sticky top-16 z-30 border-b border-gray-200 bg-white lg:hidden"
-    >
-      <div className="flex gap-1 overflow-x-auto px-3 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {items.map((item) => {
-          const Icon = ICONS[item.icon];
-          const active = isActive(pathname, item);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={cn(
-                "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                active
-                  ? "bg-primary-600 text-white"
-                  : "bg-gray-100 text-gray-600 active:bg-gray-200",
-              )}
-            >
-              <Icon size={14} />
-              {item.label}
-            </Link>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}

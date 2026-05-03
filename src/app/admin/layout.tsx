@@ -1,7 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { hasMasterAccess } from "@/lib/admin-auth";
-import { AdminSidebar, AdminMobileTabs, type AdminNavItem } from "./AdminNav";
+import { AdminSidebar, type AdminNavItem } from "./AdminNav";
 import { AdminGroupTabs } from "./AdminGroupTabs";
+import { AdminBottomTabBar } from "./AdminBottomTabBar";
 
 const baseNav: AdminNavItem[] = [
   { label: "대시보드", href: "/admin", icon: "dashboard" },
@@ -67,12 +68,12 @@ export default async function AdminLayout({
 
   return (
     <div className="lg:flex lg:min-h-[calc(100vh-4rem)]">
-      <AdminMobileTabs items={adminNav} />
       <AdminSidebar items={adminNav} />
-      <main className="min-w-0 flex-1">
+      <main className="min-w-0 flex-1 pb-20 lg:pb-0">
         <AdminGroupTabs />
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
+      <AdminBottomTabBar />
     </div>
   );
 }
