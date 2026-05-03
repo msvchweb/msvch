@@ -30,7 +30,7 @@ export function BottomTabBar() {
       {/* 교회학교 부서 선택 패널 */}
       {showDepts && (
         <div
-          className="fixed inset-0 z-40 lg:hidden"
+          className="fixed inset-0 z-[60] lg:hidden"
           onClick={() => setShowDepts(false)}
         >
           <div className="absolute inset-0 bg-black/30" />
@@ -40,18 +40,18 @@ export function BottomTabBar() {
           >
             <div className="mx-auto max-w-lg rounded-2xl bg-white p-4 shadow-xl">
               <p className="mb-3 text-center text-sm font-semibold text-gray-700">부서 선택</p>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-5 gap-2">
                 {departments.map((dept) => (
                   <Link
                     key={dept.href}
                     href={dept.href}
                     onClick={() => setShowDepts(false)}
-                    className="flex flex-col items-center gap-2 rounded-xl p-3 transition active:bg-gray-100"
+                    className="flex flex-col items-center gap-2 rounded-xl p-2 transition active:bg-gray-100"
                   >
                     <div className={`flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ${dept.color} text-white shadow-sm`}>
                       <dept.icon size={20} />
                     </div>
-                    <span className="text-xs font-medium text-gray-700">{dept.label}</span>
+                    <span className="whitespace-nowrap text-[11px] font-medium text-gray-700">{dept.label}</span>
                   </Link>
                 ))}
               </div>
