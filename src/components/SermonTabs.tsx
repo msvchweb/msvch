@@ -67,6 +67,7 @@ export function SermonTabs({ videos }: { videos: SermonVideo[] }) {
                   fill
                   className="object-cover"
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                  unoptimized
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition group-hover:opacity-100">
                   <div className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium">

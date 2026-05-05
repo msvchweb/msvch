@@ -78,6 +78,7 @@ export default function AdminSermonsPage() {
                   fill
                   className="object-cover"
                   sizes="(min-width: 640px) 192px, 100vw"
+                  unoptimized
                 />
               </div>
               <div className="flex-1">
