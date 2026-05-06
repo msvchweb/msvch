@@ -472,6 +472,7 @@ export default function AdminGalleryPage() {
       <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">갤러리 관리</h1>
         <button
+          data-tour="gallery-new"
           onClick={() => setShowForm(!showForm)}
           className="flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"
         >
@@ -607,6 +608,7 @@ export default function AdminGalleryPage() {
                     {album.is_public ? "공개" : "비공개"}
                   </button>
                   <button
+                    data-tour="gallery-upload"
                     onClick={() => {
                       fileInputRef.current?.setAttribute("data-album-id", album.id);
                       fileInputRef.current?.click();

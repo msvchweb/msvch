@@ -8,9 +8,11 @@ import {
   FileText,
   ImageIcon,
   ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { AdminTourStartButton } from "@/components/admin/AdminTourStartButton";
 
 export const metadata: Metadata = { title: "관리자 대시보드" };
 
@@ -121,7 +123,19 @@ export default async function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">대시보드</h1>
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">대시보드</h1>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/admin/guide"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 sm:text-sm"
+          >
+            <BookOpen size={14} />
+            가이드
+          </Link>
+          <AdminTourStartButton label="둘러보기" />
+        </div>
+      </div>
 
       {/* A — 처리 대기 */}
       <section>

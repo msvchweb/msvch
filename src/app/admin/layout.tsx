@@ -3,6 +3,7 @@ import { hasMasterAccess } from "@/lib/admin-auth";
 import { AdminSidebar, type AdminNavItem } from "./AdminNav";
 import { AdminGroupTabs } from "./AdminGroupTabs";
 import { AdminBottomTabBar } from "./AdminBottomTabBar";
+import { AdminTour } from "@/components/admin/AdminTour";
 
 const baseNav: AdminNavItem[] = [
   { label: "대시보드", href: "/admin", icon: "dashboard" },
@@ -74,6 +75,7 @@ export default async function AdminLayout({
         <div className="p-4 sm:p-6 lg:p-8">{children}</div>
       </main>
       <AdminBottomTabBar />
+      <AdminTour />
     </div>
   );
 }

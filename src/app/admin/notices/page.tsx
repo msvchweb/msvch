@@ -244,6 +244,7 @@ export default function AdminNoticesPage() {
       <div className="mb-6 flex flex-col gap-3 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">공지사항 관리</h1>
         <button
+          data-tour="notice-new"
           onClick={() => { if (showForm) resetForm(); else setShowForm(true); }}
           className="flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 sm:w-auto"
         >
@@ -385,6 +386,7 @@ export default function AdminNoticesPage() {
                   </td>
                   <td className="px-4 py-3">
                     <button
+                      data-tour="notice-publish"
                       onClick={() => togglePublic(notice.id, notice.is_public)}
                       className={`flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${
                         notice.is_public ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
@@ -473,6 +475,7 @@ export default function AdminNoticesPage() {
               </div>
               <div className="mt-3 flex items-center justify-between border-t border-gray-100 pt-3">
                 <button
+                  data-tour="notice-publish"
                   onClick={() => togglePublic(notice.id, notice.is_public)}
                   className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${
                     notice.is_public ? "bg-green-50 text-green-700" : "bg-gray-100 text-gray-500"
