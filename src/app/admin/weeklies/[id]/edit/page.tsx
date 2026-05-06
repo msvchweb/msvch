@@ -71,7 +71,6 @@ export default function AdminWeeklyEditPage({
   const [weekly, setWeekly] = useState<Weekly | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [generatingPdf, setGeneratingPdf] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -113,28 +112,6 @@ export default function AdminWeeklyEditPage({
     router.push("/admin/weeklies");
   }
 
-  async function handleGeneratePdf() {
-    setGeneratingPdf(true);
-    try {
-      const res = await fetch("/api/weeklies/generate-pdf", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weeklyId: id }),
-      });
-      if (!res.ok) {
-        const err = await res.json() as { error?: string };
-        alert("PDF 생성 실패: " + (err.error ?? "알 수 없는 오류"));
-      } else {
-        const result = await res.json() as { pdfUrl: string };
-        alert("PDF가 생성되었습니다. 미리보기: " + result.pdfUrl);
-      }
-    } catch {
-      alert("PDF 생성 중 오류가 발생했습니다.");
-    } finally {
-      setGeneratingPdf(false);
-    }
-  }
-
   if (loading) {
     return (
       <div className="py-12 text-center text-gray-400">로딩 중...</div>
@@ -158,8 +135,6 @@ export default function AdminWeeklyEditPage({
       <WeeklyEditorWithPreview
         initial={weeklyToFormData(weekly)}
         onSubmit={handleSubmit}
-        onGeneratePdf={handleGeneratePdf}
-        generatingPdf={generatingPdf}
         submitting={submitting}
         weeklyId={id}
       />

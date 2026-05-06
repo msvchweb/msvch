@@ -4,6 +4,7 @@ import Bulletin from "@/components/bulletin/Bulletin";
 import { loadBulletinMaster } from "@/lib/bulletin-master";
 import { hasStaffAccess } from "@/lib/admin-auth";
 import type { Weekly } from "@/types/notice";
+import { PrintTrigger } from "./PrintTrigger";
 
 async function loadWeekly(id: string, token: string | undefined) {
   const supabase = await createClient();
@@ -60,6 +61,9 @@ export default async function WeeklyPrintPage({
         body > header, body > footer, body > div[class*="ChatBot"], body > nav, body > div:has(> button[aria-label*="챗봇"]) { display: none !important; }
         main { padding: 0 !important; }
 
+        /* 인쇄 시 배경색·아이콘색이 빠지지 않도록 강제 (섹션 헤더 회색 등) */
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
         /* 화면(상단 미리보기) — A4 가로 시트 두 장을 세로로 쌓아 보여줌 */
         .bulletin-print {
           display: flex;
@@ -104,8 +108,10 @@ export default async function WeeklyPrintPage({
           body { background: white !important; }
           .bulletin-print { padding: 0; gap: 0; }
           .bulletin-print .page { box-shadow: none; margin: 0; }
+          .no-print { display: none !important; }
         }
       `}</style>
+      <PrintTrigger />
       <Bulletin weekly={res.weekly} mode="print" master={res.master} />
     </>
   );

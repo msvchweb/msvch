@@ -21,8 +21,6 @@ import type { Weekly } from "@/types/notice";
 interface Props {
   initial: WeeklyContentInput;
   onSubmit: (data: WeeklyContentInput, publish: boolean) => Promise<void>;
-  onGeneratePdf?: () => Promise<void>;
-  generatingPdf?: boolean;
   submitting?: boolean;
   weeklyId?: string;
 }
@@ -143,8 +141,6 @@ const TAB_TO_PAGE: Record<string, number> = {
 export function WeeklyEditorWithPreview({
   initial,
   onSubmit,
-  onGeneratePdf,
-  generatingPdf,
   submitting,
   weeklyId,
 }: Props) {
@@ -196,8 +192,6 @@ export function WeeklyEditorWithPreview({
         <WeeklyForm
           initial={initial}
           onSubmit={onSubmit}
-          onGeneratePdf={onGeneratePdf}
-          generatingPdf={generatingPdf}
           submitting={submitting}
           weeklyId={weeklyId}
           onFormChange={setForm}

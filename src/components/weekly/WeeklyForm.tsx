@@ -32,8 +32,6 @@ import {
 interface Props {
   initial: WeeklyContentInput;
   onSubmit: (data: WeeklyContentInput, publish: boolean) => Promise<void>;
-  onGeneratePdf?: () => Promise<void>;
-  generatingPdf?: boolean;
   submitting?: boolean;
   weeklyId?: string;
   /** 현재 폼 값을 부모(미리보기 등)에 노출. 상태 저장 용도가 아니라 파생 값 전달 용도 */
@@ -175,8 +173,6 @@ export function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentIn
 export function WeeklyForm({
   initial,
   onSubmit,
-  onGeneratePdf,
-  generatingPdf,
   submitting,
   weeklyId,
   onFormChange,
@@ -291,16 +287,6 @@ export function WeeklyForm({
       <FormTabs tabs={tabs} onActiveChange={onTabChange} />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 pt-6 pb-8">
-        {weeklyId && onGeneratePdf && (
-          <button
-            type="button"
-            onClick={onGeneratePdf}
-            disabled={generatingPdf}
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            {generatingPdf ? "PDF 생성 중..." : "PDF 자동 생성"}
-          </button>
-        )}
         <button
           type="button"
           onClick={() => handleSubmit(false)}
