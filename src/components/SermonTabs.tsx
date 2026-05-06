@@ -27,7 +27,7 @@ function categorize(title: string): TabKey {
 }
 
 export function SermonTabs({ videos }: { videos: SermonVideo[] }) {
-  const [activeTab, setActiveTab] = useState<TabKey>("all");
+  const [activeTab, setActiveTab] = useState<TabKey>("sunday");
 
   const filtered =
     activeTab === "all"
