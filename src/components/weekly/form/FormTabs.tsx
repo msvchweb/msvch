@@ -12,11 +12,17 @@ export interface FormTab {
 interface Props {
   tabs: FormTab[];
   initialKey?: string;
+  onActiveChange?: (key: string) => void;
 }
 
-export function FormTabs({ tabs, initialKey }: Props) {
+export function FormTabs({ tabs, initialKey, onActiveChange }: Props) {
   const [active, setActive] = useState<string>(initialKey ?? tabs[0]?.key ?? "");
   const activeTab = tabs.find((t) => t.key === active) ?? tabs[0];
+
+  function handleClick(key: string) {
+    setActive(key);
+    onActiveChange?.(key);
+  }
 
   return (
     <div>
@@ -26,7 +32,7 @@ export function FormTabs({ tabs, initialKey }: Props) {
             <button
               key={t.key}
               type="button"
-              onClick={() => setActive(t.key)}
+              onClick={() => handleClick(t.key)}
               className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
                 active === t.key
                   ? "border-primary-600 text-primary-700"

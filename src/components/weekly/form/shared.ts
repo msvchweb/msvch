@@ -10,3 +10,11 @@ export function weekOfMonth(dateStr: string): string {
   const week = Math.ceil(d.getDate() / 7);
   return ["첫째", "둘째", "셋째", "넷째", "다섯째"][week - 1] ?? `${week}째`;
 }
+
+/**
+ * "1. 제목" / "10.  제목" 처럼 머리글 번호를 떼어낸다.
+ * 점 없는 "1 제목" 은 번호로 보지 않고 그대로 둔다(파괴 방지).
+ */
+export function stripLeadingNumber(title: string): string {
+  return title.replace(/^\s*\d+\.\s*/, "");
+}

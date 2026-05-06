@@ -168,6 +168,28 @@ const DEFAULT_DATA: BulletinBackData = {
     '* 온라인헌금 - 농협 355-0068-1115-73 명성비전교회 / 필수: "이름 헌금종류" 예) "박야곱십일조"',
 };
 
+type ServiceContentRow = {
+  label: string;
+  value: string;
+  subValue?: string;
+  mergeNextValue?: boolean;
+};
+
+/** 라벨이 일치하는 행만 입력값으로 덮어쓴다. value/subValue 가 비어있으면 기본값을 유지한다. */
+function patchServiceContents(
+  base: ServiceContentRow[],
+  patches: { label: string; value?: string | null; subValue?: string | null }[],
+): ServiceContentRow[] {
+  return base.map((row) => {
+    const patch = patches.find((p) => p.label === row.label);
+    if (!patch) return row;
+    const next: ServiceContentRow = { ...row };
+    if (patch.value) next.value = patch.value;
+    if (patch.subValue) next.subValue = patch.subValue;
+    return next;
+  });
+}
+
 export function weeklyToBackData(
   w: Weekly,
   master?: BulletinMasterData,
@@ -175,21 +197,33 @@ export function weeklyToBackData(
 ): BulletinBackData {
   const data: BulletinBackData = { ...DEFAULT_DATA };
 
+  // 기본 contents(찬양/기도/말씀/찬송/광고/축도 등)를 유지한 채
+  // 사용자 입력만 라벨로 매칭해 해당 행의 value/subValue 만 부분 갱신한다.
+  // 입력이 비어있으면 기본값을 그대로 둔다(실수로 행 자체가 사라지지 않도록).
   if (w.afternoon_service) {
     const a = w.afternoon_service;
-    const contents: { label: string; value: string; subValue?: string }[] = [];
-    if (a.scripture) contents.push({ label: "성경봉독", value: a.scripture });
-    if (a.title) contents.push({ label: "말씀", value: a.title });
-    if (a.pastor) contents.push({ label: "설교", value: a.pastor });
-    if (contents.length) data.afternoonService = { ...data.afternoonService, contents };
+    data.afternoonService = {
+      ...data.afternoonService,
+      contents: patchServiceContents(data.afternoonService.contents, [
+        { label: "성경봉독", value: a.scripture },
+        {
+          label: "말씀",
+          value: a.title,
+          subValue: a.pastor ? `/ ${a.pastor}` : undefined,
+        },
+      ]),
+    };
   }
 
   if (w.wednesday_service) {
     const ws = w.wednesday_service;
-    const contents: { label: string; value: string; subValue?: string }[] = [];
-    if (ws.scripture) contents.push({ label: "성경봉독", value: ws.scripture });
-    if (ws.title) contents.push({ label: "말씀", value: ws.title });
-    if (contents.length) data.wednesdayService = { ...data.wednesdayService, contents };
+    data.wednesdayService = {
+      ...data.wednesdayService,
+      contents: patchServiceContents(data.wednesdayService.contents, [
+        { label: "성경봉독", value: ws.scripture },
+        { label: "말씀", value: ws.title },
+      ]),
+    };
   }
 
   if (w.dawn_readings && w.dawn_readings.length > 0) {
@@ -296,7 +330,7 @@ export function BulletinBackLeft({ data }: { data: BulletinBackData }) {
                     className={i < data.offeringCommittee.slice(0, 3).length - 1 ? "border-b border-gray-100" : ""}
                   >
                     <td className="py-px font-bold w-8">{row.part}</td>
-                    <td className="py-px">{row.names}</td>
+                    <td className="py-px whitespace-pre-wrap">{row.names}</td>
                   </tr>
                 ))}
               </tbody>
@@ -587,7 +621,7 @@ function OfferingRow({ label, names }: { label: string; names: string }) {
   return (
     <div className="flex border-b border-gray-200 py-0.5">
       <span className="w-16 font-bold text-blue-900 shrink-0">{label}</span>
-      <span className="leading-tight whitespace-pre-line">{names}</span>
+      <span className="leading-tight whitespace-pre-wrap">{names}</span>
     </div>
   );
 }

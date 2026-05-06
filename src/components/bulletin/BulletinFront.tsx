@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { Weekly } from "@/types/notice";
 import type { BulletinMasterData } from "@/types/bulletin-master";
+import { stripLeadingNumber } from "@/components/weekly/form/shared";
 
 /** 이미지 자리 플레이스홀더 (추후 실제 이미지로 교체) */
 function ImageBox({
@@ -310,6 +311,7 @@ export function weeklyToFrontData(
 // slice 상한선은 레이아웃 고정을 위한 안전망이므로 제거하지 말 것.
 /** 페이지 4: 앞면 좌측 — 교회소식 + 섬기는 분들 / 후원하는 분들 */
 export function BulletinFrontLeft({ data }: { data: FrontData }) {
+  const newsCount = data.news.slice(0, 9).length;
   return (
     <div className="space-y-1">
       <section>
@@ -322,10 +324,11 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
           </div>
         </div>
 
+        {/* 교회소식 — 번호 자동 생성. 이후 통독/새가족/식당봉사도 cascade */}
         <div className="space-y-0.5 text-[10px]" style={{ lineHeight: "1.15" }}>
           {data.news.slice(0, 9).map((n, i) => (
             <div key={i}>
-              <div className="font-bold">{n.title}</div>
+              <div className="font-bold">{i + 1}. {stripLeadingNumber(n.title)}</div>
               {n.items.length > 0 && (
                 <div className="pl-2">
                   {n.items.map((it, j) => (
@@ -362,12 +365,12 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
           </div>
 
           <div>
-            <div className="font-bold">10. 2026년 성경 통독 현황</div>
+            <div className="font-bold">{newsCount + 1}. 2026년 성경 통독 현황</div>
             <div className="pl-2">{data.bibleReading}</div>
           </div>
 
           <div>
-            <div className="font-bold">11. 지난 주일 등록 새가족</div>
+            <div className="font-bold">{newsCount + 2}. 지난 주일 등록 새가족</div>
             <div className="pl-2">
               <table className="w-full border border-gray-400 border-collapse text-[10px]">
                 <thead>
@@ -405,7 +408,7 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
           </div>
 
           <div>
-            <div className="font-bold">12. 식당 봉사</div>
+            <div className="font-bold">{newsCount + 3}. 식당 봉사</div>
             <div className="pl-2">{data.mealDutyNote}</div>
           </div>
 

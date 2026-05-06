@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { loadBulletinMaster } from "@/lib/bulletin-master";
 import {
@@ -132,6 +132,14 @@ function PreviewPage({
   );
 }
 
+/** 탭 key → 미리보기 페이지 인덱스(0=페이지1, …, 3=페이지4) */
+const TAB_TO_PAGE: Record<string, number> = {
+  worship: 0,
+  "back-left": 1,
+  "back-right": 2,
+  front: 3,
+};
+
 export function WeeklyEditorWithPreview({
   initial,
   onSubmit,
@@ -143,6 +151,9 @@ export function WeeklyEditorWithPreview({
   const supabase = useMemo(() => createClient(), []);
   const [form, setForm] = useState<WeeklyContentInput>(initial);
   const [master, setMaster] = useState<BulletinMasterData | null>(null);
+
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
 
   useEffect(() => {
     let cancelled = false;
@@ -167,8 +178,20 @@ export function WeeklyEditorWithPreview({
     [previewWeekly, master],
   );
 
+  const handleTabChange = useCallback((key: string) => {
+    const idx = TAB_TO_PAGE[key];
+    if (idx === undefined) return;
+    const target = pageRefs.current[idx];
+    const container = scrollContainerRef.current;
+    if (!target || !container) return;
+    const targetRect = target.getBoundingClientRect();
+    const containerRect = container.getBoundingClientRect();
+    const top = container.scrollTop + (targetRect.top - containerRect.top);
+    container.scrollTo({ top, behavior: "smooth" });
+  }, []);
+
   return (
-    <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+    <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_560px]">
       <div className="min-w-0">
         <WeeklyForm
           initial={initial}
@@ -178,6 +201,7 @@ export function WeeklyEditorWithPreview({
           submitting={submitting}
           weeklyId={weeklyId}
           onFormChange={setForm}
+          onTabChange={handleTabChange}
         />
       </div>
       <div className="min-w-0">
@@ -187,19 +211,30 @@ export function WeeklyEditorWithPreview({
             <span className="text-xs text-gray-400">페이지 1 → 4 순서 (세로 스크롤)</span>
           </div>
           {frontData && backData ? (
-            <div className="max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-gray-100 p-3">
-              <PreviewPage page={1}>
-                <BulletinFrontRight data={frontData} />
-              </PreviewPage>
-              <PreviewPage page={2}>
-                <BulletinBackLeft data={backData} />
-              </PreviewPage>
-              <PreviewPage page={3}>
-                <BulletinBackRight data={backData} />
-              </PreviewPage>
-              <PreviewPage page={4}>
-                <BulletinFrontLeft data={frontData} />
-              </PreviewPage>
+            <div
+              ref={scrollContainerRef}
+              className="max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-gray-100 p-3"
+            >
+              <div ref={(el) => { pageRefs.current[0] = el; }}>
+                <PreviewPage page={1}>
+                  <BulletinFrontRight data={frontData} />
+                </PreviewPage>
+              </div>
+              <div ref={(el) => { pageRefs.current[1] = el; }}>
+                <PreviewPage page={2}>
+                  <BulletinBackLeft data={backData} />
+                </PreviewPage>
+              </div>
+              <div ref={(el) => { pageRefs.current[2] = el; }}>
+                <PreviewPage page={3}>
+                  <BulletinBackRight data={backData} />
+                </PreviewPage>
+              </div>
+              <div ref={(el) => { pageRefs.current[3] = el; }}>
+                <PreviewPage page={4}>
+                  <BulletinFrontLeft data={frontData} />
+                </PreviewPage>
+              </div>
             </div>
           ) : (
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-12 text-center text-sm text-gray-400">

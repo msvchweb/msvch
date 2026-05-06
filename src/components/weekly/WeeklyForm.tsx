@@ -14,7 +14,7 @@ import type { WeeklyContentInput } from "@/lib/validation";
 import { FormTabs, type FormTab } from "./form/FormTabs";
 import { DynamicArrayField } from "./form/DynamicArrayField";
 import { Field, SectionTitle } from "./form/Field";
-import { inputCls, inputErrCls, textareaCls, weekOfMonth } from "./form/shared";
+import { inputCls, inputErrCls, textareaCls, weekOfMonth, stripLeadingNumber } from "./form/shared";
 import {
   WORSHIP_ITEMS_TEMPLATE,
   WORSHIP_SLOT_HINTS,
@@ -38,6 +38,38 @@ interface Props {
   weeklyId?: string;
   /** 현재 폼 값을 부모(미리보기 등)에 노출. 상태 저장 용도가 아니라 파생 값 전달 용도 */
   onFormChange?: (form: WeeklyContentInput) => void;
+  /** 탭 변경 콜백 — 미리보기 자동 스크롤 등에 사용 */
+  onTabChange?: (key: string) => void;
+}
+
+/**
+ * 헌금 금액 입력 — 숫자만 추출 → "1,234,567원" 으로 자동 포맷.
+ * 사용자가 백스페이스로 끝의 "원"을 지운 경우(끝 "원"이 사라진 동일 prefix 패턴)
+ * 한 자리 숫자도 같이 지워지도록 한다(자연스러운 backspace UX).
+ */
+function formatMoney(prev: string, raw: string): string {
+  if (prev.endsWith("원") && raw === prev.slice(0, -1)) {
+    raw = raw.slice(0, -1);
+  }
+  const digits = raw.replace(/\D/g, "");
+  if (!digits) return "";
+  const n = parseInt(digits, 10);
+  if (!Number.isFinite(n)) return "";
+  return n.toLocaleString("ko-KR") + "원";
+}
+
+/**
+ * "1부 홍성란 권사" 처럼 접두가 붙어 저장된 값에서 표시용으로 접두를 떼낸다.
+ * 폼 입력은 이름만 받고 저장 시 접두를 다시 붙이기 위한 짝꿍 함수.
+ * 접두가 없으면 원본을 그대로 돌려준다(legacy 데이터 호환).
+ */
+function stripPartPrefix(value: string, part: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return "";
+  const withSpace = `${part} `;
+  if (trimmed.startsWith(withSpace)) return trimmed.slice(withSpace.length);
+  if (trimmed === part) return "";
+  return value;
 }
 
 /** 고정 슬롯(예배순서/헌금/다음주기도/안내위원/새벽예배) 길이 정합성 보정 */
@@ -85,6 +117,11 @@ function normalizeFixedSlots(f: WeeklyContentInput): WeeklyContentInput {
   }
   if (next.dawn_readings.length !== DAWN_WEEKDAY_LABELS.length) {
     next.dawn_readings = buildDawnReadings(next.date, next.dawn_readings);
+    changed = true;
+  }
+  // 교회소식 제목의 머리글 번호("1. ") 제거 — 번호는 자동 생성으로 대체
+  if (next.news.some((n) => /^\s*\d+\.\s*/.test(n.title))) {
+    next.news = next.news.map((n) => ({ ...n, title: stripLeadingNumber(n.title) }));
     changed = true;
   }
   return changed ? next : f;
@@ -143,6 +180,7 @@ export function WeeklyForm({
   submitting,
   weeklyId,
   onFormChange,
+  onTabChange,
 }: Props) {
   const [form, setForm] = useState<WeeklyContentInput>(() => normalizeFixedSlots(initial));
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
@@ -197,7 +235,7 @@ export function WeeklyForm({
   const tabs: FormTab[] = [
     {
       key: "basic",
-      label: "① 기본",
+      label: "기본",
       description: "제목·권·호·발행 채널을 관리합니다.",
       content: (
         <BasicTab
@@ -212,31 +250,31 @@ export function WeeklyForm({
     },
     {
       key: "worship",
-      label: "② 주일예배",
+      label: "페이지1(주일예배)",
       description: "순서지(1페이지 우측) · 암송말씀을 관리합니다.",
       content: <WorshipTab form={form} set={set} />,
     },
     {
-      key: "front",
-      label: "③ 앞면(교회소식)",
-      description: "4페이지(교회소식/모임/새가족/섬기는분들 참고)와 1페이지 일부를 관리합니다.",
-      content: <FrontTab form={form} set={set} />,
-    },
-    {
       key: "back-left",
-      label: "④ 뒷면-좌측(오후·수요·새벽)",
+      label: "페이지2(예배안내)",
       description: "2페이지(뒷면 좌측)의 예배·기도 영역을 관리합니다.",
       content: <BackLeftTab form={form} set={set} />,
     },
     {
       key: "back-right",
-      label: "⑤ 뒷면-우측(헌금)",
+      label: "페이지3(헌금)",
       description: "3페이지(뒷면 우측)의 향기로운 예물 / 누계를 관리합니다.",
       content: <BackRightTab form={form} set={set} />,
     },
     {
+      key: "front",
+      label: "페이지4(교회소식)",
+      description: "4페이지(교회소식/모임/새가족/섬기는분들 참고)와 1페이지 일부를 관리합니다.",
+      content: <FrontTab form={form} set={set} />,
+    },
+    {
       key: "misc",
-      label: "⑥ 기타",
+      label: "기타",
       description: "일반 공지·섬기는분들 텍스트 등 레거시 필드.",
       content: <MiscTab form={form} set={set} />,
     },
@@ -244,7 +282,7 @@ export function WeeklyForm({
 
   return (
     <div className="space-y-6">
-      <FormTabs tabs={tabs} />
+      <FormTabs tabs={tabs} onActiveChange={onTabChange} />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 pt-6 pb-8">
         {weeklyId && onGeneratePdf && (
@@ -591,6 +629,7 @@ function FrontTab({ form, set }: TabProps) {
     <div className="space-y-6">
       <section className="rounded-xl border border-gray-200 bg-white p-6">
         <SectionTitle>교회소식 (최대 9개)</SectionTitle>
+        <p className="mb-3 text-xs text-gray-500">번호(1./2./...)는 자동으로 매겨집니다. 제목만 입력하세요.</p>
         <DynamicArrayField<NewsItem>
           label="교회소식"
           items={form.news}
@@ -600,12 +639,12 @@ function FrontTab({ form, set }: TabProps) {
           onChange={(next) => set("news", next)}
           renderRow={(n, _i, update) => (
             <div className="space-y-2">
-              <Field label="제목">
+              <Field label={`${_i + 1}. 제목`}>
                 <input
                   className={inputCls}
                   value={n.title}
                   onChange={(e) => update({ title: e.target.value })}
-                  placeholder="1. 2026 새생명 마을축제"
+                  placeholder="2026 새생명 마을축제"
                 />
               </Field>
               <Field label="세부 항목 (한 줄 = 하나)">
@@ -661,11 +700,7 @@ function FrontTab({ form, set }: TabProps) {
             </div>
           )}
         />
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>단문 메모</SectionTitle>
-        <div className="grid gap-4">
+        <div className="mt-4 border-t border-gray-100 pt-4">
           <Field label="북한선교부 메모" hint="예: * 북한선교부 : 오늘(매 월 셋 째 주) 2부예배후 1층 사무실 안쪽">
             <input
               className={inputCls}
@@ -673,6 +708,12 @@ function FrontTab({ form, set }: TabProps) {
               onChange={(e) => set("north_korea_note", e.target.value)}
             />
           </Field>
+        </div>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 bg-white p-6">
+        <SectionTitle>단문 메모</SectionTitle>
+        <div className="grid gap-4">
           <Field label="성경 통독 현황" hint="예: * 6독 - 조성희,  10독 - 장정자">
             <input
               className={inputCls}
@@ -831,20 +872,21 @@ function BackLeftTab({ form, set }: TabProps) {
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
         <SectionTitle>다음 주 기도 (1·2·3부 고정)</SectionTitle>
-        <p className="mb-3 text-xs text-gray-500">1부/2부/3부 이름만 입력합니다.</p>
+        <p className="mb-3 text-xs text-gray-500">이름만 입력하세요. &quot;1부/2부/3부&quot; 접두는 자동으로 붙습니다.</p>
         <div className="grid gap-4 sm:grid-cols-3">
           {NEXT_WEEK_PRAYER_PARTS.map((part, i) => (
             <Field key={part} label={part}>
               <input
                 className={inputCls}
-                value={form.next_week_prayer[i] ?? ""}
+                value={stripPartPrefix(form.next_week_prayer[i] ?? "", part)}
                 onChange={(e) => {
                   const next = [...form.next_week_prayer];
                   while (next.length <= i) next.push("");
-                  next[i] = e.target.value;
+                  const name = e.target.value;
+                  next[i] = name ? `${part} ${name}` : "";
                   set("next_week_prayer", next);
                 }}
-                placeholder="이름"
+                placeholder="홍성란 권사"
               />
             </Field>
           ))}
@@ -984,19 +1026,23 @@ function BackRightTab({ form, set }: TabProps) {
       <section className="rounded-xl border border-gray-200 bg-white p-6">
         <SectionTitle>누계</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="지난주 헌금 총액">
+          <Field label="지난주 헌금 총액" hint="숫자만 입력하면 콤마와 '원'이 자동으로 표시됩니다.">
             <input
               className={inputCls}
+              inputMode="numeric"
               value={form.week_total}
-              onChange={(e) => set("week_total", e.target.value)}
+              onChange={(e) => set("week_total", formatMoney(form.week_total, e.target.value))}
               placeholder="0원"
             />
           </Field>
-          <Field label="누계">
+          <Field label="누계" hint="숫자만 입력하면 콤마와 '원'이 자동으로 표시됩니다.">
             <input
               className={inputCls}
+              inputMode="numeric"
               value={form.cumulative_total}
-              onChange={(e) => set("cumulative_total", e.target.value)}
+              onChange={(e) =>
+                set("cumulative_total", formatMoney(form.cumulative_total, e.target.value))
+              }
               placeholder="0원"
             />
           </Field>
