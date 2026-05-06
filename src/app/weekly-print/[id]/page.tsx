@@ -55,23 +55,54 @@ export default async function WeeklyPrintPage({
   return (
     <>
       <style>{`
-        @page { size: A4; margin: 0; }
+        @page { size: A4 landscape; margin: 0; }
         html, body { margin: 0; padding: 0; background: #e5e7eb; }
         body > header, body > footer, body > div[class*="ChatBot"], body > nav, body > div:has(> button[aria-label*="챗봇"]) { display: none !important; }
         main { padding: 0 !important; }
+
+        /* 화면(상단 미리보기) — A4 가로 시트 두 장을 세로로 쌓아 보여줌 */
+        .bulletin-print {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          gap: 8mm;
+          padding: 8mm 0;
+        }
         .bulletin-print .page {
-          width: 210mm;
-          height: 297mm;
-          margin: 0 auto 8mm auto;
+          width: 297mm;
+          height: 210mm;
           background: white;
           box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          overflow: hidden;
+          display: grid;
+          grid-template-columns: 148.5mm 148.5mm;
           page-break-after: always;
+          overflow: hidden;
           box-sizing: border-box;
         }
-        .bulletin-print .page:last-child { page-break-after: auto; margin-bottom: 0; }
+        .bulletin-print .page:last-child { page-break-after: auto; }
+        .bulletin-print .a5-cell {
+          width: 148.5mm;
+          height: 210mm;
+          overflow: hidden;
+          background: white;
+          display: flex;
+          align-items: flex-start;
+          justify-content: center;
+          box-sizing: border-box;
+        }
+        /* 주보 컴포넌트의 자연 디자인 폭(133×189mm) → zoom 1.11 로 A5 (148×210mm) 채움 */
+        .bulletin-print .bulletin-fit {
+          width: 133mm;
+          min-height: 189mm;
+          padding: 4mm;
+          zoom: 1.11;
+          box-sizing: border-box;
+          background: white;
+        }
+
         @media print {
           body { background: white !important; }
+          .bulletin-print { padding: 0; gap: 0; }
           .bulletin-print .page { box-shadow: none; margin: 0; }
         }
       `}</style>

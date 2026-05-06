@@ -278,6 +278,12 @@ export function WeeklyForm({
       description: "일반 공지·섬기는분들 텍스트 등 레거시 필드.",
       content: <MiscTab form={form} set={set} />,
     },
+    {
+      key: "masters",
+      label: "주보 마스터",
+      description: "여러 주보에서 공용으로 쓰는 마스터 데이터 — 새 탭에서 편집합니다.",
+      content: <MastersTab />,
+    },
   ];
 
   return (
@@ -1169,6 +1175,62 @@ function MiscTab({ form, set }: TabProps) {
           />
         </Field>
       </section>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
+//  Tab 7: 주보 마스터 (외부 라우트 링크 카드)
+// ─────────────────────────────────────────────
+
+const MASTER_SECTIONS: { href: string; title: string; desc: string }[] = [
+  {
+    href: "/admin/masters/topic",
+    title: "교회 표어 (올해의 주제)",
+    desc: "주보 1페이지 우측에 표시되는 연도 표어 — 예: '복음의 열매'",
+  },
+  {
+    href: "/admin/masters/mokjang",
+    title: "소그룹 목장",
+    desc: "주보 3페이지 소그룹 목장 표 (목장 번호 / 목자 / 부목자)",
+  },
+  {
+    href: "/admin/masters/servants",
+    title: "섬기는 분들",
+    desc: "주보 4페이지 좌측 '섬기는 분들' 역할 ↔ 이름",
+  },
+  {
+    href: "/admin/masters/supports",
+    title: "우리가 후원하는 분들",
+    desc: "주보 4페이지 좌측 '우리가 후원하는 분들' 섹션 (해외·국내·방송 등)",
+  },
+  {
+    href: "/admin/masters/community-prayers",
+    title: "교회공동체 기도제목",
+    desc: "주보 2페이지 '교회공동체 기도제목' 목록 (최대 7줄)",
+  },
+];
+
+function MastersTab() {
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-500">
+        매주 바뀌지 않고 여러 페이지에서 공용으로 쓰는 값입니다. 카드를 누르면 새 탭에서 열려, 현재 작성 중인 주보를 잃지 않고 편집할 수 있습니다.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {MASTER_SECTIONS.map((s) => (
+          <a
+            key={s.href}
+            href={s.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-primary-300 hover:shadow-sm"
+          >
+            <h3 className="mb-1 text-sm font-semibold text-gray-900">{s.title}</h3>
+            <p className="text-xs leading-relaxed text-gray-500">{s.desc}</p>
+          </a>
+        ))}
+      </div>
     </div>
   );
 }

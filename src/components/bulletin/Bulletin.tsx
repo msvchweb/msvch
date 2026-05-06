@@ -18,20 +18,31 @@ export default function Bulletin({
   const backData = weeklyToBackData(weekly, master);
 
   if (mode === "print") {
+    // A4 가로 (297×210mm) 한 장에 A5 (148×210mm) 두 면을 좌·우로 배치 — 책자 임포지션
+    //   시트 1 (앞면) : [페이지 4: 교회소식] | [페이지 1: 예배순서] ← 접으면 표지·표4
+    //   시트 2 (뒷면) : [페이지 2: 예배안내] | [페이지 3: 헌금]    ← 접으면 내지
     return (
       <div className="bulletin-print">
-        <section className="page front-page">
-          <div className="bulletin-front bg-white text-gray-800 text-[10px] leading-tight p-4">
-            <div className="grid grid-cols-2 gap-4">
+        <section className="page">
+          <div className="a5-cell">
+            <div className="bulletin-fit text-[10px] leading-tight text-gray-800">
               <BulletinFrontLeft data={frontData} />
+            </div>
+          </div>
+          <div className="a5-cell">
+            <div className="bulletin-fit text-[10px] leading-tight text-gray-800">
               <BulletinFrontRight data={frontData} />
             </div>
           </div>
         </section>
-        <section className="page back-page">
-          <div className="bulletin-back bg-white text-gray-800 text-[11px] leading-tight">
-            <div className="grid grid-cols-2 gap-6 p-4">
+        <section className="page">
+          <div className="a5-cell">
+            <div className="bulletin-fit text-[11px] leading-tight text-gray-800">
               <BulletinBackLeft data={backData} />
+            </div>
+          </div>
+          <div className="a5-cell">
+            <div className="bulletin-fit text-[11px] leading-tight text-gray-800">
               <BulletinBackRight data={backData} />
             </div>
           </div>
