@@ -8,6 +8,11 @@ interface GeminiResponse {
   }[];
 }
 
+/** Gemini API 의 contents[].parts[] 항목. text 또는 inlineData(이미지) 만 사용. */
+type GeminiPart =
+  | { text: string }
+  | { inlineData: { mimeType: string; data: string } };
+
 // 503/429/500/502/504는 일시적 장애로 보고 재시도/폴백 대상
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
@@ -29,10 +34,10 @@ function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function callGemini(
+async function callGeminiInner(
   model: string,
   apiKey: string,
-  prompt: string
+  parts: GeminiPart[],
 ): Promise<{ ok: true; text: string } | { ok: false; status: number; body: string }> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -40,7 +45,7 @@ async function callGemini(
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
+        contents: [{ parts }],
       }),
     }
   );
@@ -58,11 +63,8 @@ async function callGemini(
   return { ok: true, text };
 }
 
-/**
- * 폴백 체인 + 지수 백오프 재시도를 포함한 범용 Gemini 호출.
- * scripts/shorts/ 및 API 라우트에서 재사용 가능.
- */
-export async function callGeminiWithFallback(prompt: string): Promise<string> {
+/** 폴백 체인 + 지수 백오프 재시도 공용 본체. */
+async function callWithRetryAndFallback(parts: GeminiPart[]): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error("GEMINI_API_KEY가 설정되지 않았습니다.");
 
@@ -72,7 +74,7 @@ export async function callGeminiWithFallback(prompt: string): Promise<string> {
   for (const model of MODEL_FALLBACK_CHAIN) {
     const maxAttempts = 3;
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-      const result = await callGemini(model, apiKey, prompt);
+      const result = await callGeminiInner(model, apiKey, parts);
       if (result.ok) return result.text;
 
       if (!RETRYABLE_STATUS.has(result.status)) {
@@ -91,6 +93,32 @@ export async function callGeminiWithFallback(prompt: string): Promise<string> {
   throw new GeminiUnavailableError(
     `AI 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요. (마지막 상태: ${lastTransientStatus} ${lastErrorBody.slice(0, 200)})`
   );
+}
+
+/**
+ * 폴백 체인 + 지수 백오프 재시도를 포함한 범용 Gemini 텍스트 호출.
+ * scripts/shorts/ 및 API 라우트에서 재사용 가능.
+ */
+export async function callGeminiWithFallback(prompt: string): Promise<string> {
+  return callWithRetryAndFallback([{ text: prompt }]);
+}
+
+/**
+ * 멀티모달 호출 — 텍스트 + (선택) 이미지 1장.
+ * image 가 undefined 면 텍스트 전용 경로와 동일하게 동작.
+ * Gemini 2.5 Flash 무료티어가 image input 도 지원.
+ */
+export async function callGeminiWithFallbackMultimodal(
+  prompt: string,
+  image?: { base64: string; mimeType: string },
+): Promise<string> {
+  const parts: GeminiPart[] = image
+    ? [
+        { text: prompt },
+        { inlineData: { mimeType: image.mimeType, data: image.base64 } },
+      ]
+    : [{ text: prompt }];
+  return callWithRetryAndFallback(parts);
 }
 
 export async function summarizeSermonFromVideo(

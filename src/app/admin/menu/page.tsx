@@ -13,6 +13,7 @@ import {
   MessageSquare,
   UserPlus,
   Users,
+  Palette,
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -91,6 +92,17 @@ const baseGroups: MenuGroup[] = [
         href: "/admin/boards",
         description: "그룹별 게시판",
         icon: Layers,
+      },
+    ],
+  },
+  {
+    title: "포스터",
+    items: [
+      {
+        label: "포스터",
+        href: "/admin/posters",
+        description: "AI 로 행사·공지 포스터 생성",
+        icon: Palette,
       },
     ],
   },

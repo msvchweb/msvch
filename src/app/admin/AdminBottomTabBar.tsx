@@ -42,6 +42,7 @@ const TABS: AdminTab[] = [
       "/admin/inquiries",
       "/admin/new-families",
       "/admin/members",
+      "/admin/posters",
     ],
   },
 ];

@@ -26,6 +26,11 @@ const baseNav: AdminNavItem[] = [
     matchPaths: ["/admin/gallery", "/admin/boards"],
   },
   {
+    label: "포스터",
+    href: "/admin/posters",
+    icon: "posters",
+  },
+  {
     label: "설교·쇼츠",
     href: "/admin/sermons",
     icon: "sermons",
