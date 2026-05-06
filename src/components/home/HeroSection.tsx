@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import type { HeroSlide } from "@/types/notice";
 
 const FALLBACK: HeroSlide = {
@@ -19,6 +19,8 @@ const FALLBACK: HeroSlide = {
 export function HeroSection({ slides }: { slides: HeroSlide[] }) {
   const list: HeroSlide[] = slides.length > 0 ? slides : [FALLBACK];
   const [idx, setIdx] = useState(0);
+  const active = list[idx];
+  const isFallback = active.id === "fallback";
 
   useEffect(() => {
     if (list.length <= 1) return;
@@ -30,85 +32,99 @@ export function HeroSection({ slides }: { slides: HeroSlide[] }) {
   }, [list.length]);
 
   return (
-    <section className="relative bg-[var(--color-hero-bg-1)] px-4 pt-[60px] pb-16 text-center sm:px-12 sm:pt-[100px] sm:pb-20">
-      <h1 className="mx-auto mb-6 max-w-[900px] text-4xl font-bold leading-[1.15] tracking-[-0.035em] text-church-dark sm:text-5xl md:text-[68px]">
-        꿈이 있는 건강한 교회
-        <br />
-        <span className="text-primary-700">명성비전교회</span>입니다
-      </h1>
-
-      <div className="mb-12 flex justify-center gap-2.5 sm:mb-16">
-        <Link
-          href="/worship"
-          className="group flex items-center gap-1 rounded-full bg-church-dark px-7 py-3.5 text-sm font-medium text-church-cream transition-colors hover:bg-gray-800"
-        >
-          예배 안내
-          <ChevronRight size={16} className="transition-transform group-hover:translate-x-0.5" />
-        </Link>
-        <Link
-          href="/greetings"
-          className="rounded-full border border-gray-300 px-7 py-3.5 text-sm font-medium text-church-dark hover:bg-white"
-        >
-          교회 소개
-        </Link>
-      </div>
-
-      <div className="relative mx-auto h-[280px] max-w-[1100px] overflow-hidden rounded-[20px] shadow-[0_30px_80px_-30px_rgba(30,40,60,0.3)] sm:h-[440px]">
+    <section className="relative h-[82vh] min-h-[560px] overflow-hidden sm:min-h-[640px]">
+      <div className="absolute inset-0">
         <div
           className="flex h-full w-full transition-transform duration-700 ease-out"
           style={{ transform: `translateX(-${idx * 100}%)` }}
         >
-          {list.map((slide, i) => {
-            const isFallbackSlide = slide.id === "fallback";
-            return (
-              <div key={slide.id} className="relative h-full w-full shrink-0">
-                <Image
-                  src={slide.image}
-                  alt={slide.title}
-                  fill
-                  sizes="(max-width: 1100px) 100vw, 1100px"
-                  className="object-cover"
-                  priority={i === 0}
-                  unoptimized={slide.image.startsWith("http")}
-                />
-                {!isFallbackSlide && (
-                  <>
-                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-black/25 to-transparent" />
-                    <div className="pointer-events-none absolute inset-x-0 bottom-0 px-6 pb-16 pt-10 text-left sm:px-10 sm:pb-20">
-                      <h2 className="max-w-[900px] text-lg font-bold leading-[1.3] tracking-[-0.02em] text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.5)] sm:text-2xl md:text-3xl">
-                        {slide.title}
-                      </h2>
-                    </div>
-                    <Link
-                      href={slide.href}
-                      aria-label={slide.title}
-                      className="absolute inset-0"
-                    >
-                      <span className="sr-only">{slide.title}</span>
-                    </Link>
-                  </>
-                )}
-              </div>
-            );
-          })}
+          {list.map((slide, i) => (
+            <div key={slide.id} className="relative h-full w-full shrink-0">
+              <Image
+                src={slide.image}
+                alt={slide.title}
+                fill
+                sizes="100vw"
+                className="object-cover"
+                priority={i === 0}
+                unoptimized={slide.image.startsWith("http")}
+              />
+            </div>
+          ))}
+        </div>
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.55)_0%,rgba(0,0,0,0.15)_35%,rgba(0,0,0,0.2)_65%,rgba(0,0,0,0.78)_100%)]" />
+      </div>
+
+      <div className="relative z-10 flex h-full flex-col justify-between px-6 pt-24 pb-10 sm:px-16 sm:pt-32 sm:pb-12">
+        <div className="max-w-[920px]">
+          <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.28em] text-white/70">
+            Welcome
+          </p>
+          <h1 className="text-4xl font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-6xl md:text-[80px]">
+            꿈이 있는 건강한 교회
+            <br />
+            <span className="font-light text-white/90">명성비전교회</span>
+          </h1>
+          <div className="mt-9 flex flex-wrap gap-x-8 gap-y-3">
+            <Link
+              href="/worship"
+              className="group inline-flex items-center gap-1.5 text-sm font-medium text-white"
+            >
+              예배 안내
+              <ArrowRight
+                size={16}
+                className="transition-transform group-hover:translate-x-1"
+              />
+            </Link>
+            <Link
+              href="/greetings"
+              className="group inline-flex items-center gap-1.5 text-sm font-medium text-white/75 hover:text-white"
+            >
+              교회 소개
+              <ArrowRight
+                size={16}
+                className="transition-transform group-hover:translate-x-1"
+              />
+            </Link>
+          </div>
         </div>
 
-        {list.length > 1 && (
-          <div className="absolute bottom-5 left-1/2 z-10 flex -translate-x-1/2 gap-2 rounded-full bg-white/85 px-3.5 py-2 backdrop-blur-md">
-            {list.map((slide, i) => (
-              <button
-                key={slide.id}
-                onClick={() => setIdx(i)}
-                aria-label={`슬라이드 ${i + 1}`}
-                className="h-1.5 rounded-full transition-all"
-                style={{
-                  width: i === idx ? 24 : 6,
-                  background: i === idx ? "#1a2332" : "rgba(30,40,60,0.3)",
-                }}
-              />
-            ))}
+        <div className="flex items-end justify-between gap-6">
+          <div className="min-w-0 flex-1">
+            {!isFallback && (
+              <Link
+                href={active.href}
+                className="group block max-w-[680px]"
+              >
+                <p className="text-[11px] uppercase tracking-[0.28em] text-white/60">
+                  현재 공지
+                </p>
+                <h2 className="mt-2 line-clamp-2 text-lg font-medium leading-snug text-white sm:text-2xl">
+                  {active.title}
+                </h2>
+              </Link>
+            )}
           </div>
-        )}
+          {list.length > 1 && (
+            <div className="flex shrink-0 items-center gap-1.5">
+              {list.map((slide, i) => (
+                <button
+                  key={slide.id}
+                  onClick={() => setIdx(i)}
+                  aria-label={`슬라이드 ${i + 1}`}
+                  className="h-[3px] rounded-full transition-all"
+                  style={{
+                    width: i === idx ? 36 : 14,
+                    background:
+                      i === idx
+                        ? "rgba(255,255,255,0.95)"
+                        : "rgba(255,255,255,0.35)",
+                  }}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );
