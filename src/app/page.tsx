@@ -5,7 +5,7 @@ import { UpcomingEvents } from "@/components/home/UpcomingEvents";
 import { RecentNotice } from "@/components/home/RecentNotice";
 import { LatestSermon } from "@/components/home/LatestSermon";
 import { getHeroSlides, getNotices } from "@/lib/notices";
-import { getLatestSermon } from "@/lib/youtube";
+import { getLatestSermon } from "@/lib/sermons";
 import { getUpcomingEvents } from "@/lib/events";
 
 export const revalidate = 3600;

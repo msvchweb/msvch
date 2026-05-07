@@ -1,5 +1,5 @@
 import { Container } from "@/components/ui/Container";
-import { getSermonVideos } from "@/lib/youtube";
+import { getSermonByVideoId } from "@/lib/sermons";
 import { formatDateKorean } from "@/lib/utils";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -15,8 +15,7 @@ export async function generateMetadata({
   params: Params;
 }): Promise<Metadata> {
   const { id } = await params;
-  const videos = await getSermonVideos();
-  const video = videos.find((v) => v.videoId === id);
+  const video = await getSermonByVideoId(id);
   return video ? { title: video.title } : { title: "설교 영상" };
 }
 
@@ -26,8 +25,7 @@ export default async function SermonDetailPage({
   params: Params;
 }) {
   const { id } = await params;
-  const videos = await getSermonVideos();
-  const video = videos.find((v) => v.videoId === id);
+  const video = await getSermonByVideoId(id);
 
   return (
     <Container>

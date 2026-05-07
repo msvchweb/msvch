@@ -3,6 +3,10 @@
     {
       "path": "/api/admin/cron/alimtalk-events",
       "schedule": "0 21 * * *"
+    },
+    {
+      "path": "/api/admin/cron/sync-sermons",
+      "schedule": "0 6 * * *"
     }
   ]
 }

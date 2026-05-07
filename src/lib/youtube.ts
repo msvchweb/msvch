@@ -1,3 +1,10 @@
+/**
+ * YouTube 업로드 플레이리스트 fetch — cron sync 전용.
+ *
+ * 표시용 코드는 이 모듈을 직접 호출하지 않는다. (대신 src/lib/sermons.ts → DB)
+ * 호출 횟수를 최소화하기 위해 sync 엔드포인트에서만 사용.
+ */
+
 import type { SermonVideo } from "@/types/youtube";
 
 const API_KEY = process.env.YOUTUBE_API_KEY ?? "";
@@ -16,7 +23,13 @@ interface PlaylistItemsResponse {
   nextPageToken?: string;
 }
 
-export async function getSermonVideos(maxResults = 15): Promise<SermonVideo[]> {
+/**
+ * 업로드 플레이리스트에서 최근 영상 fetch.
+ * sync 시 누적 저장하므로 maxResults 가 작아도 시간이 지나면 DB에 자연스럽게 누적됨.
+ */
+export async function fetchYouTubeUploads(
+  maxResults = 50,
+): Promise<SermonVideo[]> {
   if (!API_KEY) {
     console.error("YOUTUBE_API_KEY is not set");
     return [];
@@ -24,7 +37,7 @@ export async function getSermonVideos(maxResults = 15): Promise<SermonVideo[]> {
 
   try {
     const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${UPLOADS_PLAYLIST_ID}&maxResults=${maxResults}&key=${API_KEY}`;
-    const res = await fetch(url, { next: { revalidate: 1800 } });
+    const res = await fetch(url, { cache: "no-store" });
 
     if (!res.ok) {
       console.error(`YouTube API failed: ${res.status} ${res.statusText}`);
@@ -47,9 +60,4 @@ export async function getSermonVideos(maxResults = 15): Promise<SermonVideo[]> {
     console.error("YouTube API error:", error);
     return [];
   }
-}
-
-export async function getLatestSermon(): Promise<SermonVideo | null> {
-  const videos = await getSermonVideos(1);
-  return videos[0] || null;
 }

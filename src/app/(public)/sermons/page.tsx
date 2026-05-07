@@ -1,7 +1,7 @@
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { SermonTabs } from "@/components/SermonTabs";
-import { getSermonVideos } from "@/lib/youtube";
+import { getSermonVideos } from "@/lib/sermons";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "설교 영상" };

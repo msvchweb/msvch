@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getSermonVideos } from "@/lib/youtube";
+import { getLatestSermon } from "@/lib/sermons";
 
 export interface NewContentDates {
   notices: string | null;
@@ -14,11 +14,10 @@ export type ContentKey = keyof NewContentDates;
 
 export const revalidate = 600;
 
-/** YouTube RSS를 타임아웃 포함하여 가져옴 (캐시 히트 시 즉시) */
 async function getLatestSermonDate(): Promise<string | null> {
   try {
-    const videos = await getSermonVideos(1);
-    return videos[0]?.publishedAt ?? null;
+    const v = await getLatestSermon();
+    return v?.publishedAt ?? null;
   } catch {
     return null;
   }
