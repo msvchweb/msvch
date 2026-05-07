@@ -41,8 +41,12 @@ export interface AfternoonService {
 }
 
 export interface WednesdayService {
+  leader: string;
   scripture: string;
   title: string;
+  pastor: string;
+  hymn: string;
+  benediction: string;
 }
 
 export interface DawnReading {
@@ -54,14 +58,6 @@ export interface OfferingMembers {
   p1: string;
   p2: string;
   p3: string;
-}
-
-export interface PrayerItem {
-  text: string;
-}
-
-export interface Announcement {
-  text: string;
 }
 
 export interface PublishChannels {
@@ -127,22 +123,17 @@ export interface Weekly {
   created_at: string;
   volume: number | null;
   issue: number | null;
-  hymn_number: string | null;
-  scripture: string | null;
   special_praise: SpecialPraiseField;
   sermon_title: string | null;
   sermon_pastor: string | null;
   closing_hymn: string | null;
   weekly_verse: string | null;
   afternoon_service: AfternoonService;
+  /** 주일오후 찬양예배 자리를 "목장모임"(이미지+제목)으로 대체 */
+  afternoon_mokjang_mode: boolean;
   wednesday_service: WednesdayService;
   dawn_readings: DawnReading[];
   offering_members: OfferingMembers;
-  prayer_items: PrayerItem[];
-  announcements: Announcement[];
-  servants_text: string | null;
-  offering_list_text: string | null;
-  sogroup_text?: string | null;
   is_published: boolean;
   publish_channels: PublishChannels;
   // ── migration 011 신규 필드 (주보 레이아웃 직결)
@@ -159,6 +150,15 @@ export interface Weekly {
   next_week_prayer: string[];
   guide_committee: GuideCommitteeRow[];
   offerings: OfferingCategoryRow[];
+  /** 부활감사 자리(SPECIAL_OFFERING_INDEX)의 토글/라벨. 비활성 시 주보 미표시. */
+  special_offering: { enabled: boolean; label: string };
+  /** 페이지 4(교회소식 영역) 섹션별 표시 토글. 비활성 시 주보에서 행 제거 + 번호 재계산. */
+  front_toggles: {
+    bibleReading: boolean;
+    newMembers: boolean;
+    mealDuty: boolean;
+    volunteerNote: boolean;
+  };
   week_total: string | null;
   cumulative_total: string | null;
 }

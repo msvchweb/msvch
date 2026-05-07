@@ -95,6 +95,12 @@ export interface FrontData {
     items: WorshipItem[];
     memorizeVerse: { ref: string; text: string };
   };
+  toggles: {
+    bibleReading: boolean;
+    newMembers: boolean;
+    mealDuty: boolean;
+    volunteerNote: boolean;
+  };
 }
 
 const DEFAULT: FrontData = {
@@ -255,6 +261,12 @@ const DEFAULT: FrontData = {
       text: "이것을 너희에게 이르는 것은 너희로 내 안에서 평안을 누리게 하려 함이라 세상에서는 너희가 환난을 당하나 담대하라 내가 세상을 이기었노라",
     },
   },
+  toggles: {
+    bibleReading: true,
+    newMembers: true,
+    mealDuty: true,
+    volunteerNote: true,
+  },
 };
 
 export function weeklyToFrontData(
@@ -285,6 +297,7 @@ export function weeklyToFrontData(
   if (w.new_members && w.new_members.length > 0) data.newMembers = w.new_members;
   if (w.meal_duty_note) data.mealDutyNote = w.meal_duty_note;
   if (w.volunteer_note) data.volunteerNote = w.volunteer_note;
+  if (w.front_toggles) data.toggles = { ...data.toggles, ...w.front_toggles };
   if (w.worship_leader) data.worship = { ...data.worship, leader: w.worship_leader };
   if (w.worship_items && w.worship_items.length > 0) {
     data.worship = {
@@ -311,7 +324,13 @@ export function weeklyToFrontData(
 // slice 상한선은 레이아웃 고정을 위한 안전망이므로 제거하지 말 것.
 /** 페이지 4: 앞면 좌측 — 교회소식 + 섬기는 분들 / 후원하는 분들 */
 export function BulletinFrontLeft({ data }: { data: FrontData }) {
-  const newsCount = data.news.slice(0, 9).length;
+  const newsCount = data.news.slice(0, 20).length;
+  // 토글된 섹션의 번호를 동적으로 계산. 모임은 항상 표시.
+  let counter = newsCount;
+  const meetingsNum = ++counter;
+  const bibleNum = data.toggles.bibleReading ? ++counter : null;
+  const newMembersNum = data.toggles.newMembers ? ++counter : null;
+  const mealDutyNum = data.toggles.mealDuty ? ++counter : null;
   return (
     <div className="space-y-1">
       <section>
@@ -326,7 +345,7 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
 
         {/* 교회소식 — 번호 자동 생성. 이후 통독/새가족/식당봉사도 cascade */}
         <div className="space-y-0.5 text-[10px]" style={{ lineHeight: "1.15" }}>
-          {data.news.slice(0, 9).map((n, i) => (
+          {data.news.slice(0, 20).map((n, i) => (
             <div key={i}>
               <div className="font-bold">{i + 1}. {stripLeadingNumber(n.title)}</div>
               {n.items.length > 0 && (
@@ -339,38 +358,44 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
             </div>
           ))}
 
-          {/* 9. 모임 표 */}
-          <div className="pl-2">
-            <table className="w-full border border-gray-400 border-collapse text-[10px]">
-              <tbody>
-                {pairRows(data.meetings.slice(0, 6)).map((pair, i) => (
-                  <tr key={i} className="border-b border-gray-300 last:border-b-0">
-                    <td className="border-r border-gray-300 px-1 py-0 font-bold w-12">
-                      {pair[0]?.group ?? ""}
-                    </td>
-                    <td className="border-r border-gray-300 px-1 py-0">
-                      {pair[0] ? `${pair[0].when}  ${pair[0].place}` : ""}
-                    </td>
-                    <td className="border-r border-gray-300 px-1 py-0 font-bold w-12">
-                      {pair[1]?.group ?? ""}
-                    </td>
-                    <td className="px-1 py-0">
-                      {pair[1] ? `${pair[1].when}  ${pair[1].place}` : ""}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="mt-0.5">{data.northKoreaNote}</div>
+          {/* 모임: 번호.모임 타이틀 + 표 */}
+          <div>
+            <div className="font-bold">{meetingsNum}. 모임</div>
+            <div className="pl-2">
+              <table className="w-full border border-gray-400 border-collapse text-[10px]">
+                <tbody>
+                  {pairRows(data.meetings.slice(0, 6)).map((pair, i) => (
+                    <tr key={i} className="border-b border-gray-300 last:border-b-0">
+                      <td className="border-r border-gray-300 px-1 py-0 font-bold w-12">
+                        {pair[0]?.group ?? ""}
+                      </td>
+                      <td className="border-r border-gray-300 px-1 py-0">
+                        {pair[0] ? `${pair[0].when}  ${pair[0].place}` : ""}
+                      </td>
+                      <td className="border-r border-gray-300 px-1 py-0 font-bold w-12">
+                        {pair[1]?.group ?? ""}
+                      </td>
+                      <td className="px-1 py-0">
+                        {pair[1] ? `${pair[1].when}  ${pair[1].place}` : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div className="mt-0.5">{data.northKoreaNote}</div>
+            </div>
           </div>
 
-          <div>
-            <div className="font-bold">{newsCount + 1}. 2026년 성경 통독 현황</div>
-            <div className="pl-2">{data.bibleReading}</div>
-          </div>
+          {bibleNum !== null && (
+            <div>
+              <div className="font-bold">{bibleNum}. 2026년 성경 통독 현황</div>
+              <div className="pl-2">{data.bibleReading}</div>
+            </div>
+          )}
 
+          {newMembersNum !== null && (
           <div>
-            <div className="font-bold">{newsCount + 2}. 지난 주일 등록 새가족</div>
+            <div className="font-bold">{newMembersNum}. 지난 주일 등록 새가족</div>
             <div className="pl-2">
               <table className="w-full border border-gray-400 border-collapse text-[10px]">
                 <thead>
@@ -406,16 +431,21 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
               </table>
             </div>
           </div>
+          )}
 
-          <div>
-            <div className="font-bold">{newsCount + 3}. 식당 봉사</div>
-            <div className="pl-2">{data.mealDutyNote}</div>
-          </div>
+          {mealDutyNum !== null && (
+            <div>
+              <div className="font-bold">{mealDutyNum}. 식당 봉사</div>
+              <div className="pl-2">{data.mealDutyNote}</div>
+            </div>
+          )}
 
-          <div>
-            <div className="font-bold">※ 봉사센터 소식</div>
-            <div className="pl-2">{data.volunteerNote}</div>
-          </div>
+          {data.toggles.volunteerNote && (
+            <div>
+              <div className="font-bold">※ 봉사센터 소식</div>
+              <div className="pl-2">{data.volunteerNote}</div>
+            </div>
+          )}
         </div>
       </section>
 

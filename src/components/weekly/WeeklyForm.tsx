@@ -2,8 +2,6 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
-  PrayerItem,
-  Announcement,
   NewsItem,
   MeetingRow,
   NewMemberRow,
@@ -13,12 +11,18 @@ import type {
 import type { WeeklyContentInput } from "@/lib/validation";
 import { FormTabs, type FormTab } from "./form/FormTabs";
 import { DynamicArrayField } from "./form/DynamicArrayField";
+import { TopicEditor } from "./masters/TopicEditor";
+import { MokjangEditor } from "./masters/MokjangEditor";
+import { ServantsEditor } from "./masters/ServantsEditor";
+import { SupportsEditor } from "./masters/SupportsEditor";
+import { CommunityPrayersEditor } from "./masters/CommunityPrayersEditor";
 import { Field, SectionTitle } from "./form/Field";
 import { inputCls, inputErrCls, textareaCls, weekOfMonth, stripLeadingNumber } from "./form/shared";
 import {
   WORSHIP_ITEMS_TEMPLATE,
   WORSHIP_SLOT_HINTS,
   OFFERING_CATEGORIES,
+  SPECIAL_OFFERING_INDEX,
   NEXT_WEEK_PRAYER_PARTS,
   GUIDE_COMMITTEE_PARTS,
   DAWN_WEEKDAY_LABELS,
@@ -56,17 +60,62 @@ function formatMoney(prev: string, raw: string): string {
   return n.toLocaleString("ko-KR") + "원";
 }
 
+/** 입력란 + 표시 토글 묶음. 토글 OFF 시 input 비활성화 + 안내 문구. */
+function ToggleableInput({
+  label,
+  hint,
+  enabled,
+  onToggle,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint?: string;
+  enabled: boolean;
+  onToggle: (v: boolean) => void;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <label className="block text-xs font-medium text-gray-600">{label}</label>
+        <label className="flex items-center gap-1.5 text-xs text-gray-600">
+          <input
+            type="checkbox"
+            checked={enabled}
+            onChange={(e) => onToggle(e.target.checked)}
+            className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+          />
+          <span>주보에 표시</span>
+        </label>
+      </div>
+      <input
+        className={`${inputCls} ${!enabled ? "bg-gray-50 text-gray-400" : ""}`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={!enabled}
+      />
+      {hint && enabled && <p className="mt-1 text-xs text-gray-400">{hint}</p>}
+      {!enabled && (
+        <p className="mt-1 text-xs text-amber-600">
+          이번 주는 주보에 표시되지 않습니다 (입력은 보존됩니다).
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * "1부 홍성란 권사" 처럼 접두가 붙어 저장된 값에서 표시용으로 접두를 떼낸다.
  * 폼 입력은 이름만 받고 저장 시 접두를 다시 붙이기 위한 짝꿍 함수.
  * 접두가 없으면 원본을 그대로 돌려준다(legacy 데이터 호환).
  */
 function stripPartPrefix(value: string, part: string): string {
-  const trimmed = value.trim();
-  if (!trimmed) return "";
+  if (!value) return "";
   const withSpace = `${part} `;
-  if (trimmed.startsWith(withSpace)) return trimmed.slice(withSpace.length);
-  if (trimmed === part) return "";
+  if (value.startsWith(withSpace)) return value.slice(withSpace.length);
+  if (value === part) return "";
   return value;
 }
 
@@ -135,8 +184,6 @@ export function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentIn
   return {
     ...f,
     title: f.title.trim() || titleFallback,
-    hymn_number: f.hymn_number || "342",
-    scripture: f.scripture || "요한복음 16:31-33",
     special_praise: {
       part1: {
         song: f.special_praise.part1.song || "주 예수 나의 산 소망",
@@ -157,16 +204,18 @@ export function applyPlaceholderDefaults(f: WeeklyContentInput): WeeklyContentIn
       pastor: f.afternoon_service.pastor,
     },
     wednesday_service: {
+      leader: f.wednesday_service.leader,
       scripture: f.wednesday_service.scripture,
       title: f.wednesday_service.title,
+      pastor: f.wednesday_service.pastor,
+      hymn: f.wednesday_service.hymn,
+      benediction: f.wednesday_service.benediction,
     },
     offering_members: {
       p1: f.offering_members.p1,
       p2: f.offering_members.p2,
       p3: f.offering_members.p3,
     },
-    servants_text: f.servants_text,
-    offering_list_text: f.offering_list_text,
   };
 }
 
@@ -267,12 +316,6 @@ export function WeeklyForm({
       label: "페이지4(교회소식)",
       description: "4페이지(교회소식/모임/새가족/섬기는분들 참고)와 1페이지 일부를 관리합니다.",
       content: <FrontTab form={form} set={set} />,
-    },
-    {
-      key: "misc",
-      label: "기타",
-      description: "일반 공지·섬기는분들 텍스트 등 레거시 필드.",
-      content: <MiscTab form={form} set={set} />,
     },
     {
       key: "masters",
@@ -483,30 +526,6 @@ function WorshipTab({ form, set }: TabProps) {
         </div>
       </section>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>레거시 필드 (현재 1페이지 렌더링에 사용되지 않음)</SectionTitle>
-        <p className="mb-3 text-xs text-gray-500">
-          아래 필드는 이전 버전 주보 시각에서 사용하던 값입니다. 참고 / 백업 용도로 보관합니다.
-        </p>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="찬송 번호">
-            <input
-              className={inputCls}
-              value={form.hymn_number}
-              onChange={(e) => set("hymn_number", e.target.value)}
-              placeholder="342"
-            />
-          </Field>
-          <Field label="성경봉독 본문">
-            <input
-              className={inputCls}
-              value={form.scripture}
-              onChange={(e) => set("scripture", e.target.value)}
-              placeholder="요한복음 16:31-33"
-            />
-          </Field>
-        </div>
-      </section>
     </div>
   );
 }
@@ -523,6 +542,53 @@ function FixedWorshipRow({
   const hint = WORSHIP_SLOT_HINTS[index] ?? {};
   const assigneeLabels = hint.assigneeLabels;
   const subRowLabels = hint.subRowLabels;
+  const quoteContent = !!hint.quoteContent;
+
+  const hasSubRows = !!(subRowLabels && subRowLabels.length > 0);
+  const hasAssigneeInputs =
+    (assigneeLabels && assigneeLabels.length > 0) || item.assignees.length > 0;
+
+  const contentDisplay = quoteContent
+    ? item.content.replace(/^"+/, "").replace(/"+$/, "")
+    : item.content;
+
+  const assigneeNode =
+    assigneeLabels && assigneeLabels.length > 0 ? (
+      <div
+        className={`grid gap-2 ${
+          assigneeLabels.length >= 3
+            ? "sm:grid-cols-3"
+            : assigneeLabels.length === 2
+            ? "sm:grid-cols-2"
+            : ""
+        }`}
+      >
+        {assigneeLabels.map((lb, i) => (
+          <Field key={i} label={lb}>
+            <input
+              className={inputCls}
+              value={item.assignees[i] ?? ""}
+              onChange={(e) => {
+                const next = [...item.assignees];
+                while (next.length <= i) next.push("");
+                next[i] = e.target.value;
+                onUpdate({ assignees: next });
+              }}
+              placeholder="이름"
+            />
+          </Field>
+        ))}
+      </div>
+    ) : item.assignees.length === 0 ? null : (
+      <Field label="담당">
+        <input
+          className={inputCls}
+          value={item.assignees[0] ?? ""}
+          onChange={(e) => onUpdate({ assignees: [e.target.value] })}
+          placeholder={item.assignees[0] || "담당자"}
+        />
+      </Field>
+    );
 
   return (
     <div className="rounded border border-gray-200 bg-gray-50 p-3">
@@ -533,61 +599,60 @@ function FixedWorshipRow({
         <span className="text-sm font-semibold text-gray-800">{item.label}</span>
       </div>
 
-      {/* 내용 */}
-      <Field label="내용">
-        <input
-          className={inputCls}
-          value={item.content}
-          onChange={(e) => onUpdate({ content: e.target.value })}
-          placeholder="빈 칸으로 두면 주보에 공백으로 표시됩니다"
-        />
-      </Field>
-
-      {/* 담당자: 힌트가 있으면 슬롯별 개별 입력, 없으면 단일 입력 */}
-      {assigneeLabels && assigneeLabels.length > 0 ? (
-        <div className="mt-2 grid gap-2 sm:grid-cols-3">
-          {assigneeLabels.map((lb, i) => (
-            <Field key={i} label={lb}>
-              <input
-                className={inputCls}
-                value={item.assignees[i] ?? ""}
-                onChange={(e) => {
-                  const next = [...item.assignees];
-                  while (next.length <= i) next.push("");
-                  next[i] = e.target.value;
-                  onUpdate({ assignees: next });
-                }}
-                placeholder="이름"
-              />
-            </Field>
-          ))}
+      {/* 내용 + 담당 한 줄 배치 (subRows 가 있는 행 — 찬양 — 은 내용 입력 생략) */}
+      {hasSubRows ? (
+        assigneeNode
+      ) : (
+        <div
+          className={
+            hasAssigneeInputs
+              ? "grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+              : ""
+          }
+        >
+          <Field label="내용">
+            <input
+              className={inputCls}
+              value={contentDisplay}
+              onChange={(e) => {
+                const raw = e.target.value;
+                onUpdate({
+                  content: quoteContent && raw ? `"${raw}"` : raw,
+                });
+              }}
+              placeholder={
+                quoteContent
+                  ? "예: 구원의 길 (저장 시 자동으로 큰따옴표가 붙습니다)"
+                  : "빈 칸으로 두면 주보에 공백으로 표시됩니다"
+              }
+            />
+          </Field>
+          {assigneeNode}
         </div>
-      ) : item.assignees.length === 0 ? null : (
-        <Field label="담당">
-          <input
-            className={inputCls}
-            value={item.assignees[0] ?? ""}
-            onChange={(e) => onUpdate({ assignees: [e.target.value] })}
-            placeholder={item.assignees[0] || "담당자"}
-          />
-        </Field>
       )}
 
-      {/* subRows: 찬양(1부/2부) 등 */}
-      {subRowLabels && subRowLabels.length > 0 && (
+      {/* subRows: 찬양(1부/2부) 등. "1부 :" / "2부 :" 접두사 자동 부여 */}
+      {hasSubRows && (
         <div className="mt-2 grid gap-2">
-          {subRowLabels.map((lb, j) => {
+          {subRowLabels!.map((lb, j) => {
             const sr: WorshipSubRow = item.subRows[j] ?? { content: "", assignee: "" };
+            const partLabel = `${j + 1}부`;
+            const stripRe = new RegExp(`^\\s*${partLabel}\\s*:\\s*`);
+            const songValue = sr.content.replace(stripRe, "");
             return (
               <div key={j} className="grid gap-2 sm:grid-cols-[8rem_1fr_1fr] items-center">
                 <span className="text-xs font-medium text-gray-600">{lb}</span>
                 <input
                   className={inputCls}
-                  value={sr.content}
+                  value={songValue}
                   onChange={(e) => {
                     const next = [...item.subRows];
                     while (next.length <= j) next.push({ content: "", assignee: "" });
-                    next[j] = { ...next[j], content: e.target.value };
+                    const song = e.target.value;
+                    next[j] = {
+                      ...next[j],
+                      content: song ? `${partLabel} : ${song}` : `${partLabel} :`,
+                    };
                     onUpdate({ subRows: next });
                   }}
                   placeholder={`${lb} 곡명`}
@@ -620,12 +685,15 @@ function FrontTab({ form, set }: TabProps) {
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>교회소식 (최대 9개)</SectionTitle>
-        <p className="mb-3 text-xs text-gray-500">번호(1./2./...)는 자동으로 매겨집니다. 제목만 입력하세요.</p>
+        <SectionTitle>교회소식 (최대 20개)</SectionTitle>
+        <p className="mb-3 text-xs text-gray-500">
+          번호(1./2./...)는 자동으로 매겨집니다. 제목만 입력하세요.
+          항목이 많으면 인쇄용 주보 4페이지 영역을 넘어갈 수 있습니다.
+        </p>
         <DynamicArrayField<NewsItem>
           label="교회소식"
           items={form.news}
-          max={9}
+          max={20}
           addLabel="소식 추가"
           createEmpty={() => ({ title: "", items: [] })}
           onChange={(next) => set("news", next)}
@@ -706,32 +774,60 @@ function FrontTab({ form, set }: TabProps) {
       <section className="rounded-xl border border-gray-200 bg-white p-6">
         <SectionTitle>단문 메모</SectionTitle>
         <div className="grid gap-4">
-          <Field label="성경 통독 현황" hint="예: * 6독 - 조성희,  10독 - 장정자">
-            <input
-              className={inputCls}
-              value={form.bible_reading}
-              onChange={(e) => set("bible_reading", e.target.value)}
-            />
-          </Field>
-          <Field label="식당 봉사 메모">
-            <input
-              className={inputCls}
-              value={form.meal_duty_note}
-              onChange={(e) => set("meal_duty_note", e.target.value)}
-            />
-          </Field>
-          <Field label="봉사센터 소식">
-            <input
-              className={inputCls}
-              value={form.volunteer_note}
-              onChange={(e) => set("volunteer_note", e.target.value)}
-            />
-          </Field>
+          <ToggleableInput
+            label="성경 통독 현황"
+            hint="예: * 6독 - 조성희,  10독 - 장정자"
+            enabled={form.front_toggles.bibleReading}
+            onToggle={(v) =>
+              set("front_toggles", { ...form.front_toggles, bibleReading: v })
+            }
+            value={form.bible_reading}
+            onChange={(v) => set("bible_reading", v)}
+          />
+          <ToggleableInput
+            label="식당 봉사 메모"
+            enabled={form.front_toggles.mealDuty}
+            onToggle={(v) =>
+              set("front_toggles", { ...form.front_toggles, mealDuty: v })
+            }
+            value={form.meal_duty_note}
+            onChange={(v) => set("meal_duty_note", v)}
+          />
+          <ToggleableInput
+            label="봉사센터 소식"
+            enabled={form.front_toggles.volunteerNote}
+            onToggle={(v) =>
+              set("front_toggles", { ...form.front_toggles, volunteerNote: v })
+            }
+            value={form.volunteer_note}
+            onChange={(v) => set("volunteer_note", v)}
+          />
         </div>
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>지난 주일 등록 새가족 (최대 4명)</SectionTitle>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <SectionTitle>지난 주일 등록 새가족 (최대 4명)</SectionTitle>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={form.front_toggles.newMembers}
+              onChange={(e) =>
+                set("front_toggles", {
+                  ...form.front_toggles,
+                  newMembers: e.target.checked,
+                })
+              }
+              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span>주보에 표시</span>
+          </label>
+        </div>
+        {!form.front_toggles.newMembers && (
+          <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            이번 주는 주보에 표시되지 않습니다 (입력은 보존됩니다).
+          </p>
+        )}
         <DynamicArrayField<NewMemberRow>
           label="새가족"
           items={form.new_members}
@@ -791,50 +887,82 @@ function BackLeftTab({ form, set }: TabProps) {
   return (
     <div className="space-y-6">
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>주일오후 찬양예배</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-3">
-          <Field label="성경봉독">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <SectionTitle>주일오후 찬양예배</SectionTitle>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
             <input
-              className={inputCls}
-              value={form.afternoon_service.scripture}
-              onChange={(e) =>
-                set("afternoon_service", {
-                  ...form.afternoon_service,
-                  scripture: e.target.value,
-                })
-              }
+              type="checkbox"
+              checked={form.afternoon_mokjang_mode}
+              onChange={(e) => set("afternoon_mokjang_mode", e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
             />
-          </Field>
-          <Field label="말씀 제목">
-            <input
-              className={inputCls}
-              value={form.afternoon_service.title}
-              onChange={(e) =>
-                set("afternoon_service", {
-                  ...form.afternoon_service,
-                  title: e.target.value,
-                })
-              }
-            />
-          </Field>
-          <Field label="설교자">
-            <input
-              className={inputCls}
-              value={form.afternoon_service.pastor}
-              onChange={(e) =>
-                set("afternoon_service", {
-                  ...form.afternoon_service,
-                  pastor: e.target.value,
-                })
-              }
-            />
-          </Field>
+            <span>목장모임으로 대체</span>
+          </label>
         </div>
+        {form.afternoon_mokjang_mode ? (
+          <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            이번 주는 주일오후 찬양예배 자리에 <strong>목장모임</strong> 이미지가 표시됩니다.
+            성경봉독·말씀·설교자 입력은 무시됩니다.
+          </p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Field label="성경봉독">
+              <input
+                className={inputCls}
+                value={form.afternoon_service.scripture}
+                onChange={(e) =>
+                  set("afternoon_service", {
+                    ...form.afternoon_service,
+                    scripture: e.target.value,
+                  })
+                }
+              />
+            </Field>
+            <Field label="말씀 제목" hint='저장 시 자동으로 큰따옴표("")가 붙습니다.'>
+              <input
+                className={inputCls}
+                value={form.afternoon_service.title.replace(/^"+/, "").replace(/"+$/, "")}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  set("afternoon_service", {
+                    ...form.afternoon_service,
+                    title: raw ? `"${raw}"` : "",
+                  });
+                }}
+              />
+            </Field>
+            <Field label="설교자">
+              <input
+                className={inputCls}
+                value={form.afternoon_service.pastor}
+                onChange={(e) =>
+                  set("afternoon_service", {
+                    ...form.afternoon_service,
+                    pastor: e.target.value,
+                  })
+                }
+              />
+            </Field>
+          </div>
+        )}
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
         <SectionTitle>수요예배</SectionTitle>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="인도자">
+            <input
+              className={inputCls}
+              value={form.wednesday_service.leader}
+              onChange={(e) =>
+                set("wednesday_service", {
+                  ...form.wednesday_service,
+                  leader: e.target.value,
+                })
+              }
+              placeholder="이양재 목사"
+            />
+          </Field>
           <Field label="성경봉독">
             <input
               className={inputCls}
@@ -845,18 +973,60 @@ function BackLeftTab({ form, set }: TabProps) {
                   scripture: e.target.value,
                 })
               }
+              placeholder="삼하 22:30-37"
             />
           </Field>
-          <Field label="말씀 제목">
+          <Field label="말씀 제목" hint='저장 시 자동으로 큰따옴표("")가 붙습니다.'>
             <input
               className={inputCls}
-              value={form.wednesday_service.title}
+              value={form.wednesday_service.title.replace(/^"+/, "").replace(/"+$/, "")}
+              onChange={(e) => {
+                const raw = e.target.value;
+                set("wednesday_service", {
+                  ...form.wednesday_service,
+                  title: raw ? `"${raw}"` : "",
+                });
+              }}
+              placeholder="세월 지나갈수록"
+            />
+          </Field>
+          <Field label="설교자">
+            <input
+              className={inputCls}
+              value={form.wednesday_service.pastor}
               onChange={(e) =>
                 set("wednesday_service", {
                   ...form.wednesday_service,
-                  title: e.target.value,
+                  pastor: e.target.value,
                 })
               }
+              placeholder="이양재 목사"
+            />
+          </Field>
+          <Field label="찬송">
+            <input
+              className={inputCls}
+              value={form.wednesday_service.hymn}
+              onChange={(e) =>
+                set("wednesday_service", {
+                  ...form.wednesday_service,
+                  hymn: e.target.value,
+                })
+              }
+              placeholder="384장"
+            />
+          </Field>
+          <Field label="축도">
+            <input
+              className={inputCls}
+              value={form.wednesday_service.benediction}
+              onChange={(e) =>
+                set("wednesday_service", {
+                  ...form.wednesday_service,
+                  benediction: e.target.value,
+                })
+              }
+              placeholder="인도자"
             />
           </Field>
         </div>
@@ -994,21 +1164,56 @@ function BackRightTab({ form, set }: TabProps) {
         <div className="space-y-2">
           {OFFERING_CATEGORIES.map((label, i) => {
             const row = form.offerings[i] ?? { label, names: "" };
+            const isSpecial = i === SPECIAL_OFFERING_INDEX;
+            const so = form.special_offering;
             return (
               <div key={label} className="grid gap-2 sm:grid-cols-[8rem_1fr] items-start">
-                <span className="pt-2 text-sm font-semibold text-gray-700">{label}</span>
-                <textarea
-                  className={textareaCls}
-                  rows={2}
-                  value={row.names}
-                  onChange={(e) => {
-                    const next = [...form.offerings];
-                    while (next.length <= i) next.push({ label: OFFERING_CATEGORIES[next.length], names: "" });
-                    next[i] = { label, names: e.target.value };
-                    set("offerings", next);
-                  }}
-                  placeholder={"김철수 이영희\n박민준 최수진"}
-                />
+                {isSpecial ? (
+                  <div className="space-y-1.5 pt-1.5">
+                    <label className="flex items-center gap-1.5 text-sm font-semibold text-gray-700">
+                      <input
+                        type="checkbox"
+                        checked={so.enabled}
+                        onChange={(e) =>
+                          set("special_offering", { ...so, enabled: e.target.checked })
+                        }
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                      />
+                      <span>특별헌금</span>
+                    </label>
+                    {so.enabled && (
+                      <input
+                        className="block w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                        value={so.label}
+                        onChange={(e) =>
+                          set("special_offering", { ...so, label: e.target.value })
+                        }
+                        placeholder="부활감사"
+                      />
+                    )}
+                  </div>
+                ) : (
+                  <span className="pt-2 text-sm font-semibold text-gray-700">{label}</span>
+                )}
+                {isSpecial && !so.enabled ? (
+                  <p className="pt-2 text-xs text-gray-400">
+                    토글을 켜면 입력란이 활성화되고 주보에 표시됩니다.
+                  </p>
+                ) : (
+                  <textarea
+                    className={textareaCls}
+                    rows={2}
+                    value={row.names}
+                    onChange={(e) => {
+                      const next = [...form.offerings];
+                      while (next.length <= i)
+                        next.push({ label: OFFERING_CATEGORIES[next.length], names: "" });
+                      next[i] = { label, names: e.target.value };
+                      set("offerings", next);
+                    }}
+                    placeholder={"김철수 이영희\n박민준 최수진"}
+                  />
+                )}
               </div>
             );
           })}
@@ -1045,177 +1250,86 @@ function BackRightTab({ form, set }: TabProps) {
 }
 
 // ─────────────────────────────────────────────
-//  Tab 6: 기타 (legacy)
+//  Tab 6: 주보 마스터 (인라인 편집)
 // ─────────────────────────────────────────────
 
-function MiscTab({ form, set }: TabProps) {
-  function addPrayer() {
-    set("prayer_items", [...form.prayer_items, { text: "" } satisfies PrayerItem]);
-  }
-  function updatePrayer(i: number, value: string) {
-    const next = form.prayer_items.map((p, idx) => (idx === i ? { text: value } : p));
-    set("prayer_items", next);
-  }
-  function removePrayer(i: number) {
-    set("prayer_items", form.prayer_items.filter((_, idx) => idx !== i));
-  }
-  function addAnnouncement() {
-    set("announcements", [...form.announcements, { text: "" } satisfies Announcement]);
-  }
-  function updateAnnouncement(i: number, value: string) {
-    const next = form.announcements.map((a, idx) => (idx === i ? { text: value } : a));
-    set("announcements", next);
-  }
-  function removeAnnouncement(i: number) {
-    set("announcements", form.announcements.filter((_, idx) => idx !== i));
-  }
-
-  return (
-    <div className="space-y-6">
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>교회공동체 기도제목 (백업 용도)</SectionTitle>
-        <p className="mb-3 text-xs text-gray-500">
-          기본 소스는 <strong>마스터 ▷ 교회공동체 기도제목</strong> 입니다. 마스터를 비운 주만 이 값이 사용됩니다.
-        </p>
-        <div className="space-y-2">
-          {form.prayer_items.map((p, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <span className="mt-2 text-xs text-gray-400">{i + 1}.</span>
-              <textarea
-                className={`${textareaCls} flex-1`}
-                rows={2}
-                value={p.text}
-                onChange={(e) => updatePrayer(i, e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => removePrayer(i)}
-                className="mt-2 text-xs text-red-400 hover:text-red-600"
-              >
-                삭제
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addPrayer}
-            className="text-xs text-primary-600 hover:text-primary-700"
-          >
-            + 기도제목 추가
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>공지사항 (레거시)</SectionTitle>
-        <div className="space-y-2">
-          {form.announcements.map((a, i) => (
-            <div key={i} className="flex items-start gap-2">
-              <span className="mt-2 text-xs text-gray-400">{i + 1}.</span>
-              <textarea
-                className={`${textareaCls} flex-1`}
-                rows={2}
-                value={a.text}
-                onChange={(e) => updateAnnouncement(i, e.target.value)}
-              />
-              <button
-                type="button"
-                onClick={() => removeAnnouncement(i)}
-                className="mt-2 text-xs text-red-400 hover:text-red-600"
-              >
-                삭제
-              </button>
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addAnnouncement}
-            className="text-xs text-primary-600 hover:text-primary-700"
-          >
-            + 공지 추가
-          </button>
-        </div>
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>섬기는 분들 (자유 텍스트 · 레거시)</SectionTitle>
-        <Field label="역할: 이름 형식으로 한 줄씩">
-          <textarea
-            className={textareaCls}
-            rows={8}
-            value={form.servants_text}
-            onChange={(e) => set("servants_text", e.target.value)}
-            placeholder={"담 당: 이연재\n사 회: 박기범..."}
-          />
-        </Field>
-      </section>
-
-      <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>헌금 명단 자유 텍스트 (레거시)</SectionTitle>
-        <Field label="헌금 목록 (자유 형식)">
-          <textarea
-            className={textareaCls}
-            rows={6}
-            value={form.offering_list_text}
-            onChange={(e) => set("offering_list_text", e.target.value)}
-          />
-        </Field>
-      </section>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────
-//  Tab 7: 주보 마스터 (외부 라우트 링크 카드)
-// ─────────────────────────────────────────────
-
-const MASTER_SECTIONS: { href: string; title: string; desc: string }[] = [
+const MASTER_SECTIONS: {
+  key: string;
+  title: string;
+  desc: string;
+  Editor: React.ComponentType;
+}[] = [
   {
-    href: "/admin/masters/topic",
+    key: "topic",
     title: "교회 표어 (올해의 주제)",
     desc: "주보 1페이지 우측에 표시되는 연도 표어 — 예: '복음의 열매'",
+    Editor: TopicEditor,
   },
   {
-    href: "/admin/masters/mokjang",
-    title: "소그룹 목장",
-    desc: "주보 3페이지 소그룹 목장 표 (목장 번호 / 목자 / 부목자)",
-  },
-  {
-    href: "/admin/masters/servants",
-    title: "섬기는 분들",
-    desc: "주보 4페이지 좌측 '섬기는 분들' 역할 ↔ 이름",
-  },
-  {
-    href: "/admin/masters/supports",
-    title: "우리가 후원하는 분들",
-    desc: "주보 4페이지 좌측 '우리가 후원하는 분들' 섹션 (해외·국내·방송 등)",
-  },
-  {
-    href: "/admin/masters/community-prayers",
+    key: "community-prayers",
     title: "교회공동체 기도제목",
     desc: "주보 2페이지 '교회공동체 기도제목' 목록 (최대 7줄)",
+    Editor: CommunityPrayersEditor,
+  },
+  {
+    key: "mokjang",
+    title: "소그룹 목장",
+    desc: "주보 3페이지 소그룹 목장 표 (목장 번호 / 목자 / 부목자)",
+    Editor: MokjangEditor,
+  },
+  {
+    key: "servants",
+    title: "섬기는 분들",
+    desc: "주보 4페이지 좌측 '섬기는 분들' 역할 ↔ 이름",
+    Editor: ServantsEditor,
+  },
+  {
+    key: "supports",
+    title: "우리가 후원하는 분들",
+    desc: "주보 4페이지 좌측 '우리가 후원하는 분들' 섹션 (해외·국내·방송 등)",
+    Editor: SupportsEditor,
   },
 ];
 
 function MastersTab() {
+  const [openKey, setOpenKey] = useState<string | null>(null);
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-500">
-        매주 바뀌지 않고 여러 페이지에서 공용으로 쓰는 값입니다. 카드를 누르면 새 탭에서 열려, 현재 작성 중인 주보를 잃지 않고 편집할 수 있습니다.
+        매주 바뀌지 않고 여러 페이지에서 공용으로 쓰는 값입니다. 항목을 펼쳐 바로 수정할 수 있습니다.
       </p>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {MASTER_SECTIONS.map((s) => (
-          <a
-            key={s.href}
-            href={s.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-xl border border-gray-200 bg-white p-4 transition hover:border-primary-300 hover:shadow-sm"
-          >
-            <h3 className="mb-1 text-sm font-semibold text-gray-900">{s.title}</h3>
-            <p className="text-xs leading-relaxed text-gray-500">{s.desc}</p>
-          </a>
-        ))}
+      <div className="space-y-2">
+        {MASTER_SECTIONS.map(({ key, title, desc, Editor }) => {
+          const open = openKey === key;
+          return (
+            <div
+              key={key}
+              className="rounded-xl border border-gray-200 bg-white"
+            >
+              <button
+                type="button"
+                onClick={() => setOpenKey(open ? null : key)}
+                className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left transition hover:bg-gray-50"
+              >
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+                  <p className="mt-0.5 text-xs leading-relaxed text-gray-500">{desc}</p>
+                </div>
+                <span
+                  className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`}
+                  aria-hidden
+                >
+                  ▾
+                </span>
+              </button>
+              {open && (
+                <div className="border-t border-gray-100 p-4">
+                  <Editor />
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

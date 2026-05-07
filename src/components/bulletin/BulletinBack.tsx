@@ -1,5 +1,9 @@
 import type { Weekly } from "@/types/notice";
 import type { BulletinMasterData } from "@/types/bulletin-master";
+import {
+  SPECIAL_OFFERING_INDEX,
+  SPECIAL_OFFERING_DEFAULT_LABEL,
+} from "@/components/weekly/form/constants";
 
 export interface MokjangEntry {
   id: number;
@@ -18,6 +22,8 @@ export interface BulletinBackData {
     leader?: string;
     contents: { label: string; value: string; subValue?: string; mergeNextValue?: boolean }[];
   };
+  /** 주일오후 찬양예배 영역을 "목장모임"(이미지 + 제목)으로 대체할지 여부 */
+  afternoonMokjangMode: boolean;
   wednesdayService: {
     time?: string;
     leader?: string;
@@ -57,6 +63,7 @@ const DEFAULT_DATA: BulletinBackData = {
       { label: "축도", value: "/ 인도자" },
     ],
   },
+  afternoonMokjangMode: false,
   wednesdayService: {
     time: "저녁 7시 30분",
     leader: "이양재 목사",
@@ -214,14 +221,19 @@ export function weeklyToBackData(
       ]),
     };
   }
+  data.afternoonMokjangMode = !!w.afternoon_mokjang_mode;
 
   if (w.wednesday_service) {
     const ws = w.wednesday_service;
     data.wednesdayService = {
       ...data.wednesdayService,
+      leader: ws.leader || data.wednesdayService.leader,
       contents: patchServiceContents(data.wednesdayService.contents, [
         { label: "성경봉독", value: ws.scripture },
         { label: "말씀", value: ws.title },
+        { label: "특강", value: ws.pastor ? `/ ${ws.pastor}` : "" },
+        { label: "찬송", value: ws.hymn },
+        { label: "축도", value: ws.benediction ? `/ ${ws.benediction}` : "" },
       ]),
     };
   }
@@ -231,12 +243,10 @@ export function weeklyToBackData(
     data.dawnReadings = w.dawn_readings.slice(0, 8).map((d) => ({ date: d.date, passage: d.passage }));
   }
 
-  // ── 교회공동체 기도제목: 마스터(live reference) 우선, 없으면 주보 row 의 prayer_items 사용
+  // ── 교회공동체 기도제목: 마스터(live reference)에서만 가져옴
   if (master && master.communityPrayers.length > 0) {
     // MAX 7 — 초과 시 페이지 높이 붕괴
     data.prayerItems = master.communityPrayers.slice(0, 7);
-  } else if (w.prayer_items && w.prayer_items.length > 0) {
-    data.prayerItems = w.prayer_items.slice(0, 7).map((p) => p.text);
   }
 
   if (w.offering_members) {
@@ -263,9 +273,17 @@ export function weeklyToBackData(
     data.mokjangList = master.mokjang.slice(0, 40);
   }
 
-  // ── 향기로운 예물: offerings
+  // ── 향기로운 예물: offerings (특별헌금 슬롯은 토글에 따라 라벨 치환 또는 행 제거)
   if (w.offerings && w.offerings.length > 0) {
-    data.offerings = w.offerings.slice(0, 11);
+    const so = w.special_offering ?? {
+      enabled: false,
+      label: SPECIAL_OFFERING_DEFAULT_LABEL,
+    };
+    data.offerings = w.offerings.slice(0, 11).flatMap((o, i) => {
+      if (i !== SPECIAL_OFFERING_INDEX) return [o];
+      if (!so.enabled) return [];
+      return [{ ...o, label: so.label || SPECIAL_OFFERING_DEFAULT_LABEL }];
+    });
   }
   if (w.week_total) data.weekTotal = w.week_total;
   if (w.cumulative_total) data.cumulativeTotal = w.cumulative_total;
@@ -289,13 +307,17 @@ export function BulletinBackLeft({ data }: { data: BulletinBackData }) {
   return (
     <div>
       <div className="grid grid-cols-2 gap-4 mb-1" style={{ zoom: 0.9 }}>
-        <ServiceSection
-          title="주일오후 찬양예배"
-          time={data.afternoonService.time ?? ""}
-          leader={data.afternoonService.leader ?? ""}
-          contents={data.afternoonService.contents}
-          compact
-        />
+        {data.afternoonMokjangMode ? (
+          <MokjangSection />
+        ) : (
+          <ServiceSection
+            title="주일오후 찬양예배"
+            time={data.afternoonService.time ?? ""}
+            leader={data.afternoonService.leader ?? ""}
+            contents={data.afternoonService.contents}
+            compact
+          />
+        )}
         <ServiceSection
           title="수요예배"
           time={data.wednesdayService.time ?? ""}
@@ -593,6 +615,23 @@ function ServiceSection({
           })}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function MokjangSection() {
+  return (
+    <div className="mb-1">
+      <div className="border-b-2 border-blue-800 mb-1">
+        <span className="text-sm font-bold">주일오후 찬양예배</span>
+      </div>
+      <div className="flex flex-col items-center">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/mokjang.jpg" alt="목장모임" className="h-28 w-auto" />
+        <p className="mt-1 text-center text-xs font-semibold text-gray-700">
+          각 목장 모임으로 대체됩니다.
+        </p>
+      </div>
     </div>
   );
 }

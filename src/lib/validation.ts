@@ -148,8 +148,6 @@ export const WeeklyContentSchema = z.object({
   date: z.string().optional(),
   volume: z.number().int().positive().nullable().default(null),
   issue: z.number().int().positive().nullable().default(null),
-  hymn_number: z.string().max(10).default(""),
-  scripture: z.string().max(100).default(""),
   special_praise: z.object({
     part1: SpecialPraisePartSchema,
     part2: SpecialPraisePartSchema,
@@ -163,10 +161,15 @@ export const WeeklyContentSchema = z.object({
     title: z.string().max(200).default(""),
     pastor: z.string().max(50).default(""),
   }).default({ scripture: "", title: "", pastor: "" }),
+  afternoon_mokjang_mode: z.boolean().default(false),
   wednesday_service: z.object({
+    leader: z.string().max(50).default(""),
     scripture: z.string().max(100).default(""),
     title: z.string().max(200).default(""),
-  }).default({ scripture: "", title: "" }),
+    pastor: z.string().max(50).default(""),
+    hymn: z.string().max(20).default(""),
+    benediction: z.string().max(50).default(""),
+  }).default({ leader: "", scripture: "", title: "", pastor: "", hymn: "", benediction: "" }),
   dawn_readings: z.array(z.object({
     date: z.string().max(20),
     passage: z.string().max(100),
@@ -176,10 +179,6 @@ export const WeeklyContentSchema = z.object({
     p2: z.string().max(50).default(""),
     p3: z.string().max(50).default(""),
   }).default({ p1: "", p2: "", p3: "" }),
-  prayer_items: z.array(z.object({ text: z.string().max(500) })).default([]),
-  announcements: z.array(z.object({ text: z.string().max(500) })).default([]),
-  servants_text: z.string().max(2000).default(""),
-  offering_list_text: z.string().max(5000).default(""),
   is_published: z.boolean().default(false),
   publish_channels: z.object({
     website: z.boolean().default(false),
@@ -190,7 +189,7 @@ export const WeeklyContentSchema = z.object({
   news: z.array(z.object({
     title: z.string().max(120).default(""),
     items: z.array(z.string().max(500)).max(10).default([]),
-  })).max(9).default([]),
+  })).max(20).default([]),
   meetings: z.array(z.object({
     group: z.string().max(40).default(""),
     when: z.string().max(60).default(""),
@@ -233,6 +232,21 @@ export const WeeklyContentSchema = z.object({
     label: z.string().max(30).default(""),
     names: z.string().max(500).default(""),
   })).max(11).default([]),
+  special_offering: z.object({
+    enabled: z.boolean().default(false),
+    label: z.string().max(30).default("부활감사"),
+  }).default({ enabled: false, label: "부활감사" }),
+  front_toggles: z.object({
+    bibleReading: z.boolean().default(true),
+    newMembers: z.boolean().default(true),
+    mealDuty: z.boolean().default(true),
+    volunteerNote: z.boolean().default(true),
+  }).default({
+    bibleReading: true,
+    newMembers: true,
+    mealDuty: true,
+    volunteerNote: true,
+  }),
   week_total: z.string().max(40).default(""),
   cumulative_total: z.string().max(40).default(""),
 });
@@ -282,8 +296,6 @@ export function createEmptyWeeklyInput(): WeeklyContentInput {
     date: undefined,
     volume: null,
     issue: null,
-    hymn_number: "",
-    scripture: "",
     special_praise: {
       part1: { song: "", choir: "" },
       part2: { song: "", choir: "" },
@@ -293,13 +305,17 @@ export function createEmptyWeeklyInput(): WeeklyContentInput {
     closing_hymn: "",
     weekly_verse: "",
     afternoon_service: { scripture: "", title: "", pastor: "" },
-    wednesday_service: { scripture: "", title: "" },
+    afternoon_mokjang_mode: false,
+    wednesday_service: {
+      leader: "",
+      scripture: "",
+      title: "",
+      pastor: "",
+      hymn: "",
+      benediction: "",
+    },
     dawn_readings: [],
     offering_members: { p1: "", p2: "", p3: "" },
-    prayer_items: [],
-    announcements: [],
-    servants_text: "",
-    offering_list_text: "",
     is_published: false,
     publish_channels: { website: false, alimtalk: false, instagram: false },
     news: [],
@@ -315,6 +331,13 @@ export function createEmptyWeeklyInput(): WeeklyContentInput {
     next_week_prayer: [],
     guide_committee: [],
     offerings: [],
+    special_offering: { enabled: false, label: "부활감사" },
+    front_toggles: {
+      bibleReading: true,
+      newMembers: true,
+      mealDuty: true,
+      volunteerNote: true,
+    },
     week_total: "",
     cumulative_total: "",
   };

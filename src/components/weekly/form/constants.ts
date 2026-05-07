@@ -37,8 +37,13 @@ export const WORSHIP_ITEMS_TEMPLATE: readonly WorshipItemRow[] = [
  * 슬롯 힌트(폼 UI 가이드용):
  *   - assigneeLabels: assignees 각 슬롯에 어떤 이름을 넣는지 안내 (길이 = assignees 수)
  *   - subRowLabels : subRows 에 해당하는 행의 역할 안내
+ *   - quoteContent : content 저장 시 양쪽에 쌍따옴표("") 자동 부여 (말씀 등)
  */
-export const WORSHIP_SLOT_HINTS: readonly { assigneeLabels?: string[]; subRowLabels?: string[] }[] = [
+export const WORSHIP_SLOT_HINTS: readonly {
+  assigneeLabels?: string[];
+  subRowLabels?: string[];
+  quoteContent?: boolean;
+}[] = [
   {},                                                                           // 0 예배의 부름
   {},                                                                           // 1 영광의 찬송
   {},                                                                           // 2 기원
@@ -50,7 +55,7 @@ export const WORSHIP_SLOT_HINTS: readonly { assigneeLabels?: string[]; subRowLab
   {},                                                                           // 8 봉헌 및 기도
   {},                                                                           // 9 성경봉독
   { subRowLabels: ["1부 찬양", "2부 찬양"] },                                    // 10 찬양
-  { assigneeLabels: ["설교자"] },                                               // 11 말씀
+  { assigneeLabels: ["설교자"], quoteContent: true },                           // 11 말씀
   {},                                                                           // 12 결단의 찬송
   {},                                                                           // 13 교회소식
   {},                                                                           // 14 성도의 교제
@@ -58,7 +63,8 @@ export const WORSHIP_SLOT_HINTS: readonly { assigneeLabels?: string[]; subRowLab
   { assigneeLabels: ["축도자"] },                                               // 16 축도
 ] as const;
 
-/** 향기로운 예물 — 10 카테고리 고정. label 은 수정 불가, names 만 편집 */
+/** 향기로운 예물 — 10 카테고리 고정. label 은 수정 불가, names 만 편집.
+ *  단, 인덱스 3(SPECIAL_OFFERING_INDEX) 슬롯은 "특별헌금"으로 토글/라벨 변경 가능. */
 export const OFFERING_CATEGORIES: readonly string[] = [
   "십일조",
   "감사헌금",
@@ -71,6 +77,10 @@ export const OFFERING_CATEGORIES: readonly string[] = [
   "주정헌금",
   "성전헌금",
 ] as const;
+
+/** 특별헌금 슬롯 인덱스(부활감사 자리). 토글/라벨 변경 가능. */
+export const SPECIAL_OFFERING_INDEX = 3;
+export const SPECIAL_OFFERING_DEFAULT_LABEL = "부활감사";
 
 /** 다음주 기도 — 부 라벨 3개 고정. 이름만 입력 */
 export const NEXT_WEEK_PRAYER_PARTS: readonly string[] = ["1부", "2부", "3부"] as const;
