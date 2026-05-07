@@ -533,6 +533,7 @@ export function BulletinFrontRight({ data }: { data: FrontData }) {
               height={80}
               className="h-14 w-auto"
               priority
+              unoptimized
             />
           </div>
           <div className="flex items-start justify-end gap-2">
