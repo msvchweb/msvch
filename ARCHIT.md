@@ -12,9 +12,10 @@
 | 아이콘 | Lucide React | 1.7+ |
 | 유틸 | clsx + tailwind-merge, date-fns | - |
 | 검증 | Zod (런타임 스키마 검증) | 4.x |
-| 이미지 처리 | sharp | 0.34+ |
+| 이미지 처리 | sharp / Canvas API (포스터 합성) | 0.34+ |
 | 갤러리 | yet-another-react-lightbox | 3.30+ |
-| PDF 생성 | puppeteer-core + @sparticuz/chromium | - |
+| PDF 생성 | puppeteer-core + @sparticuz/chromium-min (런타임 다운로드) | - |
+| QR 코드 | qrcode | - |
 | 언어 | TypeScript | 5.x |
 
 ---
@@ -60,6 +61,11 @@ src/
 │   ├── admin/                   # 관리자 전용 (미들웨어 보호 — staff/admin/master)
 │   │   ├── layout.tsx           # PC 사이드바 + 모바일 상단 가로 스크롤 탭
 │   │   ├── AdminNav.tsx         # 사이드바/모바일탭 클라이언트 컴포넌트
+│   │   ├── AdminBottomTabBar.tsx# 관리자 하단 탭 (모바일)
+│   │   ├── AdminGroupTabs.tsx   # 그룹 페이지 상단 가로 탭
+│   │   ├── menu/                # 전체 메뉴 (모바일 더보기 진입점, 카드 그리드)
+│   │   ├── guide/               # 관리자 가이드 (공지/갤러리/주보/포스터/문의 사용법)
+│   │   ├── posters/             # 포스터 도구 (PromptBuilder + Finalizer 두 패널)
 │   │   ├── gallery/
 │   │   ├── notices/
 │   │   ├── sermons/
@@ -70,13 +76,14 @@ src/
 │   │   ├── new-families/        # 새가족 등록 (목록/상태변경/메모/삭제)
 │   │   ├── boards/              # 소모임 게시판 (신설/숨김/멤버관리)
 │   │   ├── members/             # 회원관리 (master 단독, role 변경)
-│   │   ├── masters/             # 주보 마스터 (올해표어/목장/섬기는이/후원/공동체기도)
+│   │   ├── masters/             # 주보 마스터 라우트 (인라인 에디터 wrapper)
 │   │   └── weeklies/
 │   │
 │   └── api/                     # API 라우트
 │       ├── admin/
 │       │   ├── cron/
-│       │   │   └── alimtalk-events/ # Vercel Cron — D-1 일정 알림톡 발송
+│       │   │   ├── alimtalk-events/ # Vercel Cron — D-1 일정 알림톡 발송 (KST 06:00)
+│       │   │   └── sync-sermons/    # Vercel Cron — YouTube 50개 → sermon_videos upsert (KST 15:00)
 │       │   ├── event-subscribers/   # 일정 알림 수신자 CRUD (master)
 │       │   │   └── [id]/
 │       │   ├── new-families/        # 새가족 등록 GET 목록 + [id] PATCH/DELETE
@@ -100,12 +107,15 @@ src/
 │       ├── boards/              # 소모임 게시판 멤버 API (모바일 호환)
 │       │   └── [id]/posts/[postId]/comments/[cid]/  # 글/댓글 CRUD, cursor 페이지네이션
 │       ├── og/                  # OG 이미지 생성 (Edge)
+│       ├── posters/
+│       │   ├── build-prompt/    # 메타 프롬프트 → Gemini 텍스트 → 영문 이미지 프롬프트
+│       │   └── proxy-image/     # 참고 이미지 CORS 우회 프록시
 │       ├── revalidate/          # ISR 캐시 무효화 (시크릿)
 │       ├── sermon-summary/      # Gemini 설교 요약
-│       ├── sermons/             # 설교 목록
+│       ├── sermons/             # 설교 목록 (DB sermon_videos 에서 read)
 │       ├── shorts/              # 쇼츠 CRUD + 트리거 (모바일 호환)
 │       └── weeklies/
-│           └── generate-pdf/    # Puppeteer PDF 생성 → Supabase Storage 업로드
+│           └── generate-pdf/    # Puppeteer + page.goto(/weekly-print/[id]) → PDF → Storage
 │
 ├── components/
 │   ├── layout/                  # 레이아웃 컴포넌트
@@ -133,26 +143,38 @@ src/
 │   │   └── DiscussionList.tsx
 │   │
 │   ├── weekly/
-│   │   ├── WeeklyForm.tsx       # 주보 입력 폼 (6탭 구조, 클라이언트 컴포넌트)
-│   │   ├── WeeklyInlineView.tsx # 공개 페이지 인라인 뷰 (설교/기도제목/공지)
-│   │   └── form/                # 주보 폼 공용 추상화
-│   │       ├── FormTabs.tsx         # 탭 컨테이너
-│   │       ├── DynamicArrayField.tsx # 제네릭 배열 편집기 (add/remove/move)
-│   │       ├── Field.tsx             # 라벨+도움말 래퍼
-│   │       └── shared.ts             # inputCls, weekOfMonth 등
+│   │   ├── WeeklyForm.tsx          # 주보 입력 폼 (5탭 + 마스터, 클라이언트 컴포넌트)
+│   │   ├── WeeklyEditorWithPreview.tsx # 폼 + 우측 4페이지 실시간 미리보기 (자동 스케일)
+│   │   ├── form/                   # 주보 폼 공용 추상화
+│   │   │   ├── FormTabs.tsx            # 탭 컨테이너 (data-tour 부여)
+│   │   │   ├── DynamicArrayField.tsx   # 제네릭 배열 편집기 (add/remove/move)
+│   │   │   ├── Field.tsx               # 라벨+도움말 래퍼
+│   │   │   ├── constants.ts            # WORSHIP_ITEMS_TEMPLATE 등 고정 슬롯
+│   │   │   └── shared.ts               # inputCls, weekOfMonth 등
+│   │   └── masters/                # 주보 마스터 5개 인라인 에디터
+│   │       ├── TopicEditor.tsx
+│   │       ├── MokjangEditor.tsx
+│   │       ├── ServantsEditor.tsx
+│   │       ├── SupportsEditor.tsx
+│   │       └── CommunityPrayersEditor.tsx
 │   │
-│   ├── bulletin/                 # ⚠ LAYOUT LOCKED (원본 디자인 유지)
-│   │   ├── Bulletin.tsx         # 진입점 (print/web 모드 + master prop)
+│   ├── bulletin/                # ⚠ LAYOUT LOCKED (인쇄 — 원본 디자인 유지)
+│   │   ├── Bulletin.tsx         # 진입점 (print/web 모드 분기 + master prop)
+│   │   ├── BulletinWebView.tsx  # 공개 웹 모드 — ResizeObserver 자동 스케일 (PC 2x2 / 모바일 1열)
 │   │   ├── BulletinFront.tsx    # 앞면 레이아웃 + weeklyToFrontData(w, master?)
 │   │   └── BulletinBack.tsx     # 뒷면 레이아웃 + weeklyToBackData(w, master?)
 │   │
-│   ├── LogoutButton.tsx         # 로그아웃 버튼 (클라이언트 컴포넌트)
+│   ├── admin/                    # 관리자 공용 컴포넌트
+│   │   ├── AdminTour.tsx           # 스포트라이트 투어 (16단계, clickOnEnter 자동 탭 전환)
+│   │   ├── AdminTourStartButton.tsx# 투어 시작 트리거
+│   │   └── nav-tour-keys.ts        # 사이드바·메뉴 카드 공유 data-tour 매핑
 │   │
-│   └── ui/                      # 공용 UI
+│   ├── LogoutButton.tsx          # 로그아웃 버튼 (클라이언트 컴포넌트)
+│   │
+│   └── ui/                       # 공용 UI
 │       ├── Card.tsx
 │       ├── Container.tsx
-│       ├── PageHeader.tsx
-│       └── Skeleton.tsx
+│       └── PageHeader.tsx
 │
 ├── lib/
 │   ├── supabase/
@@ -169,11 +191,15 @@ src/
 │   ├── events.ts                # 자체 캘린더 데이터 함수 (events 테이블)
 │   ├── alimtalk.ts              # 알림톡 추상화 (카카오 비즈 미설정 시 noop)
 │   ├── notices.ts               # 공지/주보 데이터 + getHeroSlides() (홈 히어로 DTO)
-│   ├── new-content-provider.ts  # 새 콘텐츠 레드닷 React Context
+│   ├── new-content-provider.tsx # 새 콘텐츠 레드닷 React Context
 │   ├── utils.ts                 # cn(), formatDate()
 │   ├── validation.ts            # Zod 스키마 + 파일/입력 검증 유틸
-│   ├── weekly-html-template.ts  # 주보 HTML 빌더 (앞/뒷면, A4 인쇄용)
-│   └── youtube.ts               # YouTube Data API v3
+│   ├── boards.ts                # 소모임 게시판 데이터 함수
+│   ├── poster-prompts.ts        # 포스터 메타 프롬프트 빌더 (칩→영문 프롬프트 지시문)
+│   ├── poster-footer.ts         # 포스터 Canvas 합성 (배경 + 한글 텍스트 + 교회 푸터/QR)
+│   ├── sermons.ts               # 설교 영상 DB 리더 (sermon_videos)
+│   ├── sermon-category.ts       # categorizeSermon(title) 분류 유틸 (UI · sync 공유)
+│   └── youtube.ts               # YouTube 업로드 플레이리스트 fetch — sync cron 전용
 │
 ├── types/
 │   ├── bulletin-master.ts       # BulletinMasterData, 5개 row 타입
@@ -213,9 +239,18 @@ src/
 - 숨김: `/admin/*`, `/login`, `/auth/*`
 
 ### Admin 네비게이션
-- `admin/layout.tsx` — PC(`lg+`): 좌측 사이드바, 모바일: 상단 sticky 가로 스크롤 pill 탭
-- `AdminNav.tsx` — `AdminSidebar` + `AdminMobileTabs` (활성 상태 표시, 아이콘은 문자열 키로 직렬화 가능)
-- 메뉴: 대시보드, 공지사항, 주보, 주보 마스터, 갤러리, 교회일정, 일정 구독자, 설교 요약, 쇼츠, 문의 내역, 새가족 등록, 소모임 게시판, 회원관리(master 전용)
+- `admin/layout.tsx` — PC(`lg+`): 좌측 `AdminSidebar`, 모바일: `AdminBottomTabBar` (4 + 더보기) + 그룹 페이지에선 `AdminGroupTabs` 가 상단 가로 탭으로 분기
+- `AdminNav.tsx` — `AdminSidebar` (사이드바). 아이콘은 문자열 키로 직렬화 가능
+- `/admin/menu` — 모바일 더보기 진입점, 카드 그리드로 모든 섹션 노출
+- 메뉴: 대시보드, 공지사항, 주보, 주보 마스터, 갤러리, 교회일정, 일정 구독자, 설교 요약, 쇼츠, 문의 내역, 새가족 등록, 소모임 게시판, 포스터 도구, 회원관리(master 전용)
+
+### 관리자 온보딩 — 가이드 + 스포트라이트 투어
+- `/admin/guide` — 공지/갤러리/주보/포스터/문의 단계별 사용법(Section + Step + Tip)
+- `AdminTour` — 16단계 스포트라이트 투어. SVG mask 로 화면 어둡게 + 타깃만 cutout
+  - 단계마다 자동 경로 이동(usePathname/Router) + scrollIntoView
+  - `clickOnEnter` 플래그로 탭 버튼을 진입 시 자동 클릭 → 패널 콘텐츠까지 함께 시연
+  - 사이드바·메뉴 카드 양쪽에 동일 `data-tour` 부여 → viewport 별로 보이는 쪽 자동 매칭 (`nav-tour-keys.ts` 가 매핑)
+- 트리거: `'admin-tour:start'` 윈도우 이벤트 — 대시보드/가이드 페이지의 시작 버튼이 발사
 
 ---
 
@@ -244,41 +279,80 @@ HeroSlide[]                  ← src/types/notice.ts (플랫폼 공용 DTO)
 ## 데이터 흐름
 
 ```
-Google Calendar API ──→ google-calendar.ts ──→ CalendarEvent[]
-YouTube RSS ──→ youtube.ts ──→ SermonVideo[]
-                                    │
-Gemini API ←── gemini.ts ←──────────┘ (설교 요약)
-                    │
-                    ▼
-Supabase DB ←── notices.ts (저장) ──→ Notice[]
+설교 영상 (DB 누적 모델 — 마이그레이션 032 이후):
+    매일 KST 15:00 Vercel Cron
+         │
+         ▼
+    GET /api/admin/cron/sync-sermons (CRON_SECRET 인증)
+         │
+         ▼
+    fetchYouTubeUploads(50)  ── youtube.ts (sync 전용)
+         │
+         ▼
+    Supabase upsert ── sermon_videos (PK=video_id, 누적 보존)
+         │
+         └── 표시: src/lib/sermons.ts → DB read only
+               ├─ /sermons (목록 + SermonTabs 필터)
+               ├─ /sermons/[id] (상세 + iframe 임베드)
+               ├─ 홈 LatestSermon
+               └─ /api/new-content (레드닷 최신 일자)
+
+Supabase DB ←── notices.ts (저장) ──→ Notice[] + HeroSlide[]
             ←── gallery.ts ──────────→ GalleryAlbum[]
-            ←── server.ts (auth) ────→ Profile, GroupPost[]
+            ←── server.ts (auth) ────→ Profile, BoardPost[]
+Gemini API ←── gemini.ts ←─── (설교 요약 / 챗봇 / 포스터 영문 프롬프트)
 
 Supabase Storage ← gallery 버킷 (이미지)
                  ← weeklies 버킷 (PDF)
                  ← shorts 버킷 (mp4, 임시)
+                 ← board-images 버킷 (게시판 첨부)
+                 ← poster-images 버킷 (포스터 결과 — 마이그레이션 026, 현재 표시 흐름과는 미연결)
 
-Admin UI (WeeklyForm, 6-tab form) ──→ Supabase DB (weeklies)
+Admin UI (WeeklyForm, 5탭 + 마스터) ──→ Supabase DB (weeklies)
+    │  탭 구성: 기본 / 페이지1 주일예배 / 페이지2 예배안내 / 페이지3 헌금 / 페이지4 교회소식 / 주보 마스터(인라인 accordion)
+    │
+    ▼
+WeeklyEditorWithPreview ── 우측에 4페이지 실시간 미리보기 (자동 스케일)
+
 Admin UI (/admin/masters/*) ────────→ Supabase DB (church_settings,
-                                          mokjang_entries, servants,
-                                          support_sections, community_prayers)
+    │                                     mokjang_entries, servants,
+    │                                     support_sections, community_prayers)
+    │  standalone 라우트 + 주보 폼 마스터 탭이 동일한 Editor 컴포넌트(masters/*) 재사용
+    │
+    │  Public /weekly:
+    │    최신 발행 주보 1건을 <Bulletin mode="web"> 으로 풀 렌더 (BulletinWebView 자동 스케일)
+    │    하단에 지난 주보 목록 → 상세는 /weekly/[id]
     │
     │  Public /weekly/[id] & /weekly-print/[id]:
     │    loadBulletinMaster(supabase) → BulletinMasterData
     │    └→ <Bulletin weekly={...} master={...} /> (Live Reference)
     │
-    └── POST /api/weeklies/generate-pdf
+    └── POST /api/weeklies/generate-pdf  (인쇄/저장용)
             │
             ▼
-        buildWeeklyHtml() ──→ HTML 문자열 (앞면 + 뒷면)
-            │
-            ▼
-        Puppeteer (puppeteer-core + @sparticuz/chromium)
-            │  page.setContent(html) → page.pdf({ format: 'A4' })
+        Puppeteer (puppeteer-core + @sparticuz/chromium-min, 런타임 다운로드)
+            │  page.goto(/weekly-print/[id]) → page.pdf({ format: 'A4' })
+            │  (HTML 빌더 제거 — 라이브 라우트를 그대로 인쇄)
             ▼
         PDF Buffer ──→ Supabase Storage (weeklies/{id}-generated.pdf)
-            │
             └── weeklies.pdf_url 업데이트
+
+포스터 도구 (admin/posters):
+    ① PromptBuilder (칩 5종 + 행사 정보 입력)
+         │  buildMetaPromptForGemini()  ── poster-prompts.ts
+         ▼
+    POST /api/posters/build-prompt  ── Gemini 텍스트 호출
+         │
+         ▼
+    영문 이미지 프롬프트 ── 사용자가 복사해 외부 AI 도구(ChatGPT/Gemini/Midjourney 등)에 붙여 이미지 생성
+         │
+         ▼
+    ② Finalizer ── AI 결과 이미지 업로드
+         │  poster-footer.ts: drawCover + 한글 텍스트 오버레이 + 교회 푸터(로고 banner.avif + 전화/주소 + QR)
+         │  비율별 캔버스: 1080×1080 / 1080×1920 / A4 1240×1754
+         │  /api/posters/proxy-image — 참고 이미지 CORS 우회 시 사용
+         ▼
+    PNG 다운로드 (클라이언트 직접) — 외부 SNS/인쇄 사용
 
 GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
     │               ├── yt-dlp (다운로드 + 자막)
@@ -422,15 +496,37 @@ Promise.all([ weeklies SELECT, loadBulletinMaster(supabase) ])
 
 `src/components/weekly/form/`:
 
-- `FormTabs` — 6탭 구조(①기본 ②주일예배 ③앞면(교회소식) ④뒷면좌측 ⑤뒷면우측 ⑥기타)
+- `FormTabs` — 5탭 + 주보 마스터 = 6 탭 (①기본 ②페이지1 주일예배 ③페이지2 예배안내 ④페이지3 헌금 ⑤페이지4 교회소식 ⑥주보 마스터). 각 버튼에 `data-tour="weekly-tab-{key}"` 부여
 - `DynamicArrayField<T>` — 제네릭 배열 편집기 (add/remove/move-up/move-down, max 상한)
 - `Field`, `SectionTitle` — 라벨/도움말/섹션 헤더
+- `constants.ts` — `WORSHIP_ITEMS_TEMPLATE` (16행 고정), `OFFERING_CATEGORIES` (10), `SPECIAL_OFFERING_INDEX=3` 등 고정 슬롯
 
-마스터 CRUD(5개)는 `src/app/admin/masters/` 하위에 각각 별도 페이지로 분리:
-`topic`, `mokjang`(40행 고정), `servants`, `supports`, `community-prayers`(max 7).
+`WeeklyEditorWithPreview` — 폼 + 우측 4페이지 실시간 미리보기. `ResizeObserver` 로 컨테이너 폭에 맞춰 자동 스케일, 활성 탭 변경 시 해당 페이지로 자동 스크롤.
+
+### 주보 마스터 인라인 편집
+
+마스터 CRUD(5개) 컴포넌트는 `src/components/weekly/masters/` 에 추출:
+`TopicEditor`, `MokjangEditor` (40행 고정), `ServantsEditor`, `SupportsEditor`, `CommunityPrayersEditor` (max 7).
+
+이들은 두 곳에서 재사용:
+1. **standalone 라우트** `/admin/masters/{name}` — 페이지 헤더 + Editor (deep-link/북마크 호환)
+2. **주보 폼 6번째 탭 "주보 마스터"** — accordion 으로 5개 Editor 인라인 편집 (현재 작성 중인 주보 잃지 않고 마스터 수정 가능)
 
 Reorder 시 UNIQUE(seq) 충돌을 피하기 위해 **shift-to-temp 패턴** 사용 — 먼저 seq+1000으로
 upsert 후 실제 seq로 재upsert.
+
+### 새 토글 필드 (마이그레이션 028~030)
+
+| 필드 | 타입 | 효과 |
+|------|------|------|
+| `weeklies.afternoon_mokjang_mode` | boolean | true 면 페이지2 좌상단 "주일오후 찬양예배" 셀이 목장모임 이미지(`public/mokjang.jpg`)+안내 문구로 대체 |
+| `weeklies.special_offering` | jsonb `{enabled,label}` | 헌금 4번째 슬롯(부활감사 자리)을 토글/이름변경. enabled=false 면 행 자체 제거 |
+| `weeklies.front_toggles` | jsonb 4개 boolean | 페이지4 4섹션(성경통독·새가족·식당봉사·봉사센터) 표시 토글, 후속 항목 번호 자동 재계산 |
+
+### 정리된 레거시 (마이그레이션 027/031)
+
+- 027: `weeklies.hymn_number`, `weeklies.scripture` 컬럼 DROP
+- 031: `prayer_items`, `announcements`, `servants_text`, `offering_list_text`, `sogroup_text` 컬럼 DROP — 기도제목은 마스터(`community_prayers`)로 일원화. "기타 탭" 자체 제거. `WeeklyInlineView.tsx`, `weekly-html-template.ts` 파일도 삭제.
 
 ### 검증
 
@@ -441,7 +537,7 @@ upsert 후 실제 seq로 재upsert.
   `SupportSectionSchema`, `CommunityPrayerSchema` — 마스터별
 
 마이그레이션: `supabase/migrations/011_weeklies_layout_fields.sql`,
-`012_bulletin_master_tables.sql` (RLS: public SELECT, admin CUD).
+`012_bulletin_master_tables.sql` (RLS: public SELECT, admin CUD), 추가 027~031 (위 표 참조).
 
 ---
 
@@ -688,10 +784,17 @@ admin/boards/[id]/members 페이지
 | 대상 | 방식 | TTL |
 |------|------|-----|
 | 홈페이지 | ISR | 1시간 (`revalidate: 3600`) |
-| 설교 목록 | ISR + fetch cache | 30분 (`revalidate: 1800`) |
+| 설교 목록 | ISR (DB read) | 1시간 (`revalidate: 3600`) — YouTube fetch 는 cron 시점만 |
 | 정적 페이지 (예배, 소개 등) | Static (빌드 시) | - |
 | 공지사항 | Dynamic (매 요청) | - |
 | 온디맨드 무효화 | POST `/api/revalidate` | - |
+
+### Vercel Cron (`vercel.json`)
+
+| 경로 | 스케줄 (UTC) | 의미 |
+|------|--------------|------|
+| `/api/admin/cron/alimtalk-events` | `0 21 * * *` (KST 06:00) | D-1 일정 알림톡 발송 |
+| `/api/admin/cron/sync-sermons` | `0 6 * * *` (KST 15:00) | YouTube → sermon_videos upsert (50개 누적) |
 
 ---
 

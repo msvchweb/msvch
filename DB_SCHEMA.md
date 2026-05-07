@@ -187,24 +187,19 @@ interface HeroSlide {
 | `created_at` | `timestamptz DEFAULT now()` | 생성일 |
 | `volume` | `integer` | 권 (예: 47) |
 | `issue` | `integer` | 호 (예: 16) |
-| `hymn_number` | `text` | 찬송 번호 |
-| `scripture` | `text` | 주일 성경봉독 본문 |
 | `special_praise` | `jsonb` | 특별찬양 `{part1:{song,choir}, part2:{song,choir}}` |
 | `sermon_title` | `text` | 말씀 제목 |
 | `sermon_pastor` | `text` | 설교자 이름 |
 | `closing_hymn` | `text` | 결단 찬송 번호 |
 | `weekly_verse` | `text` | 입술말씀 (구절 + 본문) |
-| `afternoon_service` | `jsonb` | 오후 찬양예배 `{scripture, title, pastor}` |
-| `wednesday_service` | `jsonb` | 수요예배 `{scripture, title}` |
+| `afternoon_service` | `jsonb` | 주일오후 찬양예배 `{scripture, title, pastor}` |
+| `afternoon_mokjang_mode` | `boolean NOT NULL DEFAULT false` | true = 페이지2 좌상단(주일오후) 자리를 "목장모임" 이미지로 대체 (마이그레이션 028) |
+| `wednesday_service` | `jsonb` | 수요예배 `{leader, scripture, title, pastor, hymn, benediction}` (인도자/설교자/찬송/축도 필드는 jsonb 안에서 무스키마 확장) |
 | `dawn_readings` | `jsonb` | 새벽예배 신앙일기 `[{date, passage}]` (6개) |
 | `offering_members` | `jsonb` | 헌금위원 `{p1, p2, p3}` |
-| `prayer_items` | `jsonb` | 기도제목 배열 `[{text}]` |
-| `announcements` | `jsonb` | 공지사항 배열 `[{text}]` |
-| `servants_text` | `text` | 섬기는 분들 (자유 텍스트) |
-| `offering_list_text` | `text` | 향기로운 예물 (자유 텍스트) |
 | `is_published` | `boolean DEFAULT false` | 공개 발행 여부 |
 | `publish_channels` | `jsonb` | 발행 채널 `{website, alimtalk, instagram}` |
-| `news` | `jsonb` | 교회소식 배열 `[{title, items:string[]}]` (최대 9) |
+| `news` | `jsonb` | 교회소식 배열 `[{title, items:string[]}]` (최대 20, validation.ts 제약) |
 | `meetings` | `jsonb` | 모임 안내 `[{group, when, place}]` (최대 6) |
 | `north_korea_note` | `text` | 북한선교부 메모 |
 | `bible_reading` | `text` | 성경 통독 현황 메모 |
@@ -217,6 +212,8 @@ interface HeroSlide {
 | `next_week_prayer` | `jsonb` | 다음 주 기도자 배열 (최대 3) |
 | `guide_committee` | `jsonb` | 안내위원 `[{part, indoor, outdoor}]` (최대 3) |
 | `offerings` | `jsonb` | 향기로운 예물 카테고리 `[{label, names}]` (최대 11) |
+| `special_offering` | `jsonb NOT NULL DEFAULT '{"enabled":false,"label":"부활감사"}'` | 헌금 4번째 슬롯(부활감사 자리)을 토글/라벨 변경 가능한 "특별헌금" 으로 분리. enabled=false 면 주보 렌더 시 해당 행 제거 (마이그레이션 029) |
+| `front_toggles` | `jsonb NOT NULL DEFAULT '{"bibleReading":true,"newMembers":true,"mealDuty":true,"volunteerNote":true}'` | 페이지 4(교회소식 영역) 4개 섹션별 표시 토글. OFF 시 주보 렌더에서 행 제거 + 번호 자동 재계산 (마이그레이션 030) |
 | `week_total` | `text` | 지난주 헌금 총액 |
 | `cumulative_total` | `text` | 누계 |
 
@@ -230,6 +227,11 @@ interface HeroSlide {
 **마이그레이션**:
 - `010_weeklies_content.sql` — 초기 콘텐츠 필드(20개) 추가
 - `011_weeklies_layout_fields.sql` — 신규 레이아웃 필드 15개 추가 (news, meetings, worship_items 등)
+- `027_drop_weekly_legacy_fields.sql` — `hymn_number`, `scripture` (최상위) DROP. 인쇄/웹 주보가 `worship_items` 기반 신규 렌더로 통합되며 미사용 처리
+- `028_weeklies_afternoon_mokjang_mode.sql` — `afternoon_mokjang_mode boolean NOT NULL DEFAULT false` 추가
+- `029_weeklies_special_offering.sql` — `special_offering jsonb` 추가 (부활감사 자리 토글/라벨)
+- `030_weeklies_front_toggles.sql` — `front_toggles jsonb` 추가 (페이지 4 섹션 표시 토글)
+- `031_drop_weekly_misc_legacy.sql` — `prayer_items`, `announcements`, `servants_text`, `offering_list_text`, `sogroup_text` DROP. 폼의 "기타" 탭 자체 삭제. 기도제목은 마스터(`community_prayers`)로 일원화 (베이스 테이블 폴백 제거)
 
 **TypeScript 타입**: `src/types/notice.ts` `Weekly` 인터페이스 참조.
 
@@ -641,6 +643,104 @@ interface NewFamilyRegistration {
 
 ---
 
+### `posters`
+
+AI 포스터 생성 메타 + 최종 PNG URL (마이그레이션 026).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+| `updated_at` | `timestamptz NOT NULL DEFAULT now()` | 자동 갱신 트리거 (`boards_set_updated_at` 재사용) |
+| `created_by` | `uuid` | `auth.users.id` ON DELETE SET NULL |
+| `created_by_name` | `text` | 작성 시점 닉네임 스냅샷 |
+| `category` | `text NOT NULL CHECK` | `'event'` \| `'welcome'` \| `'group'` \| `'notice'` \| `'custom'` |
+| `title` | `text NOT NULL` (1~100자) | 포스터 핵심 제목 |
+| `body_text` | `text` (≤500자) | 부가 설명 (선택) |
+| `prompt_used` | `text NOT NULL` | Gemini 가 만든 영문 이미지 프롬프트 본문 |
+| `ratio` | `text NOT NULL CHECK` | `'1:1'` \| `'9:16'` \| `'a4'` |
+| `ai_image_url` | `text NOT NULL` | AI 가 생성한 원본 이미지 URL |
+| `final_image_url` | `text NOT NULL` | 한글 텍스트·푸터 합성 후 최종 PNG URL |
+| `linked_event_id` | `uuid` | `events.id` ON DELETE SET NULL (Phase 2 연결용, 현재 NULL) |
+| `linked_notice_id` | `uuid` | `notices.id` ON DELETE SET NULL (Phase 2 연결용, 현재 NULL) |
+| `cost_cents` | `int` | 생성 비용 (선택) |
+
+**RLS 정책**:
+- SELECT: staff (`is_staff()`)
+- INSERT: staff + (`created_by IS NULL OR created_by = auth.uid()`)
+- UPDATE/DELETE: 작성자 본인 OR admin/master
+
+**인덱스**: `idx_posters_created_at (created_at DESC)`, `idx_posters_created_by (created_by, created_at DESC)`
+
+**현재 사용 상태 (피벗 후)**:
+2026-05-06 피벗 — Gemini 이미지 모델 직접 호출은 무료 티어 quota 한계로 포기. 대신 **프롬프트 빌더**가 영문 프롬프트만 만들어 사용자가 자기 AI 도구(ChatGPT/Gemini/Midjourney 등)에 붙여 이미지를 생성하고, **이미지 마무리 합성기**가 그 결과 이미지에 한글 텍스트·교회 푸터를 합성한다. **테이블·로그·Storage 버킷은 026에서 만들어졌으나 현재 표시·저장 흐름과 연결되지 않음**. Phase 2 에서 events/notices 와 양방향 연결 시 활성화 예정.
+
+---
+
+### `poster_generations_log`
+
+포스터 생성 rate-limit 추적 (마이그레이션 026). 사용자별 일 20회 제한 검증 용도.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `user_id` | `uuid NOT NULL` | `auth.users.id` ON DELETE CASCADE |
+| `variants_count` | `int NOT NULL DEFAULT 1` | 한 번 호출에서 생성된 변형 수 |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+
+**RLS 정책**:
+- SELECT: 본인 (`user_id = auth.uid()`) OR admin/master
+- INSERT: 본인 + staff (`is_staff() AND user_id = auth.uid()`)
+
+**인덱스**: `idx_poster_gen_log_user_time (user_id, created_at DESC)`
+
+**현재 상태**: 026 에서 생성됐으나 피벗 이후 직접 호출 제거되어 미기록. `posters` 와 동일하게 Phase 2 활성화 대기.
+
+---
+
+### `sermon_videos`
+
+설교 영상 누적 저장 (마이그레이션 032). YouTube 업로드 플레이리스트에서 매일 1회 cron sync → 한 번 들어온 영상은 영구 보존. 표시는 모두 이 테이블에서 읽으며 YouTube API 는 sync 경로에서만 사용.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `video_id` | `text` PK | YouTube videoId |
+| `title` | `text NOT NULL` | 제목 |
+| `description` | `text NOT NULL DEFAULT ''` | 설명 |
+| `thumbnail` | `text NOT NULL DEFAULT ''` | 썸네일 URL |
+| `published_at` | `timestamptz NOT NULL` | 게시일 |
+| `category` | `text NOT NULL DEFAULT 'all'` | `'sunday'` \| `'wednesday'` \| `'friday'` \| `'dawn'` \| `'praise'` \| `'all'` (sermon-category.ts 와 동기) |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | DB 적재일 |
+| `updated_at` | `timestamptz NOT NULL DEFAULT now()` | 메타데이터 마지막 갱신일 |
+
+**RLS 정책**:
+- SELECT: 누구나 (`USING (true)`)
+- INSERT/UPDATE/DELETE: 정책 없음 — service_role(`/api/admin/cron/sync-sermons` cron) 만 가능
+
+**인덱스**:
+- `idx_sermon_videos_published_at (published_at DESC)` — 최신순 목록
+- `idx_sermon_videos_category` — 카테고리 필터
+
+**Sync 흐름**:
+- Vercel Cron `0 6 * * *` (KST 15시) → `/api/admin/cron/sync-sermons` 호출
+- `fetchYouTubeUploads(50)` → `categorizeSermon(title)` → upsert (onConflict: video_id)
+- 신규/메타 갱신 모두 동일 경로. 기존 row 의 새 영상은 추가만 되고 옛 영상은 삭제되지 않음 (영구 누적)
+
+**TypeScript 타입** (`src/types/youtube.ts`):
+```ts
+interface SermonVideo {
+  videoId: string;
+  title: string;
+  description: string;
+  thumbnail: string;
+  publishedAt: string;
+}
+```
+
+리더는 `src/lib/sermons.ts` (`getSermonVideos`/`getSermonByVideoId`/`getLatestSermon`).
+
+---
+
 ### `content_authors`
 
 컨텐츠 작성자 추적 shadow 테이블 (마이그레이션 020). 베이스 테이블에 author 컬럼을 추가하지 않으므로 공개 응답에 작성자 정보가 절대 노출되지 않음.
@@ -783,6 +883,7 @@ interface ShortsClip {
 | `shorts` | public | 쇼츠 mp4 (임시, 발행 후 삭제 가능) |
 | `blog-images` | public | 네이버 블로그 동기화 이미지 + 관리자 UI 히어로 이미지 (notices/churchschool_posts 첨부, 홈 히어로 슬라이더 소스) |
 | `board-images` | public | 소모임 게시판 글 첨부 이미지 (마이그레이션 025). 5MB 제한, jpg/png/webp/gif. 멤버만 업로드/삭제 |
+| `poster-images` | public | AI 포스터 이미지 (마이그레이션 026). 10MB 제한, png/jpeg/webp. staff 만 업로드/수정/삭제. 피벗 이후 현재 표시 흐름과 미연결 (Phase 2 대기) |
 
 각 버킷 정책: 누구나 읽기, admin만 업로드/삭제. `shorts` 버킷은 service_role도 업로드/삭제 가능 (GitHub Actions용).
 `blog-images`는 service_role(네이버 블로그 sync 스크립트) + staff(`is_staff()`, 마이그레이션 016)이 업로드/수정/삭제 가능.
@@ -827,3 +928,10 @@ interface ShortsClip {
 | `023_alimtalk_subscribers.sql` | event_subscribers + alimtalk_sent (카카오 비즈 알림톡 인프라) |
 | `024_new_family_registrations.sql` | new_family_registrations 테이블 (공개 새가족 등록 폼 — 누구나 INSERT, staff SELECT/UPDATE, admin/master DELETE) |
 | `025_boards.sql` | 소모임 게시판 시스템 — boards/board_members/board_posts/board_comments + is_board_member/can_view_board 헬퍼 + storage 버킷 board-images. ad-hoc 멤버 모델 (admin 이 제목 입력해 신설 + 멤버 임의 지정 + is_visible 토글로 숨김) |
+| `026_posters.sql` | AI 포스터 인프라 — posters/poster_generations_log + storage 버킷 poster-images. 2026-05-06 피벗 이후 직접 호출 제거되어 표시·저장 흐름과 현재 미연결 (Phase 2 대기) |
+| `027_drop_weekly_legacy_fields.sql` | weeklies.hymn_number, weeklies.scripture (최상위) DROP — 신규 worship_items 기반 렌더로 통합 |
+| `028_weeklies_afternoon_mokjang_mode.sql` | weeklies.afternoon_mokjang_mode boolean — 페이지2 좌상단 셀을 목장모임 이미지로 대체하는 토글 |
+| `029_weeklies_special_offering.sql` | weeklies.special_offering jsonb — 헌금 4번째 슬롯(부활감사 자리)을 토글/라벨 변경 가능한 특별헌금으로 분리 |
+| `030_weeklies_front_toggles.sql` | weeklies.front_toggles jsonb — 페이지 4(교회소식 영역) 4섹션 표시 토글 (성경통독/새가족/식당봉사/봉사센터) |
+| `031_drop_weekly_misc_legacy.sql` | weeklies 의 prayer_items/announcements/servants_text/offering_list_text/sogroup_text DROP — 폼 "기타" 탭 자체 제거. 기도제목은 마스터(community_prayers)로 일원화 |
+| `032_sermon_videos.sql` | sermon_videos 테이블 (video_id PK + 카테고리 + RLS 공개 SELECT). YouTube 업로드 플레이리스트에서 일 1회 cron 으로 누적 동기화 — 한 번 들어온 영상은 영구 보존. 표시는 DB 에서만 읽고 YouTube API 호출은 sync 경로 1곳으로 제한 |

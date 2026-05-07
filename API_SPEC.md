@@ -10,10 +10,13 @@ Next.js App Router 기반 API 라우트. 모든 엔드포인트는 `/api/` 하�
 
 ### GET `/api/sermons`
 
-설교 영상 목록을 YouTube RSS 피드에서 가져온다.
+설교 영상 목록을 `sermon_videos` 테이블에서 조회 (마이그레이션 032).
+이전에는 매 호출마다 YouTube API를 직접 fetch 했으나, 새 영상이 들어올수록 옛 영상이
+top-N에서 밀려나 화면에서 사라지는 문제가 있어 DB 누적 구조로 전환됨.
+YouTube fetch 는 `/api/admin/cron/sync-sermons` 가 대신 매일 1회 수행한다.
 
 - **인증**: 불필요
-- **응답**: `SermonVideo[]`
+- **응답**: `SermonVideo[]` — `published_at DESC`, 최대 50건
 
 ```ts
 interface SermonVideo {
@@ -25,8 +28,8 @@ interface SermonVideo {
 }
 ```
 
-- **캐시**: ISR 30분 (`revalidate: 1800`)
-- **최대 결과**: 15개
+- **캐시**: 라우트 자체 캐시 없음 — 데이터 함수(`getSermonVideos`)가 단순 SELECT
+- **최대 결과**: 50개
 
 ---
 
@@ -212,6 +215,41 @@ Vercel Cron 엔드포인트 — 다음 날(D-1) 일정 중 `notify=true` 인 건
 - **에러**:
   - `401` — 시크릿 불일치
   - `500` — Supabase env 누락 / 조회 실패
+
+---
+
+### GET `/api/admin/cron/sync-sermons`
+
+Vercel Cron 엔드포인트 — YouTube 업로드 플레이리스트에서 최근 50개 영상을 받아 `sermon_videos` 테이블에 upsert (마이그레이션 032).
+표시용 코드(`/api/sermons`, 홈/설교 페이지)는 이 테이블만 읽으므로, 한 번 들어온 영상은 영구 보존된다.
+
+- **인증**: `x-cron-secret` 헤더 OR `Authorization: Bearer <CRON_SECRET>` (`crypto.timingSafeEqual` 비교)
+- **스케줄**: 매일 15:00 KST (`vercel.json` — `0 6 * * *` UTC)
+- **최대 실행 시간**: 60초 (`maxDuration = 60`)
+- **동작**:
+  1. `fetchYouTubeUploads(50)` 로 YouTube Data API v3 `playlistItems.list` 호출 (channel uploads playlist)
+  2. 응답 영상마다 `categorizeSermon(title)` 으로 sunday/wednesday/friday/dawn/praise/all 분류
+  3. 기존 `video_id` 조회 후 신규 카운트 계산
+  4. `sermon_videos` upsert (`onConflict: video_id`) — 신규 행은 추가, 기존 행은 메타데이터(title/thumbnail 등)만 갱신
+- **응답 (200)**:
+
+```ts
+{
+  fetched: number;       // YouTube 응답 영상 수
+  upserted: number;      // DB 반영된 행 수 (= fetched, 실패 시 0)
+  inserted_new: number;  // 그 중 신규로 추가된 행 수
+  error?: string;        // 0건 fetch / upsert 실패 시 메시지
+}
+```
+
+- **에러**:
+  - `401` — 시크릿 불일치
+  - `500` — Supabase env 누락 / upsert 실패
+
+- **수동 트리거** (배포 직후 첫 백필 등):
+  ```bash
+  curl -H "x-cron-secret: $CRON_SECRET" https://msvch.vercel.app/api/admin/cron/sync-sermons
+  ```
 
 ---
 
@@ -445,7 +483,7 @@ GET /api/home/hero-slides?limit=3   → 최대 3개
 ```ts
 interface NewContentDates {
   notices: string | null;  // 최신 공지 date
-  sermons: string | null;  // 최신 YouTube 설교 publishedAt
+  sermons: string | null;  // 최신 설교 publishedAt — sermon_videos 테이블에서 1건 (마이그레이션 032)
   gallery: string | null;  // 최신 앨범 created_at
   weeklies: string | null; // 최신 주보 date
 }
@@ -872,6 +910,98 @@ Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. b
 
 ---
 
+## 포스터 도구
+
+행사·공지용 포스터 생성을 두 단계로 분리:
+1. **프롬프트 빌더** — 칩으로 입력한 행사 정보·스타일을 Gemini 텍스트 모델로 영문 이미지 프롬프트로 변환. 사용자가 복사해 자기 AI 이미지 도구(ChatGPT/Gemini/Midjourney/DALL·E 등)에 붙여 이미지를 만든다.
+2. **이미지 마무리** — 만들어 온 이미지에 한글 텍스트 오버레이 + 교회 푸터(로고·전화·QR)를 클라이언트 Canvas 로 합성해 PNG 다운로드.
+
+피벗 메모(2026-05-06): 무료 티어 이미지 생성 quota=0 이라 직접 이미지 생성은 서버에서 하지 않음. 마이그레이션 026 의 `posters` 테이블·`poster-images` 버킷은 향후 통합용으로 남겨두었으나 현재 표시·저장 흐름엔 연결되지 않음.
+
+### POST `/api/posters/build-prompt`
+
+칩 + 행사 정보 → 영문 이미지 프롬프트 생성.
+
+- **인증**: staff/admin/master (`requireAdmin()`) — 쿠키 또는 `Authorization: Bearer`
+- **런타임**: `nodejs`
+- **최대 실행 시간**: 45초 (`maxDuration = 45`)
+- **요청 형식**: `multipart/form-data`
+  - `payload` (string, 필수) — 아래 스키마의 JSON 직렬화
+  - `reference` (file, 선택) — 참고 이미지 1장. 5MB 이하, `image/*`. 서버에서 sharp 로 768×768 inside-fit + JPEG q85 압축 후 멀티모달 호출에 첨부.
+
+- **payload 스키마** (Zod):
+
+```ts
+{
+  category: "event" | "welcome" | "group" | "notice" | "custom";
+  ratio: "1:1" | "9:16" | "a4";
+  title: string;                           // 1~100
+  schedules: string[];                     // 각 1~120, 최대 20개
+  location?: string;                       // ≤120
+  audience?: string;                       // ≤120
+  extraLines?: string[];                   // 각 1~150, 최대 12개
+  colorPalette: ColorPalette;              // 9종 프리셋 (springPastel, summerCool, ...)
+  artStyle: ArtStyle;                      // 8종
+  mood: Mood;                              // 5종
+  motifs: Motif[];                         // 8종 중 다중, 최대 8
+  peopleHandling: "none" | "silhouette" | "abstract";
+  moodKeywords?: string;                   // ≤200, 자유 키워드
+  includeText: boolean;                    // true=AI 가 한글 텍스트도 그림 / false=텍스트 따로 합성
+  referenceAspect?: "style" | "composition" | "both";
+}
+```
+
+- **응답 (200)**:
+
+```ts
+{
+  englishPrompt: string;  // ChatGPT/Gemini/Midjourney 등에 붙여 쓰는 영문 산문체 프롬프트
+  koreanSummary: string;  // 어떤 톤으로 만들었는지 한 줄 요약 (UI 노출용)
+}
+```
+
+- **에러**:
+  - `400` — payload JSON 오류 / Zod 검증 실패 / 이미지 형식 아님
+  - `401`, `403` — 권한
+  - `413` — 참고 이미지 5MB 초과
+  - `500` — 참고 이미지 sharp 처리 실패 / 기타 서버 오류
+  - `503` — Gemini 일시 불가 (`GeminiUnavailableError`)
+
+- **내부 동작**:
+  1. `requireAdmin()` 으로 권한 검증
+  2. `multipart` 파싱 + Zod 검증
+  3. 참고 이미지가 있으면 sharp 로 압축 → base64
+  4. `buildMetaPromptForGemini(input, hasReference)` 로 메타 프롬프트 작성
+  5. `callGeminiWithFallbackMultimodal()` 호출 — Gemini 텍스트 모델이 영문 프롬프트 작성
+  6. `sanitizePromptOutput()` — 모델이 끼우는 머리말/따옴표/마크다운 제거
+  7. `buildKoreanSummary(input)` 으로 한국어 요약 생성
+
+### GET `/api/posters/proxy-image`
+
+외부 이미지 URL 을 같은 origin 으로 스트림 — 클라이언트 Canvas CORS taint 회피용.
+
+- **인증**: staff (`requireAdmin()`)
+- **런타임**: `nodejs`
+- **최대 실행 시간**: 30초 (`maxDuration = 30`)
+- **쿼리 파라미터**:
+  - `url` (필수) — 가져올 이미지의 `http(s)` URL
+
+- **SSRF 방어**:
+  - `http`/`https` 외 프로토콜 거부
+  - 내부망 호스트 차단: `localhost`, `0.0.0.0`, `127.x`, `10.x`, `172.16~31.x`, `192.168.x`, `169.254.x`, IPv6 loopback/`fe80:`/`fc/fd`
+  - 응답 `Content-Type` 이 `image/*` 이 아니면 415 반환 (HTML 인 경우 사용자 친화 안내 추가)
+
+- **응답 (200)**: 원격 이미지 바이너리 그대로. `cache-control: no-store`. 최대 25MB.
+- **에러**:
+  - `400` — `url` 누락 / 잘못된 URL / 비 http(s) / 내부망
+  - `401`, `403` — 권한
+  - `413` — 25MB 초과
+  - `415` — 이미지가 아님
+  - `502` — 원격 응답 오류
+  - `500` — 기타
+
+---
+
 ## 입력 검증
 
 모든 API 라우트의 입력 검증은 `src/lib/validation.ts`에 정의된 Zod 스키마로 수행.
@@ -901,6 +1031,8 @@ Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. b
 | POST `/api/boards/[id]/posts` | `BoardPostSchema` | 글 작성 (이미지 URL board-images 버킷 강제) |
 | PATCH `/api/boards/[id]/posts/[postId]` | `BoardPostPatchSchema` | 본인 글 수정 |
 | POST `/api/boards/[id]/posts/[postId]/comments` | `BoardCommentSchema` | 댓글 작성 |
+| POST `/api/posters/build-prompt` | route 내부 Zod (`PayloadSchema`) | 포스터 영문 프롬프트 생성. multipart payload+reference. (마이그레이션 026 — 현재 DB 미연결) |
+| GET `/api/posters/proxy-image` | URL 검증 + SSRF 차단 | 외부 이미지 origin 우회 |
 
 ---
 
@@ -947,8 +1079,11 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `getWeeklies()` | `src/lib/notices.ts` | 발행된 주보 목록 (`is_published=true`, 최근 20개) |
 | `getWeeklyById(id)` | `src/lib/notices.ts` | 주보 단건 조회 (관리자 편집용) |
 | `getGalleryAlbums(options?)` | `src/lib/gallery.ts` | 공개 앨범 + 이미지 (태그 필터 지원) |
-| `getSermonVideos(max)` | `src/lib/youtube.ts` | YouTube RSS 설교 목록 |
-| `getLatestSermon()` | `src/lib/youtube.ts` | 최신 설교 1건 |
+| `getSermonVideos(limit?)` | `src/lib/sermons.ts` | `sermon_videos` 테이블에서 published_at DESC 로 N건 조회 (기본 100) |
+| `getSermonByVideoId(id)` | `src/lib/sermons.ts` | 단건 설교 조회 (상세 페이지용) |
+| `getLatestSermon()` | `src/lib/sermons.ts` | 최신 설교 1건 (DB) |
+| `fetchYouTubeUploads(max?)` | `src/lib/youtube.ts` | YouTube Data API v3 업로드 플레이리스트 fetch — sync cron 전용 |
+| `categorizeSermon(title)` | `src/lib/sermon-category.ts` | 제목으로 sunday/wednesday/friday/dawn/praise/all 분류 (UI · sync 공유) |
 | `summarizeSermonFromVideo(sermon)` | `src/lib/gemini.ts` | Gemini 설교 요약 |
 | `callGeminiWithFallback(prompt)` | `src/lib/gemini.ts` | 범용 Gemini 호출 (폴백+재시도) |
 | `requireAdmin()` | `src/lib/admin-auth.ts` | API 라우트 admin 인증 헬퍼 |
@@ -995,5 +1130,5 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | Google Calendar API v3 | 1회 마이그레이션 스크립트(`scripts/migrate-google-calendar.ts`)에서만 사용 — 일상 트래픽 의존 없음 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY` (마이그레이션 후 제거 권장) |
 | GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |
 | Puppeteer + @sparticuz/chromium | 주보 PDF 자동 생성 | `CHROME_EXECUTABLE_PATH` (개발 환경만, 선택) |
-| Vercel Cron | 일정 알림톡 D-1 발송 (`/api/admin/cron/alimtalk-events`) | `CRON_SECRET` |
+| Vercel Cron | (1) 일정 알림톡 D-1 발송 `/api/admin/cron/alimtalk-events` 매일 06:00 KST · (2) 설교 영상 동기화 `/api/admin/cron/sync-sermons` 매일 15:00 KST | `CRON_SECRET` |
 | 카카오 비즈니스 알림톡 (중계사 — NHN Cloud / Aligo / Solapi 등) | 일정 알림톡 발송 — 비즈 승인 후 환경변수 채우면 동작 | `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY`, `KAKAO_BIZ_API_URL` |
