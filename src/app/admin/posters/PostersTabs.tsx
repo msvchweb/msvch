@@ -23,6 +23,7 @@ export function PostersTabs() {
           icon={<Sparkles size={14} />}
           label="① 프롬프트 만들기"
           hint="입력 → 영문 프롬프트 → 복사 → ChatGPT/Gemini/Midjourney"
+          dataTour="poster-prompt-tab"
         />
         <TabButton
           active={tab === "finalize"}
@@ -30,6 +31,7 @@ export function PostersTabs() {
           icon={<Wand2 size={14} />}
           label="② 이미지 마무리"
           hint="AI 결과 이미지 + 한글 텍스트 + 교회 footer 합성 → PNG"
+          dataTour="poster-finalize-tab"
         />
       </div>
 
@@ -49,18 +51,21 @@ function TabButton({
   icon,
   label,
   hint,
+  dataTour,
 }: {
   active: boolean;
   onClick: () => void;
   icon: React.ReactNode;
   label: string;
   hint: string;
+  dataTour?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       title={hint}
+      data-tour={dataTour}
       className={`flex items-center gap-1.5 px-4 py-2.5 text-sm transition-colors ${
         active
           ? "border-b-2 border-primary-600 font-semibold text-primary-700"

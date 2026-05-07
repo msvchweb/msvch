@@ -33,6 +33,7 @@ export function FormTabs({ tabs, initialKey, onActiveChange }: Props) {
               key={t.key}
               type="button"
               onClick={() => handleClick(t.key)}
+              data-tour={`weekly-tab-${t.key}`}
               className={`whitespace-nowrap border-b-2 px-4 py-2 text-sm font-medium transition-colors ${
                 active === t.key
                   ? "border-primary-600 text-primary-700"

@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasMasterAccess } from "@/lib/admin-auth";
+import { navTourKey } from "@/components/admin/nav-tour-keys";
 
 interface MenuItem {
   label: string;
@@ -190,6 +191,7 @@ export default async function AdminMenuPage() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  data-tour={navTourKey(item.href)}
                   className="flex items-center gap-3 rounded-xl border border-gray-200 bg-white p-3 transition-colors hover:bg-gray-50 active:bg-gray-100"
                 >
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary-50 text-primary-600">

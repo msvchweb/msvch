@@ -7,6 +7,8 @@ import {
   ArrowLeft,
   ExternalLink,
   Lightbulb,
+  FileText,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import { AdminTourStartButton } from "@/components/admin/AdminTourStartButton";
@@ -30,7 +32,7 @@ export default function GuidePage() {
               관리자 가이드
             </h1>
             <p className="mt-1 text-sm text-gray-500">
-              공지사항·갤러리·문의 관리 방법을 정리한 가이드입니다. 주보 가이드는 준비 중입니다.
+              공지사항·갤러리·주보·포스터 도구·문의 관리 방법을 정리한 가이드입니다.
             </p>
           </div>
           <AdminTourStartButton label="화면 따라가기" />
@@ -87,6 +89,50 @@ export default function GuidePage() {
         </Tip>
       </Section>
 
+      <Section icon={FileText} title="주보 생성" href="/admin/weeklies">
+        <Step n={1} title="새 주보 작성">
+          <Kbd>+ 새 주보 작성</Kbd> 버튼을 누르면 <strong>지난 주보의 내용이 자동으로 채워진 상태</strong>로 시작합니다. 날짜와 제목은 다가오는 일요일 기준으로 자동 계산되고, 발행 채널만 초기화됩니다.
+        </Step>
+        <Step n={2} title="6개 탭으로 나뉜 폼">
+          <ul className="mt-2 space-y-1 pl-4 text-gray-600">
+            <li>• <strong>기본</strong>: 제목·권/호·발행 채널</li>
+            <li>• <strong>페이지1(주일예배)</strong>: 예배 순서 16행 + 암송말씀. 1부/2부 찬양은 접두 자동, 말씀 제목은 큰따옴표 자동.</li>
+            <li>• <strong>페이지2(예배안내)</strong>: 주일오후·수요예배·다음주기도·헌금위원·안내위원·새벽예배·교회공동체 기도제목.</li>
+            <li>• <strong>페이지3(헌금)</strong>: 향기로운 예물 10 카테고리 + 누계. 부활감사는 특별헌금 토글로 켜고 끌 수 있습니다.</li>
+            <li>• <strong>페이지4(교회소식)</strong>: 교회소식·모임·새가족·식당봉사·봉사센터 — 각 섹션 표시 토글 가능.</li>
+            <li>• <strong>주보 마스터</strong>: 매주 안 바뀌는 공용값(섬기는분들·후원하는분들·목장·표어·교회공동체 기도제목). 인라인으로 바로 수정.</li>
+          </ul>
+        </Step>
+        <Step n={3} title="실시간 미리보기 + 발행">
+          우측에 4페이지 전체가 실시간 렌더링됩니다. <Kbd>발행</Kbd>을 누르면 인쇄용·웹용 주보가 즉시 반영됩니다.
+        </Step>
+        <Tip>
+          페이지2 주일오후 자리는 토글 한 번으로 <strong>목장모임 이미지</strong>로 대체할 수 있습니다. 부활감사 슬롯은 추수감사·성탄감사 등 이름을 자유롭게 바꿔 사용할 수 있습니다.
+        </Tip>
+      </Section>
+
+      <Section icon={Sparkles} title="포스터 도구" href="/admin/posters">
+        <Step n={1} title="① 프롬프트 만들기">
+          행사 종류·제목·일정·장소·색감·스타일·분위기 칩을 고르면 <strong>영문 이미지 프롬프트</strong>가 자동으로 생성됩니다.
+          <ul className="mt-2 space-y-1 pl-4 text-gray-600">
+            <li>• 결과 영문 프롬프트 우측의 <Kbd>복사</Kbd> 버튼으로 복사</li>
+            <li>• ChatGPT·Gemini·Midjourney·DALL·E 등 본인이 쓰는 이미지 생성 AI에 붙여넣기</li>
+            <li>• 참고 이미지 첨부 시 색감/구도/둘 다 중 어느 측면을 차용할지 선택 가능</li>
+          </ul>
+        </Step>
+        <Step n={2} title="② 이미지 마무리">
+          AI가 만든 이미지를 업로드하면 한글 텍스트와 교회 푸터(로고·전화·주소·QR)를 합성해 다운로드 가능한 PNG로 만듭니다.
+          <ul className="mt-2 space-y-1 pl-4 text-gray-600">
+            <li>• 비율 선택: 인스타 1:1 / 스토리 9:16 / 인쇄용 A4</li>
+            <li>• 한글 제목·본문 위치(상·중·하)와 크기·색·그림자 조절</li>
+            <li>• 교회 푸터 자동 합성. 푸터 영역은 AI 프롬프트가 미리 비워두도록 지시되어 있어 겹치지 않습니다.</li>
+          </ul>
+        </Step>
+        <Tip>
+          AI에 따라 한국어 텍스트를 잘 못 그리는 경우가 많아, 보통 <strong>"AI가 텍스트 안 그림 → 마무리 단계에서 한글 합성"</strong> 흐름이 가장 깔끔합니다.
+        </Tip>
+      </Section>
+
       <Section icon={MessageSquare} title="문의" href="/admin/inquiries">
         <Step n={1} title="문의 확인">
           사이트 챗봇으로 들어온 문의가 자동 수집됩니다. 이름 · 전화번호 · 메시지 · 접수 시각이 표시됩니다.
@@ -102,12 +148,6 @@ export default function GuidePage() {
         </Tip>
       </Section>
 
-      <div className="rounded-xl border border-dashed border-gray-300 bg-gray-50 p-5 text-sm">
-        <p className="font-medium text-gray-700">주보 가이드 (준비 중)</p>
-        <p className="mt-1 text-gray-500">
-          주보 관리 기능이 완성되는 대로 가이드를 추가합니다.
-        </p>
-      </div>
     </div>
   );
 }

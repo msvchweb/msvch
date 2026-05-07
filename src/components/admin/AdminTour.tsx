@@ -12,6 +12,8 @@ type Step = {
   title: string;
   body: string;
   placement?: Placement;
+  /** 진입 시 타깃을 클릭 (탭 전환 등 — 패널 내용까지 함께 보이도록) */
+  clickOnEnter?: boolean;
 };
 
 const STEPS: Step[] = [
@@ -20,6 +22,13 @@ const STEPS: Step[] = [
     title: "관리자 대시보드",
     body: "여기서 처리 대기, 빠른 작성, 최근 활동을 한눈에 보고 각 영역으로 진입할 수 있습니다.",
     placement: "center",
+  },
+  {
+    path: "/admin/menu",
+    selector: "[data-tour='nav-notices']",
+    title: "공지사항 메뉴",
+    body: "데스크톱에선 좌측 사이드바, 모바일에선 하단 \"더보기 → 공지사항\" 으로 진입합니다.",
+    placement: "right",
   },
   {
     path: "/admin/notices",
@@ -36,6 +45,13 @@ const STEPS: Step[] = [
     placement: "left",
   },
   {
+    path: "/admin/menu",
+    selector: "[data-tour='nav-gallery']",
+    title: "갤러리 메뉴",
+    body: "사진 앨범은 여기서 관리합니다. 모바일 하단탭의 \"갤러리\" 로도 바로 접근 가능합니다.",
+    placement: "right",
+  },
+  {
     path: "/admin/gallery",
     selector: "[data-tour='gallery-new']",
     title: "앨범 만들기",
@@ -50,9 +66,69 @@ const STEPS: Step[] = [
     placement: "left",
   },
   {
+    path: "/admin/menu",
+    selector: "[data-tour='nav-weeklies']",
+    title: "주보 메뉴",
+    body: "주간 주보 작성·발행은 여기서. 모바일 하단탭의 \"주보\" 로도 진입할 수 있습니다.",
+    placement: "right",
+  },
+  {
+    path: "/admin/weeklies",
+    selector: "[data-tour='weekly-new']",
+    title: "새 주보 작성",
+    body: "지난 주보의 내용이 자동으로 채워진 상태로 시작합니다. 변경된 부분만 수정해 발행하면 인쇄·웹·알림톡까지 한 번에 반영됩니다.",
+    placement: "bottom",
+  },
+  {
+    path: "/admin/weeklies/new",
+    selector: "[data-tour='weekly-tab-basic']",
+    title: "주보 폼 — 6개 탭",
+    body: "기본 / 페이지1·2·3·4 / 주보 마스터 6개 탭으로 구성됩니다. 우측엔 실시간 미리보기. 페이지별 입력은 직접 둘러보시고, 자주 헷갈리는 \"주보 마스터\" 만 짚어드립니다.",
+    placement: "bottom",
+    clickOnEnter: true,
+  },
+  {
+    path: "/admin/weeklies/new",
+    selector: "[data-tour='weekly-tab-masters']",
+    title: "주보 마스터",
+    body: "매주 안 바뀌는 공용값(섬기는분들·후원하는분들·목장·표어·기도제목)을 인라인으로 바로 수정. 손대지 않으면 그 다음 주에도 그대로 유지됩니다.",
+    placement: "bottom",
+    clickOnEnter: true,
+  },
+  {
+    path: "/admin/menu",
+    selector: "[data-tour='nav-posters']",
+    title: "포스터 도구 메뉴",
+    body: "AI 포스터 빌더 + 이미지 마무리 합성기가 여기 있습니다.",
+    placement: "right",
+  },
+  {
+    path: "/admin/posters",
+    selector: "[data-tour='poster-prompt-tab']",
+    title: "포스터 ① 프롬프트 만들기",
+    body: "행사 정보·색감·스타일 등을 칩으로 고르면 영문 이미지 프롬프트가 자동 생성됩니다. 복사해 ChatGPT·Gemini·Midjourney에 붙여 이미지를 만드세요.",
+    placement: "bottom",
+    clickOnEnter: true,
+  },
+  {
+    path: "/admin/posters",
+    selector: "[data-tour='poster-finalize-tab']",
+    title: "포스터 ② 이미지 마무리",
+    body: "AI가 만든 이미지를 업로드하면 한글 제목·교회 푸터(로고·전화·QR)를 합성해 인스타·인쇄용 PNG로 다운로드할 수 있습니다.",
+    placement: "bottom",
+    clickOnEnter: true,
+  },
+  {
+    path: "/admin/menu",
+    selector: "[data-tour='nav-inquiries']",
+    title: "문의 메뉴",
+    body: "챗봇·홈페이지로 들어온 문의가 모이는 곳입니다.",
+    placement: "right",
+  },
+  {
     path: "/admin/inquiries",
     title: "문의 관리",
-    body: "챗봇으로 들어온 문의가 여기 모입니다. 전화번호 클릭으로 즉시 발신, 휴지통 아이콘으로 정리하세요.",
+    body: "전화번호 클릭으로 즉시 발신, 휴지통 아이콘으로 정리하세요.",
     placement: "center",
   },
 ];
@@ -121,6 +197,14 @@ export function AdminTour() {
       if (cancelled) return;
       const el = findVisible();
       if (el) {
+        // 탭 버튼 등 — 진입 시 자동 클릭해서 패널 내용까지 함께 보이게
+        if (s.clickOnEnter) {
+          try {
+            el.click();
+          } catch {
+            /* noop */
+          }
+        }
         const r = el.getBoundingClientRect();
         if (r.top < 80 || r.bottom > window.innerHeight - 80) {
           el.scrollIntoView({ block: "center", behavior: "smooth" });
