@@ -58,11 +58,12 @@ function weeklyToFormData(w: Weekly): WeeklyContentInput {
     guide_committee: w.guide_committee ?? [],
     offerings: w.offerings ?? [],
     special_offering: w.special_offering ?? { enabled: false, label: "부활감사" },
-    front_toggles: w.front_toggles ?? {
-      bibleReading: true,
-      newMembers: true,
-      mealDuty: true,
-      volunteerNote: true,
+    front_toggles: {
+      meetings: w.front_toggles?.meetings ?? true,
+      bibleReading: w.front_toggles?.bibleReading ?? true,
+      newMembers: w.front_toggles?.newMembers ?? true,
+      mealDuty: w.front_toggles?.mealDuty ?? true,
+      volunteerNote: w.front_toggles?.volunteerNote ?? true,
     },
     week_total: w.week_total ?? "",
     cumulative_total: w.cumulative_total ?? "",

@@ -237,11 +237,13 @@ export const WeeklyContentSchema = z.object({
     label: z.string().max(30).default("부활감사"),
   }).default({ enabled: false, label: "부활감사" }),
   front_toggles: z.object({
+    meetings: z.boolean().default(true),
     bibleReading: z.boolean().default(true),
     newMembers: z.boolean().default(true),
     mealDuty: z.boolean().default(true),
     volunteerNote: z.boolean().default(true),
   }).default({
+    meetings: true,
     bibleReading: true,
     newMembers: true,
     mealDuty: true,
@@ -333,6 +335,7 @@ export function createEmptyWeeklyInput(): WeeklyContentInput {
     offerings: [],
     special_offering: { enabled: false, label: "부활감사" },
     front_toggles: {
+      meetings: true,
       bibleReading: true,
       newMembers: true,
       mealDuty: true,

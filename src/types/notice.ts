@@ -154,6 +154,7 @@ export interface Weekly {
   special_offering: { enabled: boolean; label: string };
   /** 페이지 4(교회소식 영역) 섹션별 표시 토글. 비활성 시 주보에서 행 제거 + 번호 재계산. */
   front_toggles: {
+    meetings: boolean;
     bibleReading: boolean;
     newMembers: boolean;
     mealDuty: boolean;

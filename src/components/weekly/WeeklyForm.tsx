@@ -729,7 +729,28 @@ function FrontTab({ form, set }: TabProps) {
       </section>
 
       <section className="rounded-xl border border-gray-200 bg-white p-6">
-        <SectionTitle>모임 안내 (최대 6개)</SectionTitle>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <SectionTitle>모임 안내 (최대 6개)</SectionTitle>
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={form.front_toggles.meetings}
+              onChange={(e) =>
+                set("front_toggles", {
+                  ...form.front_toggles,
+                  meetings: e.target.checked,
+                })
+              }
+              className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+            />
+            <span>주보에 표시</span>
+          </label>
+        </div>
+        {!form.front_toggles.meetings && (
+          <p className="mb-3 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            이번 주는 주보에 모임 안내가 표시되지 않습니다 (입력은 보존됩니다).
+          </p>
+        )}
         <DynamicArrayField<MeetingRow>
           label="모임"
           items={form.meetings}

@@ -10,7 +10,7 @@ import {
   createEmptyWeeklyInput,
   type WeeklyContentInput,
 } from "@/lib/validation";
-import type { Weekly } from "@/types/notice";
+import type { Weekly, WorshipItemRow } from "@/types/notice";
 
 function formatLocalDate(d: Date): string {
   const yyyy = d.getFullYear();
@@ -41,7 +41,35 @@ function formatWeeklyTitle(dateStr: string): string {
   return `${y}년 ${m}월 ${label}주 주보`;
 }
 
-/** 최근 주보 → 새 주보용 초기값. date/title/publish 관련 필드만 리셋. */
+/**
+ * 매주 바뀌는 worship_items 슬롯의 내용 리셋.
+ * 인덱스 기준: 5 성시교독 / 6 찬송 / 7 고백과 감사의 기도(assignees) /
+ *             9 성경봉독 / 10 찬양(subRows content) / 11 말씀 / 12 결단의 찬송
+ */
+function resetWeeklyWorshipFields(items: WorshipItemRow[]): WorshipItemRow[] {
+  return items.map((item, i) => {
+    if (i === 5 || i === 6 || i === 9 || i === 11 || i === 12) {
+      return { ...item, content: "" };
+    }
+    if (i === 7) {
+      return { ...item, assignees: item.assignees.map(() => "") };
+    }
+    if (i === 10) {
+      return {
+        ...item,
+        subRows: item.subRows.map((sr, j) => ({
+          ...sr,
+          content: `${j + 1}부 :`,
+        })),
+      };
+    }
+    return item;
+  });
+}
+
+/** 최근 주보 → 새 주보용 초기값.
+ *  매주 바뀌는 항목(예배순서 일부 / 암송 / 오후예배 / 수요예배 본문 /
+ *  다음주기도 / 신앙일기 본문)은 비우고, 그 외는 직전 주의 값을 그대로 가져옴. */
 function weeklyToPrefill(w: Weekly): WeeklyContentInput {
   const date = getUpcomingSunday();
   return {
@@ -56,22 +84,23 @@ function weeklyToPrefill(w: Weekly): WeeklyContentInput {
     sermon_title: w.sermon_title ?? "",
     sermon_pastor: w.sermon_pastor ?? "",
     closing_hymn: w.closing_hymn ?? "",
-    weekly_verse: w.weekly_verse ?? "",
-    afternoon_service: w.afternoon_service ?? {
-      scripture: "",
-      title: "",
-      pastor: "",
-    },
+    // 금주 암송말씀 — 매주 새로 입력
+    weekly_verse: "",
+    // 주일오후 찬양예배 — 매주 새로 입력
+    afternoon_service: { scripture: "", title: "", pastor: "" },
     afternoon_mokjang_mode: w.afternoon_mokjang_mode ?? false,
     wednesday_service: {
+      // leader/pastor/hymn/benediction 은 거의 매주 동일 → 유지
       leader: w.wednesday_service?.leader ?? "",
-      scripture: w.wednesday_service?.scripture ?? "",
-      title: w.wednesday_service?.title ?? "",
       pastor: w.wednesday_service?.pastor ?? "",
       hymn: w.wednesday_service?.hymn ?? "",
       benediction: w.wednesday_service?.benediction ?? "",
+      // 성경봉독·말씀 제목은 매주 새로 입력
+      scripture: "",
+      title: "",
     },
-    dawn_readings: w.dawn_readings ?? [],
+    // 새벽예배 신앙일기 — 본문(passage) 만 리셋, 날짜 라벨은 어차피 폼에서 새 일주일로 자동 재생성
+    dawn_readings: (w.dawn_readings ?? []).map((d) => ({ ...d, passage: "" })),
     offering_members: w.offering_members ?? { p1: "", p2: "", p3: "" },
     is_published: false,
     publish_channels: { website: false, alimtalk: false, instagram: false },
@@ -83,17 +112,20 @@ function weeklyToPrefill(w: Weekly): WeeklyContentInput {
     meal_duty_note: w.meal_duty_note ?? "",
     volunteer_note: w.volunteer_note ?? "",
     worship_leader: w.worship_leader ?? "",
-    worship_items: w.worship_items ?? [],
-    memorize_verse: w.memorize_verse ?? { ref: "", text: "" },
-    next_week_prayer: w.next_week_prayer ?? [],
+    worship_items: resetWeeklyWorshipFields(w.worship_items ?? []),
+    // 금주 암송말씀 — 매주 새로 입력
+    memorize_verse: { ref: "", text: "" },
+    // 다음주기도 3인 — 매주 새로 입력
+    next_week_prayer: (w.next_week_prayer ?? []).map(() => ""),
     guide_committee: w.guide_committee ?? [],
     offerings: w.offerings ?? [],
     special_offering: w.special_offering ?? { enabled: false, label: "부활감사" },
-    front_toggles: w.front_toggles ?? {
-      bibleReading: true,
-      newMembers: true,
-      mealDuty: true,
-      volunteerNote: true,
+    front_toggles: {
+      meetings: w.front_toggles?.meetings ?? true,
+      bibleReading: w.front_toggles?.bibleReading ?? true,
+      newMembers: w.front_toggles?.newMembers ?? true,
+      mealDuty: w.front_toggles?.mealDuty ?? true,
+      volunteerNote: w.front_toggles?.volunteerNote ?? true,
     },
     week_total: w.week_total ?? "",
     cumulative_total: w.cumulative_total ?? "",

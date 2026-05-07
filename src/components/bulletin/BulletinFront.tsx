@@ -96,6 +96,7 @@ export interface FrontData {
     memorizeVerse: { ref: string; text: string };
   };
   toggles: {
+    meetings: boolean;
     bibleReading: boolean;
     newMembers: boolean;
     mealDuty: boolean;
@@ -262,6 +263,7 @@ const DEFAULT: FrontData = {
     },
   },
   toggles: {
+    meetings: true,
     bibleReading: true,
     newMembers: true,
     mealDuty: true,
@@ -297,7 +299,15 @@ export function weeklyToFrontData(
   if (w.new_members && w.new_members.length > 0) data.newMembers = w.new_members;
   if (w.meal_duty_note) data.mealDutyNote = w.meal_duty_note;
   if (w.volunteer_note) data.volunteerNote = w.volunteer_note;
-  if (w.front_toggles) data.toggles = { ...data.toggles, ...w.front_toggles };
+  if (w.front_toggles) {
+    data.toggles = {
+      meetings: w.front_toggles.meetings ?? true,
+      bibleReading: w.front_toggles.bibleReading ?? true,
+      newMembers: w.front_toggles.newMembers ?? true,
+      mealDuty: w.front_toggles.mealDuty ?? true,
+      volunteerNote: w.front_toggles.volunteerNote ?? true,
+    };
+  }
   if (w.worship_leader) data.worship = { ...data.worship, leader: w.worship_leader };
   if (w.worship_items && w.worship_items.length > 0) {
     data.worship = {
@@ -325,9 +335,9 @@ export function weeklyToFrontData(
 /** 페이지 4: 앞면 좌측 — 교회소식 + 섬기는 분들 / 후원하는 분들 */
 export function BulletinFrontLeft({ data }: { data: FrontData }) {
   const newsCount = data.news.slice(0, 20).length;
-  // 토글된 섹션의 번호를 동적으로 계산. 모임은 항상 표시.
+  // 토글된 섹션의 번호를 동적으로 계산.
   let counter = newsCount;
-  const meetingsNum = ++counter;
+  const meetingsNum = data.toggles.meetings ? ++counter : null;
   const bibleNum = data.toggles.bibleReading ? ++counter : null;
   const newMembersNum = data.toggles.newMembers ? ++counter : null;
   const mealDutyNum = data.toggles.mealDuty ? ++counter : null;
@@ -358,7 +368,8 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
             </div>
           ))}
 
-          {/* 모임: 번호.모임 타이틀 + 표 */}
+          {/* 모임: 번호.모임 타이틀 + 표 (토글 OFF 시 섹션 통째 제거) */}
+          {meetingsNum !== null && (
           <div>
             <div className="font-bold">{meetingsNum}. 모임</div>
             <div className="pl-2">
@@ -385,6 +396,7 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
               <div className="mt-0.5">{data.northKoreaNote}</div>
             </div>
           </div>
+          )}
 
           {bibleNum !== null && (
             <div>
