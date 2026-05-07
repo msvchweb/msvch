@@ -19,7 +19,7 @@ export const CHURCH_FOOTER = {
   phone: "02-534-0691",
   address: "서울 동작구 사당로 16바길 9",
   qrUrl: "https://msvch.vercel.app/links",
-  logoUrl: "/logo.png",
+  logoUrl: "/images/banner.avif",
 } as const;
 
 /** 비율별 최종 출력 캔버스 픽셀 크기 */
@@ -259,7 +259,8 @@ function drawFooter(
 ): void {
   const cw = canvas.width;
   const ch = canvas.height;
-  const footerH = Math.round(ch * 0.11);
+  // 띠 높이: 캔버스 높이에 비례하되, 세로가 긴 비율(9:16·A4)에서 가로 요소가 폭을 넘지 않도록 cw 기준 상한.
+  const footerH = Math.round(Math.min(ch * 0.11, cw * 0.13));
   const y0 = ch - footerH;
 
   // 반투명 검정 띠
@@ -270,19 +271,22 @@ function drawFooter(
   ctx.fillStyle = "rgba(201, 168, 76, 0.65)"; // church-gold
   ctx.fillRect(0, y0, cw, Math.max(2, Math.round(footerH * 0.018)));
 
-  const padX = Math.round(footerH * 0.4);
+  const padX = Math.round(footerH * 0.55);
   const innerH = footerH * 0.65;
+  const gap = Math.round(footerH * 0.75); // 로고 ↔ 텍스트 ↔ QR 사이 간격
 
-  // 좌: 로고 (가로 비율 보존)
-  const logoH = innerH;
+  // 좌: 로고 (가로 비율 보존, 폭 상한 = 캔버스의 28%)
   const logoAspect = assets.logo.width / assets.logo.height;
-  const logoW = Math.round(logoH * logoAspect);
+  const maxLogoW = cw * 0.28;
+  const naturalW = innerH * logoAspect;
+  const logoW = Math.min(naturalW, maxLogoW);
+  const logoH = logoW / logoAspect;
   const logoX = padX;
   const logoY = y0 + (footerH - logoH) / 2;
   ctx.drawImage(assets.logo, logoX, logoY, logoW, logoH);
 
   // 우: QR (정사각)
-  const qrSide = Math.round(footerH * 0.85);
+  const qrSide = Math.round(footerH * 0.62);
   const qrX = cw - padX - qrSide;
   const qrY = y0 + (footerH - qrSide) / 2;
   // QR 흰 배경 패딩 (어두운 띠 위에 검정 QR 만 두면 안 보임)
@@ -292,8 +296,8 @@ function drawFooter(
   ctx.drawImage(assets.qr, qrX, qrY, qrSide, qrSide);
 
   // 중앙: 텍스트 (이름 / 전화 / 주소)
-  const textLeft = logoX + logoW + Math.round(footerH * 0.4);
-  const textRight = qrX - qrPad - Math.round(footerH * 0.4);
+  const textLeft = logoX + logoW + gap;
+  const textRight = qrX - qrPad - gap;
   const textCenterX = (textLeft + textRight) / 2;
 
   const fontScale = cw / 1080;

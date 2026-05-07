@@ -358,12 +358,13 @@ ${
 }
 - 모든 한국어 원문은 영문 프롬프트 안에 **큰따옴표로 정확히** 포함되어야 함 (오타·재해석 금지).
 - "render Korean text crisply with proper hangul typography" 명시.
-- "if Korean rendering fails, leave clearly defined empty zones in matching positions so the user can add text manually" fallback 명시.`
+- "if Korean rendering fails, leave clearly defined empty zones in matching positions so the user can add text manually" fallback 명시.
+- 모든 한국어 텍스트(제목·일시·장소·정보)는 **하단 약 14% 영역을 침범하지 않도록** 그 위쪽에만 배치하라고 명시.`
     : `사용자는 AI 가 텍스트를 그리지 않기를 원합니다 (한국어 텍스트는 따로 합성). 영문 프롬프트에 다음을 명시하세요.
 
 - "absolutely no text, no letters, no numbers, no logos in the image".
-- 빈 공간을 의도적으로 확보: 상단(제목 자리), 일정 표시 영역(${schedules.length > 0 ? "여러 회차 — 세로 리스트나 캘린더 형식 자리" : "필요시 1줄"}), 위치/대상/부가정보 자리(${location || audience || extraLines.length > 0 ? "각각 별도 배지/인포 영역" : "필요시"}), 그리고 하단 약 18% 는 교회 footer(로고·연락처·QR) 자리.
-- "make the empty zones clearly defined so the user can overlay Korean text and footer afterwards."`;
+- 빈 공간을 의도적으로 확보: 상단(제목 자리), 일정 표시 영역(${schedules.length > 0 ? "여러 회차 — 세로 리스트나 캘린더 형식 자리" : "필요시 1줄"}), 위치/대상/부가정보 자리(${location || audience || extraLines.length > 0 ? "각각 별도 배지/인포 영역" : "필요시"}).
+- "make the empty zones clearly defined so the user can overlay Korean text afterwards."`;
 
   // 참고 이미지가 함께 첨부됐을 때 추가 지시
   const aspect = input.referenceAspect ?? "style";
@@ -391,16 +392,18 @@ ${referenceSection}
 [작성 요구사항]
 1. 위 요소들을 자연스러운 영문 산문체로 엮어 한국 교회 분위기에 어울리는 영문 이미지 프롬프트를 작성하세요.
 2. ${textInstruction}
-3. 비율은 반드시 프롬프트에 포함: "${aiRatio}".
-4. 다음은 절대 포함하지 마세요:
+3. **하단 푸터 공간 필수 확보** — 생성된 이미지 위에 교회 푸터(로고·전화·주소·QR)를 후합성합니다. 영문 프롬프트에 반드시 다음 취지를 명확히 포함하세요:
+   "Reserve the bottom 14% of the canvas as completely empty space (or only soft, low-contrast background gradient). Do NOT place any subject, focal element, face, important detail, text, or logo within this bottom 14% — this strip is reserved for a footer overlay added in post-production. The composition's center of interest must sit clearly above this reserved bottom band."
+4. 비율은 반드시 프롬프트에 포함: "${aiRatio}".
+5. 다음은 절대 포함하지 마세요:
    - 묘비, 무덤 위 십자가
    - 어둡거나 음울한 톤 (사용자가 명시적으로 요청하지 않은 경우)
    - 특정 종교 인물(예수·성인) 의 구체적 얼굴 묘사
    - 사용자가 "사람 없음" 을 선택했는데 사람을 그리는 것
-5. 컴포지션·조명·질감 정보를 풍부하게 담으세요.
-6. 길이: 100~200 단어. 한 문단 또는 두 문단으로.
-7. ChatGPT·Gemini·Midjourney 어디든 그대로 붙여넣을 수 있는 자연스러운 영문 산문체.
-8. **출력은 영문 프롬프트 본문만**. 다음을 절대 출력하지 마세요:
+6. 컴포지션·조명·질감 정보를 풍부하게 담으세요.
+7. 길이: 100~220 단어. 한 문단 또는 두 문단으로.
+8. ChatGPT·Gemini·Midjourney 어디든 그대로 붙여넣을 수 있는 자연스러운 영문 산문체.
+9. **출력은 영문 프롬프트 본문만**. 다음을 절대 출력하지 마세요:
    - 마크다운 (**, ##, - 등)
    - 따옴표로 감싸기
    - "Here's the prompt:" 같은 머리말
