@@ -27,7 +27,7 @@ const COLOR_SWATCHES = [
 ];
 
 export function Finalizer() {
-  const [ratio, setRatio] = useState<PosterRatio>("1:1");
+  const [ratio, setRatio] = useState<PosterRatio>("a4");
   const [inputMode, setInputMode] = useState<InputMode>("file");
   const [imageUrlInput, setImageUrlInput] = useState("");
   const [aiImg, setAiImg] = useState<HTMLImageElement | null>(null);

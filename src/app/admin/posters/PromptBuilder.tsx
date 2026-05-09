@@ -69,7 +69,7 @@ const TARGET_TOOLS: { name: string; href: string; hint: string }[] = [
 
 export function PromptBuilder() {
   const [category, setCategory] = useState<PosterCategory>("event");
-  const [ratio, setRatio] = useState<PosterRatio>("1:1");
+  const [ratio, setRatio] = useState<PosterRatio>("a4");
   const [title, setTitle] = useState("");
 
   // 구조화 부가 정보
