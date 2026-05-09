@@ -201,26 +201,23 @@ export function Finalizer() {
 
   // ── 미리보기 캔버스 크기 ──────────────────────────────
   const dim = FINAL_DIMENSIONS[ratio];
-  const PREVIEW_W = 480;
-  const previewH = Math.round((PREVIEW_W * dim.h) / dim.w);
   const internalW = Math.min(900, dim.w);
   const internalH = Math.round((internalW * dim.h) / dim.w);
 
   return (
     <div className="grid gap-6 lg:grid-cols-[auto_1fr]">
       {/* ── 좌: 미리보기 ─────────────────────────────────── */}
-      <div className="space-y-3">
+      <div className="w-full space-y-3 lg:w-[480px]">
         <div
-          className="overflow-hidden rounded-xl border border-gray-200 bg-gray-100"
-          style={{ width: `${PREVIEW_W}px`, height: `${previewH}px` }}
+          className="w-full overflow-hidden rounded-xl border border-gray-200 bg-gray-100"
+          style={{ aspectRatio: `${dim.w} / ${dim.h}` }}
         >
           {aiImg ? (
             <canvas
               ref={previewRef}
               width={internalW}
               height={internalH}
-              style={{ width: `${PREVIEW_W}px`, height: `${previewH}px` }}
-              className="block"
+              className="block h-full w-full"
             />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-gray-400">
