@@ -44,11 +44,19 @@ function ratioForAI(ratio: PosterRatio): string {
 
 export const COLOR_PALETTES = [
   "springPastel",
+  "coralPeach",
+  "lavenderSage",
   "summerCool",
-  "autumnAmber",
-  "winterCobalt",
+  "oceanTeal",
+  "mintLemon",
+  "duskyRose",
   "easterLily",
+  "forestSage",
+  "winterCobalt",
+  "jewelTone",
+  "dancheong",
   "christmasDeep",
+  "autumnAmber",
   "navyIvory",
   "woodCream",
   "monochrome",
@@ -64,10 +72,35 @@ export const COLOR_PALETTE_DEFS: Record<
     en: "soft spring pastels with gentle pink, light green, and cream tones",
     swatch: ["#fce7e7", "#d4f0d4", "#fff8e7"],
   },
+  coralPeach: {
+    ko: "산호·복숭아",
+    en: "vibrant coral pink, soft peach, and warm cream tones with a cheerful inviting feel",
+    swatch: ["#ff7e6b", "#ffb494", "#fff5ec"],
+  },
+  lavenderSage: {
+    ko: "라벤더·세이지",
+    en: "calm lavender purple paired with soft sage green and ivory, gentle and contemplative",
+    swatch: ["#c5b3e6", "#a8c4a0", "#f5f1e8"],
+  },
   summerCool: {
     ko: "여름 청량",
     en: "cool summer palette with sky blue, fresh white, and mint accents",
     swatch: ["#bfe1ff", "#ffffff", "#cdf0e0"],
+  },
+  oceanTeal: {
+    ko: "오션 틸",
+    en: "fresh ocean teal with a coral pink accent and crisp aqua white, energetic and clean",
+    swatch: ["#2a9d8f", "#ee6c4d", "#e8f3f1"],
+  },
+  mintLemon: {
+    ko: "민트·레몬",
+    en: "fresh mint green, soft lemon yellow, and clean white with a crisp youthful feel",
+    swatch: ["#a8e6cf", "#fff2a0", "#ffffff"],
+  },
+  duskyRose: {
+    ko: "더스티 로즈",
+    en: "muted dusky rose pink with blush and warm soft grey, romantic and refined",
+    swatch: ["#c08497", "#e8b4b8", "#d8c8c4"],
   },
   autumnAmber: {
     ko: "가을 앰버",
@@ -83,6 +116,21 @@ export const COLOR_PALETTE_DEFS: Record<
     ko: "부활절 (백합·금색)",
     en: "easter palette featuring white lily, soft gold, and gentle lavender purple",
     swatch: ["#ffffff", "#e8c768", "#d8c3e8"],
+  },
+  forestSage: {
+    ko: "포레스트 세이지",
+    en: "deep forest green and soft sage with warm ivory, calm and natural with a sense of growth",
+    swatch: ["#2d5f3f", "#8aa886", "#f5f1e8"],
+  },
+  jewelTone: {
+    ko: "보석톤",
+    en: "rich jewel tones with sapphire blue, emerald green, and ruby red on a soft ivory base",
+    swatch: ["#1e40af", "#047857", "#9f1239"],
+  },
+  dancheong: {
+    ko: "단청 (전통 채색)",
+    en: "traditional Korean dancheong palette with vivid vermillion red, deep cobalt blue, and emerald green on an ivory base",
+    swatch: ["#c0382b", "#1f4e79", "#0f7e3f"],
   },
   christmasDeep: {
     ko: "성탄 (딥레드·에메랄드)",
