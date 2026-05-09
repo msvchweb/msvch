@@ -76,7 +76,7 @@ function weeklyToPrefill(w: Weekly): WeeklyContentInput {
     title: formatWeeklyTitle(date),
     date,
     volume: w.volume,
-    issue: w.issue,
+    issue: typeof w.issue === "number" ? w.issue + 1 : w.issue,
     special_praise: w.special_praise ?? {
       part1: { song: "", choir: "" },
       part2: { song: "", choir: "" },

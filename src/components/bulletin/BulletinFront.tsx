@@ -3,6 +3,31 @@ import type { Weekly } from "@/types/notice";
 import type { BulletinMasterData } from "@/types/bulletin-master";
 import { stripLeadingNumber } from "@/components/weekly/form/shared";
 
+// 1페이지 주일예배 표: 숫자만 입력해도 라벨에 따라 단위 자동 부여.
+//   "성 시 교 독" → 98 → "98번"
+//   "영광의 찬송" / "찬    송" / "결단의 찬송" → 408 → "408장"
+// 사용자가 "98번"·"408장" 처럼 단위까지 직접 입력하면 그대로 둔다.
+function formatWorshipContent(label: string, content: string): string {
+  const trimmed = content.trim();
+  if (!/^\d+$/.test(trimmed)) return content;
+  if (label.includes("교독")) return `${trimmed}번`;
+  if (label.includes("찬송")) return `${trimmed}장`;
+  return content;
+}
+
+// "고백과 감사의 기도" 의 assignees 3 슬롯에 1부/2부/3부 prefix 자동 부여.
+// 이미 "N부 " 로 시작하면 그대로 둔다.
+function formatPrayerAssignees(label: string, assignees: string[]): string[] {
+  if (label !== "고백과 감사의 기도") return assignees;
+  if (assignees.length !== 3) return assignees;
+  return assignees.map((a, i) => {
+    const trimmed = a.trim();
+    if (!trimmed) return a;
+    if (/^\d+부\s/.test(trimmed)) return a;
+    return `${i + 1}부 ${trimmed}`;
+  });
+}
+
 /** 이미지 자리 플레이스홀더 (추후 실제 이미지로 교체) */
 function ImageBox({
   label,
@@ -405,45 +430,63 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
             </div>
           )}
 
-          {newMembersNum !== null && (
-          <div>
-            <div className="font-bold">{newMembersNum}. 지난 주일 등록 새가족</div>
-            <div className="pl-2">
-              <table className="w-full border border-gray-400 border-collapse text-[10px]">
-                <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">번호</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">등 록</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">새가족</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">인도자</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">선교회</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">번호</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">등 록</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">새가족</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">인도자</th>
-                    <th className="border border-gray-300 px-1 py-0 font-semibold">선교회</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {newMemberRows(data.newMembers.slice(0, 4)).map((pair, i) => (
-                    <tr key={i} className="text-center">
-                      <td className="border border-gray-300 px-1 py-0">{pair[0]?.no ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[0]?.regNo ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[0]?.name ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[0]?.inviter ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[0]?.dept ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[1]?.no ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[1]?.regNo ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[1]?.name ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[1]?.inviter ?? ""}</td>
-                      <td className="border border-gray-300 px-1 py-0">{pair[1]?.dept ?? ""}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-          )}
+          {newMembersNum !== null && (() => {
+            const members = data.newMembers.slice(0, 4);
+            // 1명이면 5열 한 줄 표만 렌더 (오른쪽 빈 칸 숨김).
+            // 2명 이상이면 기존 5+5 페어 레이아웃, 마지막 행 pair[1] 비면 colSpan=5 무테두리로.
+            const singleRow = members.length === 1;
+            return (
+              <div>
+                <div className="font-bold">{newMembersNum}. 지난 주일 등록 새가족</div>
+                <div className="pl-2">
+                  <table className="w-full border border-gray-400 border-collapse text-[10px]">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border border-gray-300 px-1 py-0 font-semibold">번호</th>
+                        <th className="border border-gray-300 px-1 py-0 font-semibold">등 록</th>
+                        <th className="border border-gray-300 px-1 py-0 font-semibold">새가족</th>
+                        <th className="border border-gray-300 px-1 py-0 font-semibold">인도자</th>
+                        <th className="border border-gray-300 px-1 py-0 font-semibold">선교회</th>
+                        {!singleRow && (
+                          <>
+                            <th className="border border-gray-300 px-1 py-0 font-semibold">번호</th>
+                            <th className="border border-gray-300 px-1 py-0 font-semibold">등 록</th>
+                            <th className="border border-gray-300 px-1 py-0 font-semibold">새가족</th>
+                            <th className="border border-gray-300 px-1 py-0 font-semibold">인도자</th>
+                            <th className="border border-gray-300 px-1 py-0 font-semibold">선교회</th>
+                          </>
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {newMemberRows(members).map((pair, i) => (
+                        <tr key={i} className="text-center">
+                          <td className="border border-gray-300 px-1 py-0">{pair[0]?.no ?? ""}</td>
+                          <td className="border border-gray-300 px-1 py-0">{pair[0]?.regNo ?? ""}</td>
+                          <td className="border border-gray-300 px-1 py-0">{pair[0]?.name ?? ""}</td>
+                          <td className="border border-gray-300 px-1 py-0">{pair[0]?.inviter ?? ""}</td>
+                          <td className="border border-gray-300 px-1 py-0">{pair[0]?.dept ?? ""}</td>
+                          {!singleRow && (
+                            pair[1] ? (
+                              <>
+                                <td className="border border-gray-300 px-1 py-0">{pair[1].no}</td>
+                                <td className="border border-gray-300 px-1 py-0">{pair[1].regNo}</td>
+                                <td className="border border-gray-300 px-1 py-0">{pair[1].name}</td>
+                                <td className="border border-gray-300 px-1 py-0">{pair[1].inviter}</td>
+                                <td className="border border-gray-300 px-1 py-0">{pair[1].dept}</td>
+                              </>
+                            ) : (
+                              <td colSpan={5} className="px-1 py-0" />
+                            )
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            );
+          })()}
 
           {mealDutyNum !== null && (
             <div>
@@ -611,11 +654,12 @@ export function BulletinFrontRight({ data }: { data: FrontData }) {
                       </tr>
                     ));
                   }
-                  const assignees = Array.isArray(it.assignees)
+                  const rawAssignees = Array.isArray(it.assignees)
                     ? it.assignees
                     : it.assignees
                       ? [it.assignees]
                       : [""];
+                  const assignees = formatPrayerAssignees(it.label, rawAssignees);
                   return (
                     <tr key={i} className="align-middle">
                       <td className="px-1 w-6 text-center font-bold">
@@ -626,7 +670,7 @@ export function BulletinFrontRight({ data }: { data: FrontData }) {
                       </td>
                       <td className="px-1">
                         <DottedLeaderCell
-                          content={it.content ?? ""}
+                          content={formatWorshipContent(it.label, it.content ?? "")}
                           bold={it.emphasize}
                         />
                       </td>
