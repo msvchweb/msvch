@@ -117,7 +117,7 @@ export default function BoardReportPage() {
                   <li>사진 클릭 시 큰 화면으로 슬라이드 보기(라이트박스)</li>
                   <li>한 번에 최대 30장 업로드, 큰 이미지는 자동 압축</li>
                   <li>
-                    인스타 자동 연동도 시도했으나, 부서 계정 소유권 이슈로 보류
+                    인스타 자동 연동도 시도했으나, 부서 계정 소유권 이슈로 보류 중
                   </li>
                 </Ul>
               </Accordion>
@@ -247,14 +247,7 @@ export default function BoardReportPage() {
                 </Ul>
               </Accordion>
 
-              <Accordion title="2.11 개인정보 처리방침 페이지" badge="신규">
-                <Ul>
-                  <li>Meta 등 외부 인증·법적 요구를 위한 정식 처리방침</li>
-                  <li>새가족 폼 동의 항목과 연결</li>
-                </Ul>
-              </Accordion>
-
-              <Accordion title="2.12 모바일 사용성" badge="강화">
+              <Accordion title="2.11 모바일 사용성" badge="강화">
                 <Ul>
                   <li>
                     화면 하단에 5개 탭바(홈/말씀/갤러리/소식/더보기) — 앱 같은
@@ -508,16 +501,8 @@ export default function BoardReportPage() {
                       desc: "앨범 만들기, 카테고리/부서 태그 지정, 사진 일괄 업로드(최대 30장), 공개 토글",
                     },
                     {
-                      label: "새가족 등록",
-                      desc: "접수 내역 확인, 상태 변경(신규→연락중→배정완료→완료), 메모 작성",
-                    },
-                    {
                       label: "소모임 게시판",
                       desc: "(관리자 권한자) 게시판 신설·멤버 지정·숨김 처리 / (멤버) 글·댓글·사진 작성",
-                    },
-                    {
-                      label: "챗봇 문의 내역",
-                      desc: "챗봇이 답하지 못한 문의 모아보기 및 후속 응대",
                     },
                     {
                       label: "링크 페이지",
@@ -549,6 +534,14 @@ export default function BoardReportPage() {
                     {
                       label: "쇼츠 자동화",
                       desc: '설교 영상에서 "쇼츠 생성" 버튼 실행 → 검수 후 업로드',
+                    },
+                    {
+                      label: "새가족 등록",
+                      desc: "접수 내역 확인, 상태 변경(신규→연락중→배정완료→완료), 메모 작성",
+                    },
+                    {
+                      label: "챗봇 문의 내역",
+                      desc: "챗봇이 답하지 못한 문의 모아보기 및 후속 응대",
                     },
                   ]}
                 />
