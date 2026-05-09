@@ -976,6 +976,111 @@ Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. b
   6. `sanitizePromptOutput()` — 모델이 끼우는 머리말/따옴표/마크다운 제거
   7. `buildKoreanSummary(input)` 으로 한국어 요약 생성
 
+### POST `/api/admin/weeklies/[id]/extract-events`
+
+**주보 "교회소식" → 캘린더 일정 AI 자동 추출** (마이그레이션 034 이후).
+저장된 weekly 의 `news` JSONB + `meetings` 배열을 Gemini 가 분석해 일정 후보를 리턴.
+실제 INSERT 는 `/api/admin/calendar/batch` 가 담당 — 본 라우트는 검수용 후보만 생성.
+
+- **인증**: `requireAdmin(request)` — staff/admin/master. Bearer 자동 분기 (모바일 호환).
+- **입력**: 없음 (URL `[id]` = `weeklies.id`). body 빈 POST.
+- **처리**: `weeklies.date` 를 anchor 로 `extractEventsFromNews()` 호출 → Gemini 텍스트 단발 → JSON 파싱 → Zod 검증 → 요일·날짜 범위 후처리(confidence 보정).
+
+**응답** (`ExtractEventsResponse`):
+```json
+{
+  "weeklyId": "uuid",
+  "anchorDate": "2026-04-19",
+  "candidates": [
+    {
+      "title": "교회 새가족 환영파티",
+      "date": "2026-05-09",
+      "startTime": "17:00",
+      "endTime": null,
+      "location": "교회식당",
+      "description": "교회 새가족을 위한 환영파티",
+      "sourceNewsIndex": 0,
+      "sourceQuote": "5/9(토) 오후 5시 (교회식당)",
+      "confidence": 0.92,
+      "rruleHint": null
+    }
+  ],
+  "skipped": [
+    { "sourceNewsIndex": 4, "reason": "구체적 일자 없음" }
+  ]
+}
+```
+
+**에러**:
+- `400` — 잘못된 weekly id 형식 / 주보 날짜 비어있음
+- `401/403` — 인증·권한
+- `404` — 주보 없음
+- `502` — Gemini 응답이 스키마 위반 (재시도 권장)
+- `503` — Gemini 일시 장애 (`GeminiUnavailableError`)
+- `500` — 기타
+
+**주의**:
+- 자동 INSERT 안 함 — 응답을 staff 가 검수 모달에서 토글/편집 후 batch 라우트로 전달.
+- `confidence` 0.6 미만은 UI 가 amber 경고 + 자동 OFF.
+- `sourceQuote` 의 (요일) 표기와 추출 date 의 실제 요일이 어긋나면 confidence 가 0.5 이하로 강제 하향.
+
+---
+
+### POST `/api/admin/calendar/batch`
+
+**검수 통과 일정 일괄 INSERT** (마이그레이션 034 이후).
+`extract-events` 응답을 staff 가 모달에서 검수·편집한 후 호출.
+
+- **인증**: `requireAdmin(request)` — staff/admin/master. Bearer 자동 분기.
+- **입력** (`EventBatchInsertSchema`):
+```json
+{
+  "events": [
+    {
+      "title": "교회 새가족 환영파티",
+      "description": "...",
+      "location": "교회식당",
+      "date": "2026-05-09",
+      "startTime": "17:00",
+      "endTime": null,
+      "notify": false,
+      "sourceWeeklyId": "uuid",
+      "sourceNewsIndex": 0
+    }
+  ]
+}
+```
+- 항목 1~30개. 각 항목은 `events` 테이블 컬럼과 동일 구조 + `sourceWeeklyId/sourceNewsIndex` 추적 컬럼.
+- 저장 시 `extracted_by_ai = true` 강제, `created_by = auth.uid()` 자동.
+
+**응답** (`BatchInsertResult`):
+```json
+{
+  "inserted": [
+    { "id": "uuid", "title": "...", "start": "2026-05-09T17:00:00+09:00", ... }
+  ],
+  "skipped": [
+    { "index": 2, "reason": "RLS 거부 또는 INSERT 실패 사유" }
+  ]
+}
+```
+- `inserted`: 성공 항목 (`CalendarEvent` DTO).
+- `skipped`: 실패 항목 — 클라이언트가 보낸 인덱스 + DB 에러 메시지.
+
+**상태 코드**:
+- `201` — 전부 성공
+- `207` — 부분 성공 (Multi-Status). 클라이언트는 `inserted`/`skipped` 둘 다 처리해야 함.
+- `400` — 입력 스키마 위반
+- `401/403` — 인증·권한
+- `500` — 기타
+
+**보안 강화**:
+- 항목별 INSERT — RLS 거부 1건이 전체 롤백시키지 않음.
+- `created_by = userId` 명시 → content_authors 트리거가 작성자 자동 기록.
+- `notify` 기본 false — staff 가 의식적으로 ON 한 항목만 D-1 알림톡 cron 발송 대상.
+
+---
+
 ### GET `/api/posters/proxy-image`
 
 외부 이미지 URL 을 같은 origin 으로 스트림 — 클라이언트 Canvas CORS taint 회피용.
@@ -1033,6 +1138,8 @@ Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. b
 | POST `/api/boards/[id]/posts/[postId]/comments` | `BoardCommentSchema` | 댓글 작성 |
 | POST `/api/posters/build-prompt` | route 내부 Zod (`PayloadSchema`) | 포스터 영문 프롬프트 생성. multipart payload+reference. (마이그레이션 026 — 현재 DB 미연결) |
 | GET `/api/posters/proxy-image` | URL 검증 + SSRF 차단 | 외부 이미지 origin 우회 |
+| POST `/api/admin/weeklies/[id]/extract-events` | UUID 검증 + 응답 시 `ExtractEventsResponseSchema` | Gemini 응답 JSON 강제, 마이그레이션 034 |
+| POST `/api/admin/calendar/batch` | `EventBatchInsertSchema` (1~30건) | AI 추출 검수 통과 일괄 INSERT, 207 partial 가능 |
 
 ---
 

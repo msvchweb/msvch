@@ -538,3 +538,73 @@ export function parseBoardCursor(
 export function buildBoardCursor(createdAt: string, id: string): string {
   return `${createdAt}|${id}`;
 }
+
+// ──────────────────────────────────────────────
+//  주보 "교회소식" → 일정 AI 추출 (PLAN.md 2026-05-09)
+// ──────────────────────────────────────────────
+
+/** Gemini 응답 1건 — 검수 모달이 받는 후보 */
+export const ExtractedEventSchema = z.object({
+  title: z.string().min(1).max(200),
+  date: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식: YYYY-MM-DD")
+    .nullable(),
+  startTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm")
+    .nullable(),
+  endTime: z
+    .string()
+    .regex(/^\d{2}:\d{2}$/, "시간 형식: HH:mm")
+    .nullable(),
+  location: z.string().max(200).nullable(),
+  description: z.string().max(1000).nullable(),
+  sourceNewsIndex: z.number().int().min(-1).max(49).nullable(),
+  sourceQuote: z.string().max(300).nullable(),
+  confidence: z.number().min(0).max(1),
+  rruleHint: z.string().max(200).nullable(),
+});
+
+/** Gemini 응답 전체 형태 — JSON.parse 후 검증 */
+export const ExtractEventsResponseSchema = z.object({
+  candidates: z.array(ExtractedEventSchema).max(30),
+  skipped: z
+    .array(
+      z.object({
+        sourceNewsIndex: z.number().int(),
+        reason: z.string().max(200),
+      }),
+    )
+    .default([]),
+});
+
+/** POST /api/admin/calendar/batch — 클라이언트가 검수·편집 후 보내는 페이로드 1건 */
+export const EventBatchInsertItemSchema = z
+  .object({
+    title: z.string().min(1).max(200),
+    description: z.string().max(5000).nullable().optional(),
+    location: z.string().max(200).nullable().optional(),
+    date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    startTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+    endTime: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),
+    notify: z.boolean().optional(),
+    /** 추적용 — 어느 주보에서 추출됐는지 */
+    sourceWeeklyId: z.string().uuid().nullable().optional(),
+    sourceNewsIndex: z.number().int().min(0).max(49).nullable().optional(),
+  })
+  .refine((d) => !d.endTime || d.startTime, {
+    message: "종료 시간만 단독 입력은 불가합니다 (시작 시간이 필요).",
+    path: ["endTime"],
+  })
+  .refine(
+    (d) => !d.startTime || !d.endTime || d.endTime > d.startTime,
+    {
+      message: "종료 시간은 시작 시간 이후여야 합니다.",
+      path: ["endTime"],
+    },
+  );
+
+export const EventBatchInsertSchema = z.object({
+  events: z.array(EventBatchInsertItemSchema).min(1).max(30),
+});

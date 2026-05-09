@@ -399,12 +399,16 @@ interface GalleryImage {
 | `rrule` | `text` | v2 반복 일정 RRULE (v1 미사용) |
 | `notify` | `boolean DEFAULT false` | 알림톡 발송 대상 여부 |
 | `created_by` | `uuid` | 작성자 user id (`auth.users.id` ON DELETE SET NULL) |
+| `source_weekly_id` | `uuid` | AI 추출 시 어느 weeklies row 에서 뽑혔는지 (마이그 034). ON DELETE SET NULL |
+| `source_news_index` | `integer` | weeklies.news 의 0-based 인덱스 (마이그 034). CHECK `0 <= < 50` |
+| `extracted_by_ai` | `boolean NOT NULL DEFAULT false` | AI 추출 후 staff 검수를 거쳐 INSERT 된 일정 (마이그 034) |
 | `created_at` | `timestamptz DEFAULT now()` | |
 | `updated_at` | `timestamptz DEFAULT now()` | 자동 갱신 트리거 |
 
 **CHECK 제약**:
 - `end_date IS NULL OR end_date >= date`
 - `end_time IS NULL OR start_time IS NULL OR end_time > start_time`
+- `source_news_index IS NULL OR (0 <= source_news_index < 50)` (마이그 034)
 
 **RLS 정책** (022 + 021 패턴):
 - SELECT: 누구나 (캘린더는 공개)
@@ -416,6 +420,7 @@ interface GalleryImage {
 **인덱스**:
 - `idx_events_date` (date)
 - `idx_events_notify` partial index — 알림 cron 의 빠른 조회용
+- `idx_events_source_weekly` partial — `WHERE source_weekly_id IS NOT NULL` (마이그 034). AI 추출 일정만 빠르게 조회
 
 **TypeScript 타입** (`src/types/calendar.ts`):
 ```ts
@@ -935,3 +940,5 @@ interface ShortsClip {
 | `030_weeklies_front_toggles.sql` | weeklies.front_toggles jsonb — 페이지 4(교회소식 영역) 4섹션 표시 토글 (성경통독/새가족/식당봉사/봉사센터) |
 | `031_drop_weekly_misc_legacy.sql` | weeklies 의 prayer_items/announcements/servants_text/offering_list_text/sogroup_text DROP — 폼 "기타" 탭 자체 제거. 기도제목은 마스터(community_prayers)로 일원화 |
 | `032_sermon_videos.sql` | sermon_videos 테이블 (video_id PK + 카테고리 + RLS 공개 SELECT). YouTube 업로드 플레이리스트에서 일 1회 cron 으로 누적 동기화 — 한 번 들어온 영상은 영구 보존. 표시는 DB 에서만 읽고 YouTube API 호출은 sync 경로 1곳으로 제한 |
+| `033_weeklies_front_toggles_meetings.sql` | weeklies.front_toggles jsonb 에 `meetings` 키 추가 + 기존 row 백필. 페이지 4 모임 안내 섹션 표시 토글 |
+| `034_events_source_weekly.sql` | events 테이블에 AI 추출 추적 컬럼 3개 (`source_weekly_id` FK + `source_news_index` + `extracted_by_ai`) + 부분 인덱스. 주보 "교회소식" → 일정 AI 추출 (Gemini) 결과 추적 |

@@ -91,6 +91,11 @@ src/
 │       │   ├── boards/              # 소모임 게시판 admin (GET/POST + [id] PATCH/DELETE + members PUT)
 │       │   │   └── [id]/
 │       │   │       └── members/
+│       │   ├── calendar/
+│       │   │   └── batch/           # AI 추출 검수 통과 일정 일괄 INSERT (마이그 034)
+│       │   ├── weeklies/
+│       │   │   └── [id]/
+│       │   │       └── extract-events/ # 주보 news → Gemini → 일정 후보 (마이그 034)
 │       │   ├── members/             # PATCH (master 전용 role 변경)
 │       │   └── revalidate/          # 세션 인증 ISR 무효화
 │       ├── calendar/            # 교회 일정 CRUD (자체 DB, 모바일 호환)
@@ -167,7 +172,10 @@ src/
 │   ├── admin/                    # 관리자 공용 컴포넌트
 │   │   ├── AdminTour.tsx           # 스포트라이트 투어 (16단계, clickOnEnter 자동 탭 전환)
 │   │   ├── AdminTourStartButton.tsx# 투어 시작 트리거
-│   │   └── nav-tour-keys.ts        # 사이드바·메뉴 카드 공유 data-tour 매핑
+│   │   ├── nav-tour-keys.ts        # 사이드바·메뉴 카드 공유 data-tour 매핑
+│   │   └── event-extraction/       # 주보 news → 일정 AI 추출 모달 (마이그 034)
+│   │       ├── EventExtractionModal.tsx  # loading/review/inserting/done 4-phase 컨테이너
+│   │       └── ExtractedEventRow.tsx     # 1건 row + 인라인 편집 + confidence 배지 + 알림톡 토글
 │   │
 │   ├── LogoutButton.tsx          # 로그아웃 버튼 (클라이언트 컴포넌트)
 │   │
@@ -199,6 +207,7 @@ src/
 │   ├── poster-footer.ts         # 포스터 Canvas 합성 (배경 + 한글 텍스트 + 교회 푸터/QR)
 │   ├── sermons.ts               # 설교 영상 DB 리더 (sermon_videos)
 │   ├── sermon-category.ts       # categorizeSermon(title) 분류 유틸 (UI · sync 공유)
+│   ├── news-event-extractor.ts  # 주보 news → Gemini → 일정 후보 (마이그 034)
 │   └── youtube.ts               # YouTube 업로드 플레이리스트 fetch — sync cron 전용
 │
 ├── types/
@@ -375,6 +384,31 @@ GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
         │     └── DELETE /api/admin/new-families/:id (admin/master 만)
         │
         └── 모바일 앱 (장래) ── createApiClient 의 Bearer 인증으로 동일 라우트 사용
+
+주보 → 일정 AI 추출 (마이그레이션 034 이후):
+    Admin /admin/weeklies/[id]/edit 페이지4 탭
+        │  "📅 AI 일정 추출" 버튼 (weeklyId 가드 — 신규 작성 시 비활성)
+        │  POST /api/admin/weeklies/{id}/extract-events
+        ▼
+    src/lib/news-event-extractor.ts
+        │  ① flattenNews/flattenMeetings → 프롬프트 빌드 (anchor=weekly.date)
+        │  ② callGeminiWithFallback (텍스트 단발, gemini-2.5-flash → -lite → -latest 폴백)
+        │  ③ stripCodeFence + JSON.parse + Zod (ExtractEventsResponseSchema)
+        │  ④ adjustConfidenceByDayOfWeek (요일 어긋남 시 confidence ≤ 0.5)
+        │  ⑤ adjustConfidenceByDateRange (anchor ±14일 / +365일 초과 시 ≤ 0.4)
+        ▼
+    ExtractEventsResponse → EventExtractionModal 검수 UI
+        │  staff 가 항목별 toggle / 인라인 편집 / 알림톡 토글
+        │  (기본: confidence ≥ 0.7 ON, < 0.6 amber 경고 + 자동 OFF, notify 기본 false)
+        ▼
+    POST /api/admin/calendar/batch
+        │  EventBatchInsertSchema (1~30건) 항목별 INSERT
+        │  → events (extracted_by_ai=true, source_weekly_id, source_news_index)
+        │  → content_authors 트리거 자동 작성자 기록
+        │  → 응답 BatchInsertResult { inserted: CalendarEvent[], skipped: BatchSkipped[] }
+        │  → HTTP 201 (전부 성공) 또는 207 Multi-Status (부분 성공)
+        ▼
+    캘린더 페이지에 즉시 반영 + (notify=true 항목은) D-1 cron 발송 대상
 ```
 
 ---

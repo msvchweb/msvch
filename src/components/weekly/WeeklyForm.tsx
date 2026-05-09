@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Sparkles } from "lucide-react";
 import type {
   NewsItem,
   MeetingRow,
@@ -9,6 +10,7 @@ import type {
   WorshipSubRow,
 } from "@/types/notice";
 import type { WeeklyContentInput } from "@/lib/validation";
+import { EventExtractionModal } from "@/components/admin/event-extraction/EventExtractionModal";
 import { FormTabs, type FormTab } from "./form/FormTabs";
 import { DynamicArrayField } from "./form/DynamicArrayField";
 import { TopicEditor } from "./masters/TopicEditor";
@@ -315,7 +317,7 @@ export function WeeklyForm({
       key: "front",
       label: "페이지4(교회소식)",
       description: "4페이지(교회소식/모임/새가족/섬기는분들 참고)와 1페이지 일부를 관리합니다.",
-      content: <FrontTab form={form} set={set} />,
+      content: <FrontTab form={form} set={set} weeklyId={weeklyId} />,
     },
     {
       key: "masters",
@@ -681,9 +683,49 @@ function FixedWorshipRow({
 //  Tab 3: 앞면(교회소식 / 모임 / 새가족)
 // ─────────────────────────────────────────────
 
-function FrontTab({ form, set }: TabProps) {
+function FrontTab({
+  form,
+  set,
+  weeklyId,
+}: TabProps & { weeklyId?: string }) {
+  const [showExtractor, setShowExtractor] = useState(false);
+
   return (
     <div className="space-y-6">
+      {/* ─── AI 일정 추출 트리거 ──────────────────────── */}
+      <div className="flex flex-col gap-3 rounded-xl border border-primary-200 bg-primary-50/50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-primary-900">
+            📅 교회소식에서 일정 자동 추출 (AI)
+          </p>
+          <p className="mt-0.5 text-xs text-primary-700/80">
+            저장된 교회소식·모임 안내를 분석해 캘린더 일정 후보를 제안합니다.
+            검수 후 선택한 항목만 등록됩니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowExtractor(true)}
+          disabled={!weeklyId}
+          title={
+            weeklyId
+              ? "AI 가 교회소식을 분석합니다"
+              : "먼저 임시저장하면 사용할 수 있습니다"
+          }
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-xs font-medium text-white hover:bg-primary-700 disabled:bg-gray-300"
+        >
+          <Sparkles size={14} />
+          AI 일정 추출
+        </button>
+      </div>
+
+      {showExtractor && weeklyId && (
+        <EventExtractionModal
+          weeklyId={weeklyId}
+          onClose={() => setShowExtractor(false)}
+        />
+      )}
+
       <section className="rounded-xl border border-gray-200 bg-white p-6">
         <SectionTitle>교회소식 (최대 20개)</SectionTitle>
         <p className="mb-3 text-xs text-gray-500">
