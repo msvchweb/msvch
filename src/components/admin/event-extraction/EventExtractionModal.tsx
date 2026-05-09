@@ -17,6 +17,24 @@ interface Props {
 
 type Phase = "loading" | "review" | "inserting" | "done";
 
+// 504/502 등 게이트웨이 에러는 JSON 이 아닌 HTML 을 돌려보냄.
+// res.json() 을 무조건 호출하면 SyntaxError 로 죽으므로 안전하게 추출.
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  const status = res.status;
+  if (status === 504) return "AI 서버 응답이 너무 오래 걸려 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요.";
+  if (status === 502 || status === 503) return "AI 서버가 일시적으로 혼잡합니다. 잠시 후 다시 시도해 주세요.";
+  try {
+    const text = await res.text();
+    if (text.trim().startsWith("{")) {
+      const data = JSON.parse(text) as { error?: string };
+      if (data.error) return data.error;
+    }
+  } catch {
+    // ignore
+  }
+  return `${fallback} (${status})`;
+}
+
 export function EventExtractionModal({
   weeklyId,
   onClose,
@@ -44,8 +62,7 @@ export function EventExtractionModal({
         { method: "POST" },
       );
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? `요청 실패 (${res.status})`);
+        setError(await readErrorMessage(res, "요청 실패"));
         setPhase("review");
         return;
       }
@@ -96,8 +113,7 @@ export function EventExtractionModal({
         }),
       });
       if (!res.ok && res.status !== 207) {
-        const data = (await res.json()) as { error?: string };
-        setError(data.error ?? `등록 실패 (${res.status})`);
+        setError(await readErrorMessage(res, "등록 실패"));
         setPhase("review");
         return;
       }

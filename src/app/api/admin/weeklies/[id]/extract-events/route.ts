@@ -10,7 +10,9 @@ import type { ExtractEventsResponse } from "@/types/event-extraction";
 import type { NewsItem, MeetingRow } from "@/types/notice";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+// Gemini 폴백 체인(3 모델 × 최대 3회 재시도 + 백오프)이 30초를 초과해 504 가
+// 발생하던 사례 — 함수 타임아웃 상향. Vercel Hobby 플랜 한도 60s 안쪽.
+export const maxDuration = 60;
 
 interface WeeklyForExtraction {
   id: string;
