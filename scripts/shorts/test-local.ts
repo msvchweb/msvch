@@ -11,11 +11,16 @@ import os from "os";
 
 const WORK_DIR = path.join(os.tmpdir(), "shorts");
 const VIDEO_ID = "AZn08S-GlCQ";
+const BGM_DIR = path.join(process.cwd(), "scripts/shorts/bgm");
+
+type Mood = "solemn" | "uplifting" | "peaceful" | "reflective";
+const MOODS: Mood[] = ["solemn", "uplifting", "peaceful", "reflective"];
+
+interface VoicedChunk { start: number; end: number }
 
 // --- json3 파싱 ---
 interface Json3Seg { utf8: string }
 interface Json3Event { tStartMs: number; dDurationMs: number; segs?: Json3Seg[] }
-
 interface SubSegment { startMs: number; endMs: number; text: string }
 
 function parseJson3(filePath: string): SubSegment[] {
@@ -29,6 +34,42 @@ function parseJson3(filePath: string): SubSegment[] {
     }));
 }
 
+// --- 음성 chunks 산출 ---
+function computeVoicedChunks(segments: SubSegment[], startSec: number, endSec: number): VoicedChunk[] {
+  const compute = (threshold: number): VoicedChunk[] => {
+    const inClip = segments
+      .filter((s) => s.endMs / 1000 > startSec && s.startMs / 1000 < endSec)
+      .map((s) => ({
+        start: Math.max(startSec, s.startMs / 1000),
+        end: Math.min(endSec, s.endMs / 1000),
+      }))
+      .sort((a, b) => a.start - b.start);
+    for (let i = 0; i < inClip.length - 1; i++) {
+      if (inClip[i].end > inClip[i + 1].start) inClip[i].end = inClip[i + 1].start;
+    }
+    const chunks: VoicedChunk[] = [];
+    for (const seg of inClip) {
+      const last = chunks[chunks.length - 1];
+      if (!last || seg.start - last.end > threshold) {
+        chunks.push({ start: seg.start, end: seg.end });
+      } else {
+        last.end = seg.end;
+      }
+    }
+    return chunks;
+  };
+
+  let voiced = compute(1.0);
+  if (voiced.length >= 6) voiced = compute(1.5);
+
+  const clipDuration = endSec - startSec;
+  const voicedDuration = voiced.reduce((sum, v) => sum + (v.end - v.start), 0);
+  if (clipDuration <= 0 || voicedDuration / clipDuration < 0.7 || voicedDuration < 20) {
+    return [{ start: startSec, end: endSec }];
+  }
+  return voiced;
+}
+
 // --- Gemini 호출 ---
 interface HighlightSegment {
   start_sec: number;
@@ -39,6 +80,8 @@ interface HighlightSegment {
   keywords: string[];
   card_text: string;
   peak_sec?: number;
+  mood: Mood;
+  voiced: VoicedChunk[];
 }
 
 interface GeminiResponse {
@@ -79,12 +122,17 @@ end_sec - start_sec는 반드시 30~55 사이여야 합니다.
 
 각 클립에 대해 추가로 함께 산출하세요:
 - keywords: 본문에서 시각적으로 강조할 핵심 단어 3~5개. 명사·동사 위주, 조사/접속사 제외. 본문에 실제로 등장하는 표기 그대로.
-- card_text: 첫 2.5초 화면 중앙에 큰 글씨로 띄울 15자 이내 한 줄. 호기심을 유발하는 문장 또는 핵심 단어.
+- card_text: 화면 상단에 큰 글씨로 띄울 15자 이내 한 줄. 호기심을 유발하는 문장 또는 핵심 단어.
 - peak_sec: 구간 내 가장 임팩트 있는 한 시점(초).
+- mood: 이 클립의 정서. 다음 중 정확히 하나로만 답하세요.
+  · solemn — 엄숙·회개·죄·십자가·심판
+  · uplifting — 희망·은혜·약속·찬양
+  · peaceful — 평온·위로·안식·사랑
+  · reflective — 사색·결단·적용·말씀 묵상
 
 반드시 아래 JSON 형식으로만 응답하세요.
 
-{"highlights":[{"start_sec":330,"end_sec":375,"title":"20자 이내","hook":"첫 3초 훅 한 줄","reason":"선정 이유 1문장","keywords":["단어1","단어2","단어3"],"card_text":"15자 이내","peak_sec":345}]}
+{"highlights":[{"start_sec":330,"end_sec":375,"title":"20자 이내","hook":"첫 3초 훅 한 줄","reason":"선정 이유 1문장","keywords":["단어1","단어2","단어3"],"card_text":"15자 이내","peak_sec":345,"mood":"peaceful"}]}
 
 트랜스크립트:
 ${transcript}`;
@@ -125,7 +173,7 @@ ${transcript}`;
     console.log(`  ${h.title} (${h.start_sec}s ~ ${h.end_sec}s) — ${h.hook}`);
   }
 
-  // segment 경계 스냅 + 유효성 검증 + keywords/card_text 기본값
+  // segment 경계 스냅 + 기본값 + voiced
   const snapped = parsed.highlights.map((h) => {
     const startSeg = segments.reduce((best, s) =>
       Math.abs(s.startMs / 1000 - h.start_sec) < Math.abs(best.startMs / 1000 - h.start_sec) ? s : best
@@ -133,12 +181,17 @@ ${transcript}`;
     const endSeg = segments.reduce((best, s) =>
       Math.abs(s.endMs / 1000 - h.end_sec) < Math.abs(best.endMs / 1000 - h.end_sec) ? s : best
     );
+    const startSec = startSeg.startMs / 1000;
+    const endSec = endSeg.endMs / 1000;
+    const mood: Mood = MOODS.includes(h.mood) ? h.mood : "peaceful";
     return {
       ...h,
-      start_sec: startSeg.startMs / 1000,
-      end_sec: endSeg.endMs / 1000,
+      start_sec: startSec,
+      end_sec: endSec,
       keywords: Array.isArray(h.keywords) ? h.keywords.filter((k) => k.trim().length > 0) : [],
       card_text: typeof h.card_text === "string" && h.card_text.trim().length > 0 ? h.card_text.trim() : h.title,
+      mood,
+      voiced: computeVoicedChunks(segments, startSec, endSec),
     };
   });
 
@@ -198,24 +251,69 @@ function highlightKeywords(text: string, keywords: string[]): string {
     .join("");
 }
 
+function shiftSegment(absStart: number, absEnd: number, voiced: VoicedChunk[]): { relStart: number; relEnd: number } | null {
+  let accumulated = 0;
+  let relStart: number | null = null;
+  let relEnd: number | null = null;
+  for (const v of voiced) {
+    const overlapStart = Math.max(absStart, v.start);
+    const overlapEnd = Math.min(absEnd, v.end);
+    if (overlapEnd > overlapStart) {
+      if (relStart === null) relStart = accumulated + (overlapStart - v.start);
+      relEnd = accumulated + (overlapEnd - v.start);
+    }
+    accumulated += v.end - v.start;
+  }
+  if (relStart === null || relEnd === null || relEnd <= relStart) return null;
+  return { relStart, relEnd };
+}
+
+function isFullClip(voiced: VoicedChunk[], startSec: number, endSec: number): boolean {
+  return (
+    voiced.length === 1 &&
+    Math.abs(voiced[0].start - startSec) < 0.05 &&
+    Math.abs(voiced[0].end - endSec) < 0.05
+  );
+}
+
+function buildSelectExpr(voiced: VoicedChunk[], startSec: number): string {
+  return voiced
+    .map((v) => {
+      const a = Math.max(0, v.start - startSec).toFixed(3);
+      const b = Math.max(0, v.end - startSec).toFixed(3);
+      return `between(t,${a},${b})`;
+    })
+    .join("+");
+}
+
+function getBgmPath(mood: Mood): string | null {
+  const candidate = path.join(BGM_DIR, `${mood}.mp3`);
+  if (existsSync(candidate)) return candidate;
+  for (const m of ["peaceful", "uplifting", "solemn", "reflective"] as const) {
+    const p = path.join(BGM_DIR, `${m}.mp3`);
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
 function generateASS(
   subtitlePath: string,
   startSec: number,
   endSec: number,
   keywords: string[],
   cardText: string,
+  voiced: VoicedChunk[],
 ): string {
   const raw = JSON.parse(readFileSync(subtitlePath, "utf-8")) as { events: Json3Event[] };
-  const clipDuration = endSec - startSec;
+  const finalDuration = voiced.reduce((sum, v) => sum + (v.end - v.start), 0);
   let assDialogue = "";
 
-  // 1) 상단 고정 카드 — 클립 전체 동안 상단 여백 영역에 노출
-  if (cardText.trim().length > 0 && clipDuration > 0) {
-    assDialogue += `Dialogue: 0,${fmtASSTime(0)},${fmtASSTime(clipDuration)},Card,,0,0,0,,{\\fad(300,0)}${escapeASSText(cardText.trim())}\n`;
+  // 1) 상단 고정 카드 — 컷 후 클립 전체 동안 노출
+  if (cardText.trim().length > 0 && finalDuration > 0) {
+    assDialogue += `Dialogue: 0,${fmtASSTime(0)},${fmtASSTime(finalDuration)},Card,,0,0,0,,{\\fad(300,0)}${escapeASSText(cardText.trim())}\n`;
   }
 
-  // 2) 본문 자막 — keywords 강조
-  //    YouTube 자동자막 rolling caption 의 겹침을 제거하여 항상 한 줄로 표시
+  // 2) 본문 자막 — rolling caption 겹침 제거 후 voiced 기반 시간 시프트
   const subtitles: { start: number; end: number; text: string }[] = [];
   for (const e of raw.events) {
     const evtStart = e.tStartMs / 1000;
@@ -233,11 +331,10 @@ function generateASS(
     }
   }
   for (const evt of subtitles) {
-    const relStart = Math.max(0, evt.start - startSec);
-    const relEnd = Math.min(endSec - startSec, evt.end - startSec);
-    if (relEnd <= relStart) continue;
+    const shifted = shiftSegment(evt.start, evt.end, voiced);
+    if (!shifted) continue;
     const styled = highlightKeywords(evt.text, keywords);
-    assDialogue += `Dialogue: 0,${fmtASSTime(relStart)},${fmtASSTime(relEnd)},Default,,0,0,0,,${styled}\n`;
+    assDialogue += `Dialogue: 0,${fmtASSTime(shifted.relStart)},${fmtASSTime(shifted.relEnd)},Default,,0,0,0,,${styled}\n`;
   }
 
   // 레이아웃: y=0~350 카드(Alignment=8, MarginV=120), y=350~1430 영상(1:1), y=1430~1920 자막(Alignment=2, MarginV=240)
@@ -271,46 +368,66 @@ async function main() {
   console.log(`영상: ${videoPath}`);
   console.log(`자막: ${subtitlePath}`);
 
-  // 1. 하이라이트 선정 (3개만 — 테스트용)
   const highlights = await selectHighlights(subtitlePath);
 
-  // 2. 첫 번째 클립만 FFmpeg으로 편집
   const { mkdirSync } = await import("fs");
   const outputDir = path.join(WORK_DIR, "output");
   mkdirSync(outputDir, { recursive: true });
 
   for (let i = 0; i < highlights.length; i++) {
     const h = highlights[i];
-    console.log(`\n[${i + 1}/${highlights.length}] "${h.title}" 편집 중 (${h.start_sec}s ~ ${h.end_sec}s)...`);
+    const cutInfo = isFullClip(h.voiced, h.start_sec, h.end_sec) ? "컷 없음" : `${h.voiced.length}개 chunk`;
+    const bgmPath = getBgmPath(h.mood);
+    console.log(`\n[${i + 1}/${highlights.length}] "${h.title}" (${h.start_sec}s ~ ${h.end_sec}s)`);
+    console.log(`  mood=${h.mood}, cut=${cutInfo}, bgm=${bgmPath ? path.basename(bgmPath) : "없음"}`);
     if (h.keywords.length > 0) console.log(`  강조 단어: ${h.keywords.join(", ")}`);
     console.log(`  카드: "${h.card_text}"`);
 
-    const assContent = generateASS(subtitlePath, h.start_sec, h.end_sec, h.keywords, h.card_text);
+    const assContent = generateASS(subtitlePath, h.start_sec, h.end_sec, h.keywords, h.card_text, h.voiced);
     const assPath = path.join(outputDir, `clip_${i}.ass`);
     const outputPath = path.join(outputDir, `clip_${i}.mp4`);
 
     writeFileSync(assPath, assContent, "utf-8");
 
-    // Windows에서 ffmpeg 필터에 경로 넣을 때 백슬래시 이스케이프
     const assPathEscaped = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+    const useCut = !isFullClip(h.voiced, h.start_sec, h.end_sec);
 
-    // 새 레이아웃: 검정 1080x1920 + 영상 1:1 정사각 crop(1080x1080) + overlay y=350
-    const filterFull = [
-      "color=c=black:s=1080x1920:d=1[bg]",
-      "[0:v]crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]",
-      "[bg][fg]overlay=0:350[merged]",
-      `[merged]ass='${assPathEscaped}'[out]`,
-    ].join(";");
+    // 비디오/오디오 필터 체인 구성
+    const videoFilters: string[] = [];
+    if (useCut) {
+      videoFilters.push(`[0:v]select='${buildSelectExpr(h.voiced, h.start_sec)}',setpts=N/FRAME_RATE/TB[vcut]`);
+    }
+    const fgSource = useCut ? "[vcut]" : "[0:v]";
+    videoFilters.push("color=c=black:s=1080x1920:d=1[bg]");
+    videoFilters.push(`${fgSource}crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]`);
+    videoFilters.push("[bg][fg]overlay=0:350[merged]");
+    videoFilters.push(`[merged]ass='${assPathEscaped}'[vout]`);
+
+    const audioFilters: string[] = [];
+    if (useCut) {
+      audioFilters.push(`[0:a]aselect='${buildSelectExpr(h.voiced, h.start_sec)}',asetpts=N/SR/TB[acut]`);
+    }
+    const sermonAudio = useCut ? "[acut]" : "[0:a]";
+    if (bgmPath) {
+      audioFilters.push("[1:a]volume=0.08,afade=t=in:d=0.5[bgm]");
+      audioFilters.push(`${sermonAudio}[bgm]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
+    } else if (useCut) {
+      audioFilters.push(`${sermonAudio}anull[aout]`);
+    }
+
+    const filterComplex = [...videoFilters, ...audioFilters].join(";");
+    const audioMap = bgmPath || useCut ? '-map "[aout]"' : "-map 0:a";
+    const inputs = bgmPath
+      ? `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}" -i "${bgmPath}"`
+      : `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
 
     try {
       execSync(
         [
           "ffmpeg -y",
-          `-ss ${h.start_sec}`,
-          `-to ${h.end_sec}`,
-          `-i "${videoPath}"`,
-          `-filter_complex "${filterFull}"`,
-          `-map "[out]" -map 0:a`,
+          inputs,
+          `-filter_complex "${filterComplex}"`,
+          `-map "[vout]" ${audioMap}`,
           "-c:v libx264 -preset fast -crf 23",
           "-c:a aac -b:a 128k",
           "-movflags +faststart",

@@ -1,9 +1,67 @@
 import { execSync } from "child_process";
-import { readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
-import type { HighlightSegment } from "./highlight";
+import type { HighlightSegment, VoicedChunk, Mood } from "./highlight";
 
 const WORK_DIR = "/tmp/shorts";
+const BGM_DIR = path.join(process.cwd(), "scripts/shorts/bgm");
+
+/** mood → BGM 파일 경로. 해당 무드 음원 없으면 다른 무드라도 있으면 사용. 모두 없으면 null. */
+function getBgmPath(mood: Mood): string | null {
+  const candidate = path.join(BGM_DIR, `${mood}.mp3`);
+  if (existsSync(candidate)) return candidate;
+  for (const m of ["peaceful", "uplifting", "solemn", "reflective"] as const) {
+    const p = path.join(BGM_DIR, `${m}.mp3`);
+    if (existsSync(p)) return p;
+  }
+  return null;
+}
+
+/**
+ * 자막 segment 의 절대 시간(absStart, absEnd)을 voiced chunks 기반 컷 후 상대 시간으로 변환.
+ * segment 가 침묵 구간을 걸치면 voiced 영역 부분만 추출(시간이 줄어듦).
+ * 침묵 안에 완전히 포함되면 null.
+ */
+function shiftSegment(
+  absStart: number,
+  absEnd: number,
+  voiced: VoicedChunk[],
+): { relStart: number; relEnd: number } | null {
+  let accumulated = 0;
+  let relStart: number | null = null;
+  let relEnd: number | null = null;
+  for (const v of voiced) {
+    const overlapStart = Math.max(absStart, v.start);
+    const overlapEnd = Math.min(absEnd, v.end);
+    if (overlapEnd > overlapStart) {
+      if (relStart === null) relStart = accumulated + (overlapStart - v.start);
+      relEnd = accumulated + (overlapEnd - v.start);
+    }
+    accumulated += v.end - v.start;
+  }
+  if (relStart === null || relEnd === null || relEnd <= relStart) return null;
+  return { relStart, relEnd };
+}
+
+/** voiced chunks 가 단일 chunk 이고 [startSec, endSec] 전체를 덮으면 컷 없음. */
+function isFullClip(voiced: VoicedChunk[], startSec: number, endSec: number): boolean {
+  return (
+    voiced.length === 1 &&
+    Math.abs(voiced[0].start - startSec) < 0.05 &&
+    Math.abs(voiced[0].end - endSec) < 0.05
+  );
+}
+
+/** voiced chunks 를 ffmpeg select/aselect 의 between() 표현식으로 변환. 기준 시간은 클립 상대(startSec=0). */
+function buildSelectExpr(voiced: VoicedChunk[], startSec: number): string {
+  return voiced
+    .map((v) => {
+      const a = Math.max(0, v.start - startSec).toFixed(3);
+      const b = Math.max(0, v.end - startSec).toFixed(3);
+      return `between(t,${a},${b})`;
+    })
+    .join("+");
+}
 
 interface Json3Seg {
   utf8: string;
@@ -73,23 +131,24 @@ function generateASS(
   endSec: number,
   keywords: string[],
   cardText: string,
+  voiced: VoicedChunk[],
 ): string {
   const raw = JSON.parse(readFileSync(subtitlePath, "utf-8")) as {
     events: Json3Event[];
   };
   const events = raw.events ?? [];
 
-  const clipDuration = endSec - startSec;
+  // 컷 후 클립 길이 = voiced chunks 합계
+  const finalDuration = voiced.reduce((sum, v) => sum + (v.end - v.start), 0);
   let assDialogue = "";
 
-  // 1) 상단 고정 카드 — 클립 전체 동안 상단 여백 영역(Alignment=8)에 노출
-  if (cardText.trim().length > 0 && clipDuration > 0) {
-    assDialogue += `Dialogue: 0,${fmtASSTime(0)},${fmtASSTime(clipDuration)},Card,,0,0,0,,{\\fad(300,0)}${escapeASSText(cardText.trim())}\n`;
+  // 1) 상단 고정 카드 — 컷 후 클립 전체 동안 노출
+  if (cardText.trim().length > 0 && finalDuration > 0) {
+    assDialogue += `Dialogue: 0,${fmtASSTime(0)},${fmtASSTime(finalDuration)},Card,,0,0,0,,{\\fad(300,0)}${escapeASSText(cardText.trim())}\n`;
   }
 
   // 2) 하단 본문 자막
-  //    YouTube 자동자막은 rolling caption 이라 인접 event 시간이 겹쳐서 ASS 가 두 줄로 분리함.
-  //    이전 evt 의 end 를 다음 evt 의 start 로 clamp 해서 겹침을 없애 항상 한 줄로 표시.
+  //    YouTube 자동자막 rolling caption 겹침 정리 후, voiced 기반으로 시간 시프트.
   const subtitles: { start: number; end: number; text: string }[] = [];
   for (const e of events) {
     const evtStart = e.tStartMs / 1000;
@@ -107,11 +166,10 @@ function generateASS(
     }
   }
   for (const evt of subtitles) {
-    const relStart = Math.max(0, evt.start - startSec);
-    const relEnd = Math.min(endSec - startSec, evt.end - startSec);
-    if (relEnd <= relStart) continue;
+    const shifted = shiftSegment(evt.start, evt.end, voiced);
+    if (!shifted) continue;
     const styled = highlightKeywords(evt.text, keywords);
-    assDialogue += `Dialogue: 0,${fmtASSTime(relStart)},${fmtASSTime(relEnd)},Default,,0,0,0,,${styled}\n`;
+    assDialogue += `Dialogue: 0,${fmtASSTime(shifted.relStart)},${fmtASSTime(shifted.relEnd)},Default,,0,0,0,,${styled}\n`;
   }
 
   // 레이아웃:
@@ -153,6 +211,7 @@ export function editClips(
       h.end_sec,
       h.keywords,
       h.card_text,
+      h.voiced,
     );
     const assPath = path.join(WORK_DIR, `clip_${i}.ass`);
     const outputPath = path.join(WORK_DIR, `clip_${i}.mp4`);
@@ -160,33 +219,65 @@ export function editClips(
     writeFileSync(assPath, assContent, "utf-8");
 
     const assRef = escapeFilterPath(assPath);
+    const bgmPath = getBgmPath(h.mood);
+    const useCut = !isFullClip(h.voiced, h.start_sec, h.end_sec);
 
-    // 필터 그래프:
-    //   검정 1080x1920 캔버스 [bg]
-    //   영상은 1:1 정사각 crop (화자 크게) + 1080x1080 + 컬러 그레이딩 [fg]
-    //   overlay y=350 — 영상이 상단 여백 350 아래에 붙고 하단 490이 자막 영역
-    //   ass 로 자막(하단)+카드(상단) 번인
-    const filterComplex = [
-      "color=c=black:s=1080x1920:d=1[bg]",
-      "[0:v]crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]",
-      "[bg][fg]overlay=0:350[merged]",
-      `[merged]ass='${assRef}'[out]`,
-    ].join(";");
+    // 비디오 체인:
+    //   (옵션) select: 침묵 컷 적용 → [vcut]
+    //   color 1080x1920 검정 캔버스 [bg]
+    //   영상 1:1 정사각 crop → [fg]
+    //   overlay y=350 [merged] → ass 자막/카드 번인 → [vout]
+    const videoFilters: string[] = [];
+    if (useCut) {
+      videoFilters.push(`[0:v]select='${buildSelectExpr(h.voiced, h.start_sec)}',setpts=N/FRAME_RATE/TB[vcut]`);
+    }
+    const fgSource = useCut ? "[vcut]" : "[0:v]";
+    videoFilters.push("color=c=black:s=1080x1920:d=1[bg]");
+    videoFilters.push(`${fgSource}crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]`);
+    videoFilters.push("[bg][fg]overlay=0:350[merged]");
+    videoFilters.push(`[merged]ass='${assRef}'[vout]`);
+
+    // 오디오 체인:
+    //   (옵션) aselect: 침묵 컷 적용 → [acut]
+    //   (옵션) BGM amix → [aout], 없으면 sermon audio 그대로
+    const audioFilters: string[] = [];
+    if (useCut) {
+      audioFilters.push(`[0:a]aselect='${buildSelectExpr(h.voiced, h.start_sec)}',asetpts=N/SR/TB[acut]`);
+    }
+    const sermonAudio = useCut ? "[acut]" : "[0:a]";
+    if (bgmPath) {
+      audioFilters.push("[1:a]volume=0.08,afade=t=in:d=0.5[bgm]");
+      audioFilters.push(`${sermonAudio}[bgm]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
+    } else if (useCut) {
+      // BGM 없고 cut 적용 — sermon audio (cut) 만 [aout] 로 통일
+      audioFilters.push(`${sermonAudio}anull[aout]`);
+    }
+
+    const filterComplex = [...videoFilters, ...audioFilters].join(";");
+
+    // BGM 없고 cut 도 없으면 [0:a] 그대로 map
+    const audioMap = bgmPath || useCut ? '-map "[aout]"' : "-map 0:a";
+
+    const inputs = bgmPath
+      ? `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}" -i "${bgmPath}"`
+      : `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
 
     execSync(
       [
         "ffmpeg -y",
-        `-ss ${h.start_sec}`,
-        `-to ${h.end_sec}`,
-        `-i "${videoPath}"`,
+        inputs,
         `-filter_complex "${filterComplex}"`,
-        `-map "[out]" -map 0:a`,
+        `-map "[vout]" ${audioMap}`,
         "-c:v libx264 -preset medium -crf 23",
         "-c:a aac -b:a 128k",
         "-movflags +faststart",
         `"${outputPath}"`,
       ].join(" "),
       { stdio: "inherit", timeout: 180_000 },
+    );
+
+    console.log(
+      `[shorts] clip ${i}: mood=${h.mood}, cut=${useCut ? `${h.voiced.length}chunks` : "none"}, bgm=${bgmPath ? path.basename(bgmPath) : "none"}`,
     );
 
     outputPaths.push(outputPath);
