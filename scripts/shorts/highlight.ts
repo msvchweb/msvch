@@ -7,6 +7,9 @@ export interface HighlightSegment {
   title: string;
   hook: string;
   reason: string;
+  keywords: string[];
+  card_text: string;
+  peak_sec?: number;
 }
 
 interface Json3Seg {
@@ -88,9 +91,14 @@ export async function selectHighlights(
 - 비신자에게도 이해 가능할 것 (내부 용어/상황 의존 X)
 - 5개는 서로 주제가 겹치지 않을 것
 
+각 클립에 대해 추가로 아래 항목을 함께 산출하세요:
+- keywords: 본문에서 시각적으로 강조할 핵심 단어 3~5개. 한국어 명사·동사 위주. 조사·접속사 제외. 본문에 실제로 등장하는 표기 그대로.
+- card_text: 첫 2.5초 화면 중앙에 큰 글씨로 띄울 15자 이내 한 줄. 제목과 다른 각도에서 호기심을 유발하는 문장이나 핵심 단어.
+- peak_sec: 구간 내 가장 임팩트 있는 한 시점(초).
+
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요.
 
-{"highlights":[{"start_sec":0,"end_sec":0,"title":"20자 이내","hook":"첫 3초 훅 한 줄","reason":"선정 이유 1문장"}]}
+{"highlights":[{"start_sec":0,"end_sec":0,"title":"20자 이내","hook":"첫 3초 훅 한 줄","reason":"선정 이유 1문장","keywords":["단어1","단어2","단어3"],"card_text":"15자 이내","peak_sec":0}]}
 
 트랜스크립트:
 ${transcript}`;
@@ -118,6 +126,7 @@ ${transcript}`;
   const parsed = JSON.parse(text) as GeminiHighlightResult;
 
   // 타임스탬프 스냅: 가장 가까운 segment 경계로 보정
+  // keywords / card_text 누락 시 안전 기본값으로 채움 (Gemini가 가끔 빠뜨림)
   return parsed.highlights.map((h) => {
     const startSeg = segments.reduce((best, s) =>
       Math.abs(s.startMs / 1000 - h.start_sec) <
@@ -136,6 +145,8 @@ ${transcript}`;
       ...h,
       start_sec: startSeg.startMs / 1000,
       end_sec: endSeg.endMs / 1000,
+      keywords: Array.isArray(h.keywords) ? h.keywords.filter((k) => k.trim().length > 0) : [],
+      card_text: typeof h.card_text === "string" && h.card_text.trim().length > 0 ? h.card_text.trim() : h.title,
     };
   });
 }

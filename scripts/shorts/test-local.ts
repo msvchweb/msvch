@@ -10,7 +10,7 @@ import path from "path";
 import os from "os";
 
 const WORK_DIR = path.join(os.tmpdir(), "shorts");
-const VIDEO_ID = "bxsT4UdE2qE";
+const VIDEO_ID = "AZn08S-GlCQ";
 
 // --- json3 파싱 ---
 interface Json3Seg { utf8: string }
@@ -36,6 +36,9 @@ interface HighlightSegment {
   title: string;
   hook: string;
   reason: string;
+  keywords: string[];
+  card_text: string;
+  peak_sec?: number;
 }
 
 interface GeminiResponse {
@@ -74,9 +77,14 @@ async function selectHighlights(subtitlePath: string): Promise<HighlightSegment[
 중요: start_sec와 end_sec는 반드시 "초" 단위 숫자입니다. 예를 들어 트랜스크립트에서 [05:30]은 330초, [12:45]는 765초입니다.
 end_sec - start_sec는 반드시 30~55 사이여야 합니다.
 
+각 클립에 대해 추가로 함께 산출하세요:
+- keywords: 본문에서 시각적으로 강조할 핵심 단어 3~5개. 명사·동사 위주, 조사/접속사 제외. 본문에 실제로 등장하는 표기 그대로.
+- card_text: 첫 2.5초 화면 중앙에 큰 글씨로 띄울 15자 이내 한 줄. 호기심을 유발하는 문장 또는 핵심 단어.
+- peak_sec: 구간 내 가장 임팩트 있는 한 시점(초).
+
 반드시 아래 JSON 형식으로만 응답하세요.
 
-{"highlights":[{"start_sec":330,"end_sec":375,"title":"20자 이내","hook":"첫 3초 훅 한 줄","reason":"선정 이유 1문장"}]}
+{"highlights":[{"start_sec":330,"end_sec":375,"title":"20자 이내","hook":"첫 3초 훅 한 줄","reason":"선정 이유 1문장","keywords":["단어1","단어2","단어3"],"card_text":"15자 이내","peak_sec":345}]}
 
 트랜스크립트:
 ${transcript}`;
@@ -117,7 +125,7 @@ ${transcript}`;
     console.log(`  ${h.title} (${h.start_sec}s ~ ${h.end_sec}s) — ${h.hook}`);
   }
 
-  // segment 경계 스냅 + 유효성 검증
+  // segment 경계 스냅 + 유효성 검증 + keywords/card_text 기본값
   const snapped = parsed.highlights.map((h) => {
     const startSeg = segments.reduce((best, s) =>
       Math.abs(s.startMs / 1000 - h.start_sec) < Math.abs(best.startMs / 1000 - h.start_sec) ? s : best
@@ -125,7 +133,13 @@ ${transcript}`;
     const endSeg = segments.reduce((best, s) =>
       Math.abs(s.endMs / 1000 - h.end_sec) < Math.abs(best.endMs / 1000 - h.end_sec) ? s : best
     );
-    return { ...h, start_sec: startSeg.startMs / 1000, end_sec: endSeg.endMs / 1000 };
+    return {
+      ...h,
+      start_sec: startSeg.startMs / 1000,
+      end_sec: endSeg.endMs / 1000,
+      keywords: Array.isArray(h.keywords) ? h.keywords.filter((k) => k.trim().length > 0) : [],
+      card_text: typeof h.card_text === "string" && h.card_text.trim().length > 0 ? h.card_text.trim() : h.title,
+    };
   });
 
   // 최소 15초 이상인 것만 유지
@@ -145,10 +159,64 @@ function fmtASSTime(seconds: number): string {
   return `${h}:${String(m).padStart(2, "0")}:${s.toFixed(2).padStart(5, "0")}`;
 }
 
-function generateASS(subtitlePath: string, startSec: number, endSec: number): string {
+function escapeASSText(text: string): string {
+  return text.replace(/\\/g, "\\\\").replace(/\{/g, "\\{").replace(/\}/g, "\\}");
+}
+
+function highlightKeywords(text: string, keywords: string[]): string {
+  if (keywords.length === 0) return escapeASSText(text);
+  const sorted = [...keywords].sort((a, b) => b.length - a.length);
+
+  const tokens: { text: string; emphasize: boolean }[] = [];
+  let remaining = text;
+  while (remaining.length > 0) {
+    let hitIdx = -1;
+    let hitKw = "";
+    for (const kw of sorted) {
+      if (kw.length === 0) continue;
+      const idx = remaining.indexOf(kw);
+      if (idx !== -1 && (hitIdx === -1 || idx < hitIdx)) {
+        hitIdx = idx;
+        hitKw = kw;
+      }
+    }
+    if (hitIdx === -1) {
+      tokens.push({ text: remaining, emphasize: false });
+      break;
+    }
+    if (hitIdx > 0) tokens.push({ text: remaining.slice(0, hitIdx), emphasize: false });
+    tokens.push({ text: hitKw, emphasize: true });
+    remaining = remaining.slice(hitIdx + hitKw.length);
+  }
+
+  return tokens
+    .map((t) =>
+      t.emphasize
+        ? `{\\c&H00FFFF&\\b1}${escapeASSText(t.text)}{\\c&HFFFFFF&\\b0}`
+        : escapeASSText(t.text),
+    )
+    .join("");
+}
+
+function generateASS(
+  subtitlePath: string,
+  startSec: number,
+  endSec: number,
+  keywords: string[],
+  cardText: string,
+): string {
   const raw = JSON.parse(readFileSync(subtitlePath, "utf-8")) as { events: Json3Event[] };
+  const clipDuration = endSec - startSec;
   let assDialogue = "";
 
+  // 1) 상단 고정 카드 — 클립 전체 동안 상단 여백 영역에 노출
+  if (cardText.trim().length > 0 && clipDuration > 0) {
+    assDialogue += `Dialogue: 0,${fmtASSTime(0)},${fmtASSTime(clipDuration)},Card,,0,0,0,,{\\fad(300,0)}${escapeASSText(cardText.trim())}\n`;
+  }
+
+  // 2) 본문 자막 — keywords 강조
+  //    YouTube 자동자막 rolling caption 의 겹침을 제거하여 항상 한 줄로 표시
+  const subtitles: { start: number; end: number; text: string }[] = [];
   for (const e of raw.events) {
     const evtStart = e.tStartMs / 1000;
     const evtEnd = (e.tStartMs + e.dDurationMs) / 1000;
@@ -156,12 +224,23 @@ function generateASS(subtitlePath: string, startSec: number, endSec: number): st
     if (!e.segs) continue;
     const text = e.segs.map((s) => s.utf8).join("").trim();
     if (!text) continue;
-
-    const relStart = Math.max(0, evtStart - startSec);
-    const relEnd = Math.min(endSec - startSec, evtEnd - startSec);
-    assDialogue += `Dialogue: 0,${fmtASSTime(relStart)},${fmtASSTime(relEnd)},Default,,0,0,0,,${text}\n`;
+    subtitles.push({ start: evtStart, end: evtEnd, text });
+  }
+  subtitles.sort((a, b) => a.start - b.start);
+  for (let i = 0; i < subtitles.length - 1; i++) {
+    if (subtitles[i].end > subtitles[i + 1].start) {
+      subtitles[i].end = subtitles[i + 1].start;
+    }
+  }
+  for (const evt of subtitles) {
+    const relStart = Math.max(0, evt.start - startSec);
+    const relEnd = Math.min(endSec - startSec, evt.end - startSec);
+    if (relEnd <= relStart) continue;
+    const styled = highlightKeywords(evt.text, keywords);
+    assDialogue += `Dialogue: 0,${fmtASSTime(relStart)},${fmtASSTime(relEnd)},Default,,0,0,0,,${styled}\n`;
   }
 
+  // 레이아웃: y=0~350 카드(Alignment=8, MarginV=120), y=350~1430 영상(1:1), y=1430~1920 자막(Alignment=2, MarginV=240)
   return `[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
@@ -169,7 +248,8 @@ PlayResY: 1920
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Malgun Gothic,64,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,20,20,80,1
+Style: Default,Malgun Gothic,64,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,40,40,240,1
+Style: Card,Malgun Gothic,80,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,4,0,8,40,40,120,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -202,15 +282,25 @@ async function main() {
   for (let i = 0; i < highlights.length; i++) {
     const h = highlights[i];
     console.log(`\n[${i + 1}/${highlights.length}] "${h.title}" 편집 중 (${h.start_sec}s ~ ${h.end_sec}s)...`);
+    if (h.keywords.length > 0) console.log(`  강조 단어: ${h.keywords.join(", ")}`);
+    console.log(`  카드: "${h.card_text}"`);
 
-    const assContent = generateASS(subtitlePath, h.start_sec, h.end_sec);
+    const assContent = generateASS(subtitlePath, h.start_sec, h.end_sec, h.keywords, h.card_text);
     const assPath = path.join(outputDir, `clip_${i}.ass`);
     const outputPath = path.join(outputDir, `clip_${i}.mp4`);
 
     writeFileSync(assPath, assContent, "utf-8");
 
     // Windows에서 ffmpeg 필터에 경로 넣을 때 백슬래시 이스케이프
-    const assPathEscaped = assPath.replace(/\\/g, "/").replace(/:/g, "\\:");
+    const assPathEscaped = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
+
+    // 새 레이아웃: 검정 1080x1920 + 영상 1:1 정사각 crop(1080x1080) + overlay y=350
+    const filterFull = [
+      "color=c=black:s=1080x1920:d=1[bg]",
+      "[0:v]crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]",
+      "[bg][fg]overlay=0:350[merged]",
+      `[merged]ass='${assPathEscaped}'[out]`,
+    ].join(";");
 
     try {
       execSync(
@@ -219,17 +309,18 @@ async function main() {
           `-ss ${h.start_sec}`,
           `-to ${h.end_sec}`,
           `-i "${videoPath}"`,
-          `-vf "crop=ih*9/16:ih,scale=1080:1920,ass='${assPathEscaped}'"`,
+          `-filter_complex "${filterFull}"`,
+          `-map "[out]" -map 0:a`,
           "-c:v libx264 -preset fast -crf 23",
           "-c:a aac -b:a 128k",
           "-movflags +faststart",
           `"${outputPath}"`,
         ].join(" "),
-        { stdio: "inherit", timeout: 120_000 },
+        { stdio: "inherit", timeout: 180_000 },
       );
       console.log(`  -> ${outputPath}`);
     } catch (err) {
-      console.error(`  FFmpeg 실패, 자막 없이 재시도...`);
+      console.error(`  풀세트 실패, 자막 없는 단순 그래프로 재시도...`);
       execSync(
         [
           "ffmpeg -y",
@@ -244,7 +335,7 @@ async function main() {
         ].join(" "),
         { stdio: "inherit", timeout: 120_000 },
       );
-      console.log(`  -> ${outputPath} (자막 없음)`);
+      console.log(`  -> ${outputPath} (폴백: 단순 컷)`);
     }
   }
 
