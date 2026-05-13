@@ -36,6 +36,9 @@ yarn-error.log*
 # claude code local settings (contains tokens)
 .claude/
 
+# gstack local tooling outputs (security reports, etc.)
+.gstack/
+
 docs/
 .temp/
 

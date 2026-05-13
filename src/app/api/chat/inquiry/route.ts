@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 import { z } from "zod";
+import { checkRateLimit, getClientIp, escapeHtml } from "@/lib/rate-limit";
 
 const InquirySchema = z.object({
   name: z.string().min(1).max(50),
@@ -10,6 +11,23 @@ const InquirySchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // 무인증 공개 라우트 — 챗봇 본문보다 타이트한 한도
+  const ip = getClientIp(request);
+  const { allowed, retryAfter } = await checkRateLimit(ip, {
+    windowKey: "inquiry",
+    perMinute: 2,
+    perDay: 10,
+  });
+  if (!allowed) {
+    return NextResponse.json(
+      { error: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
+      {
+        status: 429,
+        headers: retryAfter ? { "Retry-After": String(retryAfter) } : {},
+      },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -39,25 +57,31 @@ export async function POST(request: NextRequest) {
   if (process.env.RESEND_API_KEY) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
+      // 사용자 입력은 모두 escapeHtml 로 통과시켜 HTML 인젝션 차단.
+      const safeName = escapeHtml(parsed.data.name);
+      const safePhone = escapeHtml(parsed.data.phone);
+      const safeMessage = parsed.data.message
+        ? escapeHtml(parsed.data.message)
+        : "";
       await resend.emails.send({
         from: "명성비전교회 <onboarding@resend.dev>",
         to: "msvch01@naver.com",
-        subject: `[문의] ${parsed.data.name}님의 문의가 접수되었습니다`,
+        subject: `[문의] ${safeName}님의 문의가 접수되었습니다`,
         html: `
           <h2>새 문의가 접수되었습니다</h2>
           <table style="border-collapse:collapse;width:100%;max-width:480px">
             <tr>
               <td style="padding:8px 12px;background:#f3f4f6;font-weight:600;width:80px">이름</td>
-              <td style="padding:8px 12px;border:1px solid #e5e7eb">${parsed.data.name}</td>
+              <td style="padding:8px 12px;border:1px solid #e5e7eb">${safeName}</td>
             </tr>
             <tr>
               <td style="padding:8px 12px;background:#f3f4f6;font-weight:600">연락처</td>
-              <td style="padding:8px 12px;border:1px solid #e5e7eb">${parsed.data.phone}</td>
+              <td style="padding:8px 12px;border:1px solid #e5e7eb">${safePhone}</td>
             </tr>
-            ${parsed.data.message ? `
+            ${safeMessage ? `
             <tr>
               <td style="padding:8px 12px;background:#f3f4f6;font-weight:600">메시지</td>
-              <td style="padding:8px 12px;border:1px solid #e5e7eb">${parsed.data.message}</td>
+              <td style="padding:8px 12px;border:1px solid #e5e7eb">${safeMessage}</td>
             </tr>` : ""}
           </table>
           <p style="margin-top:16px;color:#6b7280;font-size:14px">관리자 페이지에서 전체 문의 내역을 확인하실 수 있습니다.</p>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { GeminiUnavailableError } from "@/lib/gemini";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
 export const maxDuration = 30;
 
@@ -29,14 +30,6 @@ interface GeminiResponse {
   }[];
 }
 
-function getClientIp(request: NextRequest): string {
-  return (
-    request.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
-    request.headers.get("x-real-ip") ??
-    "unknown"
-  );
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -48,90 +41,6 @@ function getSupabase(): any {
     );
   }
   return _supabase;
-}
-
-/**
- * IP 기반 rate limit 체크.
- * - 분 단위 윈도우와 일 단위 윈도우를 각각 확인.
- * - 초과 시 { allowed: false, retryAfter } 반환.
- */
-async function checkRateLimit(
-  ip: string
-): Promise<{ allowed: boolean; retryAfter?: number }> {
-  const supabase = getSupabase();
-  const now = new Date();
-
-  // 분 윈도우 (현재 분의 시작)
-  const minuteWindow = new Date(now);
-  minuteWindow.setSeconds(0, 0);
-
-  // 일 윈도우 (오늘 00:00 KST → UTC -9h)
-  const dayWindow = new Date(now);
-  dayWindow.setUTCHours(dayWindow.getUTCHours() - ((dayWindow.getUTCHours() + 9) % 24), 0, 0, 0);
-
-  // 분당 카운트 upsert
-  const { data: minuteRow, error: minuteErr } = await supabase
-    .from("chat_rate_limit")
-    .upsert(
-      { ip, window_start: minuteWindow.toISOString(), request_count: 1 },
-      { onConflict: "ip,window_start", ignoreDuplicates: false }
-    )
-    .select("request_count")
-    .single();
-
-  if (minuteErr) {
-    // upsert가 기존 행을 반환하지 않으면 수동 increment
-    const { data: existing } = await supabase
-      .from("chat_rate_limit")
-      .select("request_count")
-      .eq("ip", ip)
-      .eq("window_start", minuteWindow.toISOString())
-      .single();
-
-    if (existing) {
-      const newCount = existing.request_count + 1;
-      await supabase
-        .from("chat_rate_limit")
-        .update({ request_count: newCount })
-        .eq("ip", ip)
-        .eq("window_start", minuteWindow.toISOString());
-
-      if (newCount > RATE_LIMIT_PER_MINUTE) {
-        const retryAfter = 60 - now.getSeconds();
-        return { allowed: false, retryAfter };
-      }
-    }
-  } else if (minuteRow && minuteRow.request_count > RATE_LIMIT_PER_MINUTE) {
-    const retryAfter = 60 - now.getSeconds();
-    return { allowed: false, retryAfter };
-  }
-
-  // 일일 카운트 (해당 일의 모든 윈도우 합산)
-  const { data: dayRows } = await supabase
-    .from("chat_rate_limit")
-    .select("request_count")
-    .eq("ip", ip)
-    .gte("window_start", dayWindow.toISOString());
-
-  const dayTotal = (dayRows ?? []).reduce(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (sum: number, r: any) => sum + (r.request_count as number),
-    0
-  );
-
-  if (dayTotal > RATE_LIMIT_PER_DAY) {
-    return { allowed: false, retryAfter: 86400 };
-  }
-
-  // 오래된 레코드 정리 (2일 이상 된 것)
-  const cutoff = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
-  supabase
-    .from("chat_rate_limit")
-    .delete()
-    .lt("window_start", cutoff.toISOString())
-    .then(() => {/* fire-and-forget */});
-
-  return { allowed: true };
 }
 
 const STATIC_KNOWLEDGE = `
@@ -258,7 +167,11 @@ export async function POST(request: NextRequest) {
   const ip = getClientIp(request);
 
   // ── Rate limit 체크 ──────────────────────────────────────
-  const { allowed, retryAfter } = await checkRateLimit(ip);
+  const { allowed, retryAfter } = await checkRateLimit(ip, {
+    windowKey: "chat",
+    perMinute: RATE_LIMIT_PER_MINUTE,
+    perDay: RATE_LIMIT_PER_DAY,
+  });
   if (!allowed) {
     return NextResponse.json(
       { error: "요청이 너무 많습니다. 잠시 후 다시 시도해 주세요." },
