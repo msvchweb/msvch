@@ -220,13 +220,16 @@ export function editClips(
 
     const assRef = escapeFilterPath(assPath);
     const bgmPath = getBgmPath(h.mood);
+    const logoPath = path.join(process.cwd(), "scripts/shorts/banner.png");
     const useCut = !isFullClip(h.voiced, h.start_sec, h.end_sec);
+    const logoInputIdx = bgmPath ? 2 : 1;
 
     // 비디오 체인:
     //   (옵션) select: 침묵 컷 적용 → [vcut]
     //   color 1080x1920 검정 캔버스 [bg]
     //   영상 1:1 정사각 crop → [fg]
-    //   overlay y=350 [merged] → ass 자막/카드 번인 → [vout]
+    //   overlay y=350 [merged] → ass 자막/카드 번인 → [captioned]
+    //   로고 overlay (하단 가운데) → [vout]
     const videoFilters: string[] = [];
     if (useCut) {
       videoFilters.push(`[0:v]select='${buildSelectExpr(h.voiced, h.start_sec)}',setpts=N/FRAME_RATE/TB[vcut]`);
@@ -235,7 +238,9 @@ export function editClips(
     videoFilters.push("color=c=black:s=1080x1920:d=1[bg]");
     videoFilters.push(`${fgSource}crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]`);
     videoFilters.push("[bg][fg]overlay=0:350[merged]");
-    videoFilters.push(`[merged]ass='${assRef}'[vout]`);
+    videoFilters.push(`[merged]ass='${assRef}'[captioned]`);
+    videoFilters.push(`[${logoInputIdx}:v]scale=400:-1[logo]`);
+    videoFilters.push(`[captioned][logo]overlay=(W-w)/2:H-h-30:shortest=1[vout]`);
 
     // 오디오 체인:
     //   (옵션) aselect: 침묵 컷 적용 → [acut]
@@ -258,9 +263,10 @@ export function editClips(
     // BGM 없고 cut 도 없으면 [0:a] 그대로 map
     const audioMap = bgmPath || useCut ? '-map "[aout]"' : "-map 0:a";
 
-    const inputs = bgmPath
-      ? `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}" -i "${bgmPath}"`
-      : `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
+    const sermonInput = `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
+    const bgmInput = bgmPath ? `-i "${bgmPath}"` : "";
+    const logoInput = `-loop 1 -i "${logoPath}"`;
+    const inputs = [sermonInput, bgmInput, logoInput].filter(Boolean).join(" ");
 
     execSync(
       [

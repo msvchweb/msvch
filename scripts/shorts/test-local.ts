@@ -391,6 +391,8 @@ async function main() {
 
     const assPathEscaped = assPath.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
     const useCut = !isFullClip(h.voiced, h.start_sec, h.end_sec);
+    const logoPath = path.join(process.cwd(), "scripts/shorts/banner.png");
+    const logoInputIdx = bgmPath ? 2 : 1;
 
     // 비디오/오디오 필터 체인 구성
     const videoFilters: string[] = [];
@@ -401,7 +403,9 @@ async function main() {
     videoFilters.push("color=c=black:s=1080x1920:d=1[bg]");
     videoFilters.push(`${fgSource}crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]`);
     videoFilters.push("[bg][fg]overlay=0:350[merged]");
-    videoFilters.push(`[merged]ass='${assPathEscaped}'[vout]`);
+    videoFilters.push(`[merged]ass='${assPathEscaped}'[captioned]`);
+    videoFilters.push(`[${logoInputIdx}:v]scale=400:-1[logo]`);
+    videoFilters.push(`[captioned][logo]overlay=(W-w)/2:H-h-30:shortest=1[vout]`);
 
     const audioFilters: string[] = [];
     if (useCut) {
@@ -417,9 +421,10 @@ async function main() {
 
     const filterComplex = [...videoFilters, ...audioFilters].join(";");
     const audioMap = bgmPath || useCut ? '-map "[aout]"' : "-map 0:a";
-    const inputs = bgmPath
-      ? `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}" -i "${bgmPath}"`
-      : `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
+    const sermonInput = `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
+    const bgmInput = bgmPath ? `-i "${bgmPath}"` : "";
+    const logoInput = `-loop 1 -i "${logoPath}"`;
+    const inputs = [sermonInput, bgmInput, logoInput].filter(Boolean).join(" ");
 
     try {
       execSync(
