@@ -119,7 +119,6 @@ export interface Weekly {
   id: string;
   title: string;
   date: string | null;
-  pdf_url: string | null;
   created_at: string;
   volume: number | null;
   issue: number | null;

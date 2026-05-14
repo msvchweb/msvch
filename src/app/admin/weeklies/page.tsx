@@ -39,12 +39,6 @@ export default function AdminWeekliesPage() {
   async function deleteWeekly(w: Weekly) {
     if (!confirm("이 주보를 삭제하시겠습니까?")) return;
 
-    if (w.pdf_url) {
-      const urlPath = new URL(w.pdf_url).pathname;
-      const segment = urlPath.split("/weeklies/")[1];
-      if (segment) await supabase.storage.from("weeklies").remove([segment]);
-    }
-
     await supabase.from("weeklies").delete().eq("id", w.id);
     loadWeeklies();
   }

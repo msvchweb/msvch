@@ -31,7 +31,6 @@ function inputToWeekly(input: WeeklyContentInput, weeklyId?: string): Weekly {
     id: weeklyId ?? "preview",
     title: input.title,
     date: input.date ?? null,
-    pdf_url: null,
     created_at: new Date().toISOString(),
     volume: input.volume,
     issue: input.issue,

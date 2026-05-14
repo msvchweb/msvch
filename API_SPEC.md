@@ -398,43 +398,6 @@ GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인�
 
 ---
 
-### POST `/api/weeklies/generate-pdf`
-
-주보 데이터를 기반으로 PDF를 자동 생성하고 Supabase Storage에 업로드한다.
-
-- **인증**: admin 역할 필수
-- **런타임**: `nodejs`
-- **최대 실행 시간**: 60초 (`maxDuration = 60`)
-- **요청 본문**:
-
-```ts
-{ weeklyId: string }
-```
-
-- **응답 (200)**:
-
-```ts
-{ pdfUrl: string }
-```
-
-- **에러 응답**:
-  - `400` — `weeklyId` 누락
-  - `401` — 미인증
-  - `403` — 비admin
-  - `404` — 해당 주보 없음
-  - `500` — PDF 생성 실패 또는 Storage 업로드 실패
-
-- **내부 동작**:
-  1. `weeklyId`로 `weeklies` 테이블 조회
-  2. `buildWeeklyHtml(weekly)` 호출 → A4 HTML 문자열 생성
-  3. Puppeteer + `@sparticuz/chromium` → `page.pdf()` 호출
-  4. 생성된 PDF Buffer → Supabase Storage `weeklies/{id}-generated.pdf` 업로드
-  5. `weeklies` 테이블 `pdf_url` 컬럼 업데이트
-
-- **환경변수**: `CHROME_EXECUTABLE_PATH` (개발 환경, 로컬 Chrome 경로)
-
----
-
 ### GET `/api/home/hero-slides`
 
 홈페이지 히어로 슬라이더용 데이터. `notices` 테이블에서 이미지가 있는 공개 공지를 최신순으로 반환.
@@ -1114,7 +1077,6 @@ Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. b
 
 | 엔드포인트 | Zod 스키마 | 비고 |
 |-----------|-----------|------|
-| POST `/api/weeklies/generate-pdf` | 없음 (body: `{ weeklyId }`) | admin 전용, Puppeteer PDF 생성 |
 | POST `/api/revalidate` | `RevalidateSchema` | paths 최대 20개, 타이밍-세이프 시크릿 비교 |
 | POST `/api/sermon-summary` | `SermonSummarySchema` | 모든 필드 길이 제한 |
 | POST `/api/shorts/trigger` | `ShortsTriggerSchema` | videoId 50자, title 300자 |

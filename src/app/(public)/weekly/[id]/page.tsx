@@ -46,20 +46,10 @@ export default async function WeeklyDetailPage({
 
   return (
     <Container className="py-6">
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4">
         <Link href="/weekly" className="text-sm text-gray-500 hover:text-gray-900">
           ← 주보 목록
         </Link>
-        {weekly.pdf_url && (
-          <a
-            href={weekly.pdf_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-100"
-          >
-            PDF 다운로드
-          </a>
-        )}
       </div>
       <Bulletin weekly={weekly} mode="web" master={master} />
     </Container>

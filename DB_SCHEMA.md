@@ -183,7 +183,6 @@ interface HeroSlide {
 | `id` | `uuid` PK | 자동 생성 |
 | `title` | `text NOT NULL` | 제목 |
 | `date` | `date` | 날짜 (nullable) |
-| `pdf_url` | `text` | PDF URL — 직접 업로드 또는 자동 생성 (nullable) |
 | `created_at` | `timestamptz DEFAULT now()` | 생성일 |
 | `volume` | `integer` | 권 (예: 47) |
 | `issue` | `integer` | 호 (예: 16) |
@@ -232,6 +231,7 @@ interface HeroSlide {
 - `029_weeklies_special_offering.sql` — `special_offering jsonb` 추가 (부활감사 자리 토글/라벨)
 - `030_weeklies_front_toggles.sql` — `front_toggles jsonb` 추가 (페이지 4 섹션 표시 토글)
 - `031_drop_weekly_misc_legacy.sql` — `prayer_items`, `announcements`, `servants_text`, `offering_list_text`, `sogroup_text` DROP. 폼의 "기타" 탭 자체 삭제. 기도제목은 마스터(`community_prayers`)로 일원화 (베이스 테이블 폴백 제거)
+- `036_drop_weeklies_pdf_url.sql` — `pdf_url` DROP. PDF 자동 생성 라우트(/api/weeklies/generate-pdf)가 모든 호출 동선을 잃어 dead 상태가 된 후 컬럼·라우트·puppeteer 의존성 일괄 정리. Storage 버킷 'weeklies' 와 정책은 보존 (과거 수동 업로드 자산 대비)
 
 **TypeScript 타입**: `src/types/notice.ts` `Weekly` 인터페이스 참조.
 
@@ -942,3 +942,5 @@ interface ShortsClip {
 | `032_sermon_videos.sql` | sermon_videos 테이블 (video_id PK + 카테고리 + RLS 공개 SELECT). YouTube 업로드 플레이리스트에서 일 1회 cron 으로 누적 동기화 — 한 번 들어온 영상은 영구 보존. 표시는 DB 에서만 읽고 YouTube API 호출은 sync 경로 1곳으로 제한 |
 | `033_weeklies_front_toggles_meetings.sql` | weeklies.front_toggles jsonb 에 `meetings` 키 추가 + 기존 row 백필. 페이지 4 모임 안내 섹션 표시 토글 |
 | `034_events_source_weekly.sql` | events 테이블에 AI 추출 추적 컬럼 3개 (`source_weekly_id` FK + `source_news_index` + `extracted_by_ai`) + 부분 인덱스. 주보 "교회소식" → 일정 AI 추출 (Gemini) 결과 추적 |
+| `035_profiles_lock_down.sql` | profiles SELECT 정책 좁히기 — 본인 행 OR staff 만 SELECT 가능. anon 의 전 회원 정보 조회 차단 (PIPA 위반 차단) |
+| `036_drop_weeklies_pdf_url.sql` | weeklies.pdf_url 컬럼 DROP — PDF 자동 생성 라우트가 모든 호출 동선을 잃어 dead 상태. 컬럼/라우트/puppeteer 의존성(@sparticuz/chromium*, puppeteer-core) 일괄 정리. Storage 버킷 'weeklies' 와 정책은 보존 |

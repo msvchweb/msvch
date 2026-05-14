@@ -11,6 +11,7 @@ import {
   BulletinBackRight,
   weeklyToBackData,
 } from "./BulletinBack";
+import { ProtectedView } from "./ProtectedView";
 import type { Weekly } from "@/types/notice";
 import type { BulletinMasterData } from "@/types/bulletin-master";
 
@@ -28,20 +29,22 @@ export function BulletinWebView({ weekly, master }: Props) {
   const backData = weeklyToBackData(weekly, master);
 
   return (
-    <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
-      <Pane>
-        <BulletinFrontRight data={frontData} />
-      </Pane>
-      <Pane>
-        <BulletinBackLeft data={backData} />
-      </Pane>
-      <Pane>
-        <BulletinBackRight data={backData} />
-      </Pane>
-      <Pane>
-        <BulletinFrontLeft data={frontData} />
-      </Pane>
-    </div>
+    <ProtectedView>
+      <div className="grid gap-4 sm:gap-5 md:grid-cols-2">
+        <Pane>
+          <BulletinFrontRight data={frontData} />
+        </Pane>
+        <Pane>
+          <BulletinBackLeft data={backData} />
+        </Pane>
+        <Pane>
+          <BulletinBackRight data={backData} />
+        </Pane>
+        <Pane>
+          <BulletinFrontLeft data={frontData} />
+        </Pane>
+      </div>
+    </ProtectedView>
   );
 }
 

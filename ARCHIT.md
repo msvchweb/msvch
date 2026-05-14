@@ -14,7 +14,6 @@
 | 검증 | Zod (런타임 스키마 검증) | 4.x |
 | 이미지 처리 | sharp / Canvas API (포스터 합성) | 0.34+ |
 | 갤러리 | yet-another-react-lightbox | 3.30+ |
-| PDF 생성 | puppeteer-core + @sparticuz/chromium-min (런타임 다운로드) | - |
 | QR 코드 | qrcode | - |
 | 언어 | TypeScript | 5.x |
 
@@ -165,9 +164,10 @@ src/
 │   │
 │   ├── bulletin/                # ⚠ LAYOUT LOCKED (인쇄 — 원본 디자인 유지)
 │   │   ├── Bulletin.tsx         # 진입점 (print/web 모드 분기 + master prop)
-│   │   ├── BulletinWebView.tsx  # 공개 웹 모드 — ResizeObserver 자동 스케일 (PC 2x2 / 모바일 1열)
+│   │   ├── BulletinWebView.tsx  # 공개 웹 모드 — ResizeObserver 자동 스케일 (PC 2x2 / 모바일 1열) + ProtectedView 자동 적용
 │   │   ├── BulletinFront.tsx    # 앞면 레이아웃 + weeklyToFrontData(w, master?)
-│   │   └── BulletinBack.tsx     # 뒷면 레이아웃 + weeklyToBackData(w, master?)
+│   │   ├── BulletinBack.tsx     # 뒷면 레이아웃 + weeklyToBackData(w, master?)
+│   │   └── ProtectedView.tsx    # 공개 웹뷰 보호 래퍼 — 우클릭/드래그/복사/단축키 차단 + 워터마크 (웹 전용, RN 은 네이티브 보호 별도)
 │   │
 │   ├── admin/                    # 관리자 공용 컴포넌트
 │   │   ├── AdminTour.tsx           # 스포트라이트 투어 (16단계, clickOnEnter 자동 탭 전환)
@@ -336,15 +336,18 @@ Admin UI (/admin/masters/*) ────────→ Supabase DB (church_sett
     │    loadBulletinMaster(supabase) → BulletinMasterData
     │    └→ <Bulletin weekly={...} master={...} /> (Live Reference)
     │
-    └── POST /api/weeklies/generate-pdf  (인쇄/저장용)
-            │
-            ▼
-        Puppeteer (puppeteer-core + @sparticuz/chromium-min, 런타임 다운로드)
-            │  page.goto(/weekly-print/[id]) → page.pdf({ format: 'A4' })
-            │  (HTML 빌더 제거 — 라이브 라우트를 그대로 인쇄)
-            ▼
-        PDF Buffer ──→ Supabase Storage (weeklies/{id}-generated.pdf)
-            └── weeklies.pdf_url 업데이트
+    │  공개 웹뷰 보호 (BulletinWebView):
+    │    BulletinWebView 가 <ProtectedView> 래퍼로 자동 감싸짐 — 외부인 마찰 추가:
+    │      · 우클릭/드래그/복사/텍스트선택 차단 (React 합성 이벤트 + CSS)
+    │      · 키보드 단축키 차단 (F12, Ctrl+S/P/C/U, Ctrl+Shift+I/J/C, Cmd 조합)
+    │      · 워터마크 (사선 줄무늬 + 중앙 회전 텍스트, 모두 pointer-events: none)
+    │      · iOS Safari 길게 누르기 메뉴 차단 (-webkit-touch-callout: none)
+    │    한계: PrintScreen·카메라 촬영·브라우저 메뉴 인쇄/소스 진입은 차단 불가.
+    │
+    │  /weekly-print/[id] (staff 전용) 와 admin 미리보기는 보호 X — 작성자/직원 본인 동선.
+    │
+    │  ※ 과거 POST /api/weeklies/generate-pdf (Puppeteer + @sparticuz/chromium) 경로는
+    │    호출 동선 부재로 마이그 036 에서 라우트·컬럼·의존성 모두 제거됨.
 
 포스터 도구 (admin/posters):
     ① PromptBuilder (칩 5종 + 행사 정보 입력)
@@ -865,5 +868,4 @@ admin/boards/[id]/members 페이지
 - **환경변수 (Vercel — 일상 트래픽)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`, `CRON_SECRET`
 - **환경변수 (선택, 카카오 비즈 승인 후 추가)**: `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY`, `KAKAO_BIZ_API_URL`
 - **환경변수 (마이그레이션 1회용 — 사용 후 제거 권장)**: `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`
-- **환경변수 (로컬 개발 only)**: `CHROME_EXECUTABLE_PATH` — 로컬 Chrome 경로 (Puppeteer PDF 생성용, Vercel에서는 @sparticuz/chromium 자동 사용)
 - **GitHub Secrets**: `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
