@@ -432,20 +432,6 @@ function BasicTab({
       <section className="rounded-xl border border-gray-200 bg-white p-6">
         <SectionTitle>발행 설정</SectionTitle>
         <div className="space-y-3">
-          <label className="flex items-center gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              className="h-4 w-4 rounded border-gray-300 text-primary-600"
-              checked={form.publish_channels.website}
-              onChange={(e) =>
-                set("publish_channels", {
-                  ...form.publish_channels,
-                  website: e.target.checked,
-                })
-              }
-            />
-            <span className="text-sm font-medium">홈페이지 게시</span>
-          </label>
           <label className="flex items-center gap-3 cursor-not-allowed opacity-50">
             <input type="checkbox" className="h-4 w-4" disabled />
             <span className="text-sm font-medium">카카오 알림톡 발송</span>
