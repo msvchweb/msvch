@@ -202,11 +202,6 @@ export default async function AdminDashboard() {
         </section>
       )}
 
-      {/* D — 업데이트 노트 */}
-      <section>
-        <UpdatesCard />
-      </section>
-
       {/* C — 빠른 진입 */}
       {(canNotices || canWeeklies || canCalendar || canGallery) && (
         <section>
@@ -297,6 +292,11 @@ export default async function AdminDashboard() {
           )}
         </section>
       )}
+
+      {/* D — 업데이트 노트 (대시보드 최하단) */}
+      <section>
+        <UpdatesCard />
+      </section>
     </div>
   );
 }
