@@ -865,6 +865,36 @@ admin/boards/[id]/members 페이지
 
 ---
 
+## 관리자 권한 매트릭스
+
+`src/lib/admin-permissions.ts` 가 단일 진실의 원천. 미들웨어·사이드바·하단 탭바·메뉴 페이지·대시보드 카드가 모두 이 모듈만 참조한다.
+
+| 경로 prefix | 최소 권한 | 비고 |
+|------------|----------|------|
+| `/admin` | staff | 대시보드 (카드는 권한별 필터링) |
+| `/admin/menu` | staff | 전체 메뉴 (아이템은 권한별 필터링) |
+| `/admin/guide` | staff | 가이드 페이지 |
+| `/admin/updates` | staff | 업데이트 노트 전체 보기 |
+| `/admin/notices` | **admin** | 공지사항 |
+| `/admin/weeklies` · `/admin/masters` · `/admin/calendar` · `/admin/event-subscribers` | **admin** | 주보·일정 그룹 |
+| `/admin/inquiries` · `/admin/new-families` | **admin** | 문의·새가족 그룹 |
+| `/admin/gallery` · `/admin/boards` | staff | 갤러리·게시판 그룹 |
+| `/admin/posters` | staff | 포스터 |
+| `/admin/sermons` · `/admin/shorts` | staff | 설교·쇼츠 그룹 |
+| `/admin/members` | **master** | 회원관리 (role 변경 단독) |
+
+**적용 경계 (Defense in depth)**
+
+1. **미들웨어** (`src/middleware.ts`) — 서버측 진짜 보안 경계. URL 직접 입력해도 차단. 부족 시 `/admin?notice=no_permission` 으로 리디렉트.
+2. **레이아웃 필터링** (`src/app/admin/layout.tsx`) — 사이드바·하단 탭바에서 권한 없는 항목을 **숨김**.
+3. **메뉴 페이지 필터링** (`src/app/admin/menu/page.tsx`) — 아이템 단위 필터, 빈 그룹은 자동 숨김.
+4. **대시보드 카드 필터링** (`src/app/admin/page.tsx`) — 처리 대기·빠른 작성·최근 활동 카드 모두 권한별 분기. 권한 없는 섹션은 통째로 비노출.
+5. **API 라우트** (`src/lib/admin-auth.ts`) — `requireAdmin(request?)` 는 staff 통과(현 사양). 향후 더 세밀한 admin-only API 가 필요하면 `requireMinRole(request, "admin")` 헬퍼 추가 검토.
+
+`RLS` 는 별도 보안층이며 UI 권한과 일치하지 않을 수 있다(예: `new_family_registrations` 는 staff SELECT 허용). UI 가시성은 위 매트릭스가, DB 접근 가능성은 RLS 가 결정한다.
+
+---
+
 ## 업데이트 노트 시스템
 
 DB 없이 **파일 기반**으로 운영. 진실의 원천은 루트 `UPDATES.md` 하나.

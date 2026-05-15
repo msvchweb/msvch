@@ -1,10 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
-import { hasMasterAccess } from "@/lib/admin-auth";
 import { AdminSidebar, type AdminNavItem } from "./AdminNav";
 import { AdminGroupTabs } from "./AdminGroupTabs";
-import { AdminBottomTabBar } from "./AdminBottomTabBar";
+import {
+  AdminBottomTabBar,
+  type AdminBottomTab,
+} from "./AdminBottomTabBar";
 import { AdminTour } from "@/components/admin/AdminTour";
 import { Wrench } from "lucide-react";
+import { canAccessAdminPath } from "@/lib/admin-permissions";
 
 function roleLabel(role: string | null): string {
   if (role === "master") return "최고 관리자";
@@ -50,10 +53,14 @@ const baseNav: AdminNavItem[] = [
     icon: "inquiries",
     matchPaths: ["/admin/inquiries", "/admin/new-families"],
   },
+  { label: "회원관리", href: "/admin/members", icon: "members" },
 ];
 
-const masterOnlyNav: AdminNavItem[] = [
-  { label: "회원관리", href: "/admin/members", icon: "members" },
+const bottomTabsAll: AdminBottomTab[] = [
+  { key: "weeklies", label: "주보", href: "/admin/weeklies", icon: "weeklies" },
+  { key: "calendar", label: "교회일정", href: "/admin/calendar", icon: "calendar" },
+  { key: "gallery", label: "갤러리", href: "/admin/gallery", icon: "gallery" },
+  { key: "boards", label: "게시판", href: "/admin/boards", icon: "boards" },
 ];
 
 export default async function AdminLayout({
@@ -76,9 +83,10 @@ export default async function AdminLayout({
     role = profile?.role ?? null;
   }
 
-  const adminNav = hasMasterAccess(role)
-    ? [...baseNav, ...masterOnlyNav]
-    : baseNav;
+  const adminNav = baseNav.filter((item) => canAccessAdminPath(role, item.href));
+  const bottomTabs = bottomTabsAll.filter((tab) =>
+    canAccessAdminPath(role, tab.href),
+  );
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100">
@@ -92,7 +100,7 @@ export default async function AdminLayout({
           <AdminGroupTabs />
           <div className="p-4 sm:p-6 lg:p-8">{children}</div>
         </main>
-        <AdminBottomTabBar />
+        <AdminBottomTabBar tabs={bottomTabs} />
         <AdminTour />
       </div>
     </div>

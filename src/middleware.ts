@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { hasStaffAccess } from "@/lib/admin-auth";
+import { canAccessAdminPath } from "@/lib/admin-permissions";
 
 function loginRedirect(request: NextRequest) {
   const url = new URL("/login", request.url);
@@ -69,6 +70,13 @@ export async function middleware(request: NextRequest) {
     const role = (profile as { role?: string } | null)?.role;
     if (!hasStaffAccess(role)) {
       return NextResponse.redirect(new URL("/?notice=no_admin", request.url));
+    }
+    // 경로별 최소 권한 검증 (admin/master/staff 등급).
+    // UI 가 탭을 숨기더라도 직접 URL 입력 시 차단되는 진짜 보안 경계.
+    if (!canAccessAdminPath(role, path)) {
+      return NextResponse.redirect(
+        new URL("/admin?notice=no_permission", request.url),
+      );
     }
   }
 

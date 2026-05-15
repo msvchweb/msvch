@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { canAccessAdminPath } from "@/lib/admin-permissions";
 import { AdminTourStartButton } from "@/components/admin/AdminTourStartButton";
 import { UpdatesCard } from "./_components/UpdatesCard";
 
@@ -60,6 +61,28 @@ interface UpcomingEvent {
 
 export default async function AdminDashboard() {
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let role: string | null = null;
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single<{ role: string }>();
+    role = profile?.role ?? null;
+  }
+
+  const canNewFamilies = canAccessAdminPath(role, "/admin/new-families");
+  const canInquiries = canAccessAdminPath(role, "/admin/inquiries");
+  const canCalendar = canAccessAdminPath(role, "/admin/calendar");
+  const canNotices = canAccessAdminPath(role, "/admin/notices");
+  const canWeeklies = canAccessAdminPath(role, "/admin/weeklies");
+  const canGallery = canAccessAdminPath(role, "/admin/gallery");
+  const canBoards = canAccessAdminPath(role, "/admin/boards");
 
   const today = new Date();
   const sevenDaysLater = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
@@ -139,37 +162,45 @@ export default async function AdminDashboard() {
       </div>
 
       {/* A — 처리 대기 */}
-      <section>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-          처리 대기
-        </h2>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <ActionCard
-            href="/admin/new-families"
-            icon={UserPlus}
-            label="새가족 신청"
-            value={newFamilyPending}
-            hint={newFamilyPending > 0 ? "확인 필요" : "처리 완료"}
-            tone={newFamilyPending > 0 ? "alert" : "neutral"}
-          />
-          <ActionCard
-            href="/admin/inquiries"
-            icon={MessageSquare}
-            label="오늘 문의"
-            value={todayInquiryCount}
-            hint={todayInquiryCount > 0 ? "확인 필요" : "신규 없음"}
-            tone={todayInquiryCount > 0 ? "alert" : "neutral"}
-          />
-          <ActionCard
-            href="/admin/calendar"
-            icon={Calendar}
-            label="7일 내 일정"
-            value={upcomingEventCount}
-            hint={upcomingEventCount > 0 ? "예정됨" : "없음"}
-            tone={upcomingEventCount > 0 ? "info" : "neutral"}
-          />
-        </div>
-      </section>
+      {(canNewFamilies || canInquiries || canCalendar) && (
+        <section>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+            처리 대기
+          </h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {canNewFamilies && (
+              <ActionCard
+                href="/admin/new-families"
+                icon={UserPlus}
+                label="새가족 신청"
+                value={newFamilyPending}
+                hint={newFamilyPending > 0 ? "확인 필요" : "처리 완료"}
+                tone={newFamilyPending > 0 ? "alert" : "neutral"}
+              />
+            )}
+            {canInquiries && (
+              <ActionCard
+                href="/admin/inquiries"
+                icon={MessageSquare}
+                label="오늘 문의"
+                value={todayInquiryCount}
+                hint={todayInquiryCount > 0 ? "확인 필요" : "신규 없음"}
+                tone={todayInquiryCount > 0 ? "alert" : "neutral"}
+              />
+            )}
+            {canCalendar && (
+              <ActionCard
+                href="/admin/calendar"
+                icon={Calendar}
+                label="7일 내 일정"
+                value={upcomingEventCount}
+                hint={upcomingEventCount > 0 ? "예정됨" : "없음"}
+                tone={upcomingEventCount > 0 ? "info" : "neutral"}
+              />
+            )}
+          </div>
+        </section>
+      )}
 
       {/* D — 업데이트 노트 */}
       <section>
@@ -177,67 +208,95 @@ export default async function AdminDashboard() {
       </section>
 
       {/* C — 빠른 진입 */}
-      <section>
-        <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-          빠른 작성
-        </h2>
-        <div className="grid gap-2 sm:grid-cols-4">
-          <QuickAction href="/admin/notices" icon={Newspaper} label="공지 작성" />
-          <QuickAction href="/admin/weeklies/new" icon={FileText} label="주보 작성" />
-          <QuickAction href="/admin/calendar" icon={Calendar} label="일정 등록" />
-          <QuickAction href="/admin/gallery" icon={ImageIcon} label="앨범 만들기" />
-        </div>
-      </section>
+      {(canNotices || canWeeklies || canCalendar || canGallery) && (
+        <section>
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+            빠른 작성
+          </h2>
+          <div className="grid gap-2 sm:grid-cols-4">
+            {canNotices && (
+              <QuickAction href="/admin/notices" icon={Newspaper} label="공지 작성" />
+            )}
+            {canWeeklies && (
+              <QuickAction
+                href="/admin/weeklies/new"
+                icon={FileText}
+                label="주보 작성"
+              />
+            )}
+            {canCalendar && (
+              <QuickAction href="/admin/calendar" icon={Calendar} label="일정 등록" />
+            )}
+            {canGallery && (
+              <QuickAction
+                href="/admin/gallery"
+                icon={ImageIcon}
+                label="앨범 만들기"
+              />
+            )}
+          </div>
+        </section>
+      )}
 
       {/* B — 최근 활동 */}
-      <section className="grid gap-6 lg:grid-cols-2">
-        <RecentList
-          title="다가오는 일정"
-          emptyText="7일 내 일정 없음"
-          href="/admin/calendar"
-          items={upcomingEvents.map((e) => ({
-            id: e.id,
-            primary: e.title,
-            secondary: `${e.date}${e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}`,
-            href: "/admin/calendar",
-          }))}
-        />
-        <RecentList
-          title="최근 새가족 신청"
-          emptyText="신청 없음"
-          href="/admin/new-families"
-          items={recentNewFamily.map((n) => ({
-            id: n.id,
-            primary: n.name,
-            secondary: `${formatRelative(n.created_at)} · ${statusLabel(n.status)}`,
-            href: "/admin/new-families",
-          }))}
-        />
-        <RecentList
-          title="최근 문의"
-          emptyText="문의 없음"
-          href="/admin/inquiries"
-          items={recentInquiry.map((q) => ({
-            id: q.id,
-            primary: q.name,
-            secondary: q.message
-              ? truncate(q.message, 40)
-              : formatRelative(q.created_at),
-            href: "/admin/inquiries",
-          }))}
-        />
-        <RecentList
-          title="최근 게시판 글"
-          emptyText="새 글 없음"
-          href="/admin/boards"
-          items={recentBoardPosts.map((p) => ({
-            id: p.id,
-            primary: p.title,
-            secondary: `${p.author_name} · ${formatRelative(p.created_at)}`,
-            href: "/admin/boards",
-          }))}
-        />
-      </section>
+      {(canCalendar || canNewFamilies || canInquiries || canBoards) && (
+        <section className="grid gap-6 lg:grid-cols-2">
+          {canCalendar && (
+            <RecentList
+              title="다가오는 일정"
+              emptyText="7일 내 일정 없음"
+              href="/admin/calendar"
+              items={upcomingEvents.map((e) => ({
+                id: e.id,
+                primary: e.title,
+                secondary: `${e.date}${e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}`,
+                href: "/admin/calendar",
+              }))}
+            />
+          )}
+          {canNewFamilies && (
+            <RecentList
+              title="최근 새가족 신청"
+              emptyText="신청 없음"
+              href="/admin/new-families"
+              items={recentNewFamily.map((n) => ({
+                id: n.id,
+                primary: n.name,
+                secondary: `${formatRelative(n.created_at)} · ${statusLabel(n.status)}`,
+                href: "/admin/new-families",
+              }))}
+            />
+          )}
+          {canInquiries && (
+            <RecentList
+              title="최근 문의"
+              emptyText="문의 없음"
+              href="/admin/inquiries"
+              items={recentInquiry.map((q) => ({
+                id: q.id,
+                primary: q.name,
+                secondary: q.message
+                  ? truncate(q.message, 40)
+                  : formatRelative(q.created_at),
+                href: "/admin/inquiries",
+              }))}
+            />
+          )}
+          {canBoards && (
+            <RecentList
+              title="최근 게시판 글"
+              emptyText="새 글 없음"
+              href="/admin/boards"
+              items={recentBoardPosts.map((p) => ({
+                id: p.id,
+                primary: p.title,
+                secondary: `${p.author_name} · ${formatRelative(p.created_at)}`,
+                href: "/admin/boards",
+              }))}
+            />
+          )}
+        </section>
+      )}
     </div>
   );
 }

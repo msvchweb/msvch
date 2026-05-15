@@ -1193,6 +1193,9 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `summarizeSermonFromVideo(sermon)` | `src/lib/gemini.ts` | Gemini 설교 요약 |
 | `callGeminiWithFallback(prompt)` | `src/lib/gemini.ts` | 범용 Gemini 호출 (폴백+재시도) |
 | `requireAdmin()` | `src/lib/admin-auth.ts` | API 라우트 admin 인증 헬퍼 |
+| `canAccessAdminPath(role, path)` | `src/lib/admin-permissions.ts` | 경로별 최소 권한 검증 — 미들웨어·UI 필터링 공통 |
+| `meetsMinRole(role, min)` | `src/lib/admin-permissions.ts` | role 등급 비교 (staff < admin < master) |
+| `getMinRoleForPath(path)` | `src/lib/admin-permissions.ts` | 경로 prefix → 최소 권한(가장 긴 매칭 우선) |
 | `loadUpdates()` | `src/lib/updates.ts` | 루트 `UPDATES.md` 파싱 → `UpdateEntry[]` (날짜 내림차순) |
 | `parseUpdates(md)` | `src/lib/updates.ts` | 순수 함수 — 마크다운 문자열을 `UpdateEntry[]`로 |
 | `stripMetaComments(body)` | `src/lib/updates.ts` | `<!-- highlight -->`, `<!-- staff-only -->` 제거 |
@@ -1203,6 +1206,23 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `validateFile(file, exts, maxSize)` | `src/lib/validation.ts` | 파일 업로드 검증 (타입 + 크기) |
 | `safeExtension(filename, allowed)` | `src/lib/validation.ts` | 안전한 확장자 추출 |
 | `parseLimit(raw, fallback)` | `src/lib/validation.ts` | limit 파라미터 파싱 (상한 100) |
+
+---
+
+## 관리자 권한 매트릭스 (페이지 라우트)
+
+`src/lib/admin-permissions.ts` 의 `ADMIN_ROUTE_PERMISSIONS` 가 단일 진실의 원천. 자세한 표는 `ARCHIT.md` 의 "관리자 권한 매트릭스" 섹션 참조.
+
+| 등급 | 포함 경로 |
+|------|----------|
+| **admin 이상** | `/admin/notices`, `/admin/weeklies`, `/admin/masters`, `/admin/calendar`, `/admin/event-subscribers`, `/admin/inquiries`, `/admin/new-families` |
+| **staff 이상** | `/admin/gallery`, `/admin/boards`, `/admin/posters`, `/admin/sermons`, `/admin/shorts` |
+| **master 단독** | `/admin/members` |
+| **공통(staff 이상)** | `/admin`, `/admin/menu`, `/admin/guide`, `/admin/updates` |
+
+미들웨어가 부족 권한 시 `/admin?notice=no_permission` 으로 리디렉트. UI 사이드바·하단 탭바·메뉴 페이지는 자동으로 권한 없는 항목을 숨긴다.
+
+API 라우트(`/api/admin/*`)는 위 페이지 매트릭스와 **별개**로 `requireAdmin()`(staff 통과) 또는 `requireMaster()`로 보호된다. 즉 staff 도 `/api/admin/notices` 등을 호출할 수 있으나 페이지 진입은 admin 이상에서만 가능 — 직접 fetch 경로는 별도 점검 필요.
 
 ---
 

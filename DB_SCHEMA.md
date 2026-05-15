@@ -5,6 +5,12 @@ Supabase (PostgreSQL) 기반. 모든 테이블에 Row Level Security(RLS) 적용
 > **DB 외 영속 데이터**: 업데이트 노트(릴리스 노트)는 의도적으로 DB가 아닌
 > 루트 `UPDATES.md` 파일에 저장. 단순성·Git history audit·검토 용이성을 우선한 결정.
 > 자세한 흐름은 `ARCHIT.md` "업데이트 노트 시스템" 섹션 참고.
+>
+> **UI 권한 vs RLS**: 관리자 페이지의 가시성은 `src/lib/admin-permissions.ts` 의
+> 매트릭스(staff/admin/master 등급)와 미들웨어가 결정하며, DB 접근 가능성은 RLS 가
+> 별도로 결정한다. 양자가 항상 일치하지는 않는다 — 예: `new_family_registrations`
+> 의 SELECT 는 staff 에게도 허용되어 있으나 페이지 `/admin/new-families` 는 admin 이상만
+> 진입 가능. RLS 는 백엔드의 최종 방어선이며, UI 가시성과는 독립적으로 운영한다.
 
 ---
 

@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { hasMasterAccess } from "@/lib/admin-auth";
+import { canAccessAdminPath } from "@/lib/admin-permissions";
 import { navTourKey } from "@/components/admin/nav-tour-keys";
 
 interface MenuItem {
@@ -32,7 +32,7 @@ interface MenuGroup {
   items: MenuItem[];
 }
 
-const baseGroups: MenuGroup[] = [
+const allGroups: MenuGroup[] = [
   {
     title: "대시보드",
     items: [
@@ -141,19 +141,18 @@ const baseGroups: MenuGroup[] = [
       },
     ],
   },
+  {
+    title: "회원관리",
+    items: [
+      {
+        label: "회원관리",
+        href: "/admin/members",
+        description: "권한·역할 관리",
+        icon: Users,
+      },
+    ],
+  },
 ];
-
-const masterOnlyGroup: MenuGroup = {
-  title: "회원관리",
-  items: [
-    {
-      label: "회원관리",
-      href: "/admin/members",
-      description: "권한·역할 관리",
-      icon: Users,
-    },
-  ],
-};
 
 export default async function AdminMenuPage() {
   const supabase = await createClient();
@@ -171,9 +170,12 @@ export default async function AdminMenuPage() {
     role = profile?.role ?? null;
   }
 
-  const groups = hasMasterAccess(role)
-    ? [...baseGroups, masterOnlyGroup]
-    : baseGroups;
+  const groups = allGroups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((it) => canAccessAdminPath(role, it.href)),
+    }))
+    .filter((g) => g.items.length > 0);
 
   return (
     <div>
