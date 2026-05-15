@@ -26,6 +26,18 @@
 
 ---
 
+## 2026-05-15 — RLS 정책을 UI 권한과 일치 (마이그 037)
+
+<!-- highlight -->
+<!-- staff-only -->
+
+- 일부 테이블의 staff 등급 정책을 `is_admin_or_master()` 로 좁힘 — UI 매트릭스와 일치.
+- 적용 대상: notices, weeklies(+Storage), 주보 마스터 5종, events INSERT/UPDATE, event_subscribers SELECT, alimtalk_sent SELECT, chat_inquiries SELECT, new_family_registrations SELECT/UPDATE, Storage `blog-images`.
+- 보존: 공개 SELECT(공지/주보/일정/설교), 작성자 본인 DELETE(021), anon INSERT(챗봇·새가족 폼).
+- 마이그레이션 파일: `supabase/migrations/037_align_rls_with_ui_matrix.sql` — **원격 Supabase 에 수동 적용 필요**.
+
+---
+
 ## 2026-05-15 — 관리자 메뉴 권한 매트릭스 정식 적용
 
 <!-- highlight -->

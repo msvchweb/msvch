@@ -6,11 +6,14 @@ Supabase (PostgreSQL) 기반. 모든 테이블에 Row Level Security(RLS) 적용
 > 루트 `UPDATES.md` 파일에 저장. 단순성·Git history audit·검토 용이성을 우선한 결정.
 > 자세한 흐름은 `ARCHIT.md` "업데이트 노트 시스템" 섹션 참고.
 >
-> **UI 권한 vs RLS**: 관리자 페이지의 가시성은 `src/lib/admin-permissions.ts` 의
-> 매트릭스(staff/admin/master 등급)와 미들웨어가 결정하며, DB 접근 가능성은 RLS 가
-> 별도로 결정한다. 양자가 항상 일치하지는 않는다 — 예: `new_family_registrations`
-> 의 SELECT 는 staff 에게도 허용되어 있으나 페이지 `/admin/new-families` 는 admin 이상만
-> 진입 가능. RLS 는 백엔드의 최종 방어선이며, UI 가시성과는 독립적으로 운영한다.
+> **UI 권한 ≈ RLS (037 이후 정렬 완료)**: 관리자 페이지의 가시성과 RLS 가
+> admin/master 등급에서 일치한다 — 마이그레이션 037 적용 후. 페이지가 admin+ 인
+> 테이블은 RLS 도 admin/master 만 INSERT/UPDATE/SELECT-all 가능.
+> 예외 정책(보존):
+> - 공개 SELECT — `notices(is_public)`, `weeklies`, `events`, `churchschool_posts`, `sermon_videos` 등은 공개 페이지에서 anon 가 읽음.
+> - 작성자 본인 DELETE — 021 패턴, `notices/weeklies/gallery_albums/events` 의 본인 작성 글은 작성자 SELECT/DELETE 가능.
+> - anon INSERT — `chat_inquiries`(챗봇), `new_family_registrations`(공개 폼).
+> - service_role / cron — RLS 우회.
 
 ---
 
@@ -954,3 +957,4 @@ interface ShortsClip {
 | `034_events_source_weekly.sql` | events 테이블에 AI 추출 추적 컬럼 3개 (`source_weekly_id` FK + `source_news_index` + `extracted_by_ai`) + 부분 인덱스. 주보 "교회소식" → 일정 AI 추출 (Gemini) 결과 추적 |
 | `035_profiles_lock_down.sql` | profiles SELECT 정책 좁히기 — 본인 행 OR staff 만 SELECT 가능. anon 의 전 회원 정보 조회 차단 (PIPA 위반 차단) |
 | `036_drop_weeklies_pdf_url.sql` | weeklies.pdf_url 컬럼 DROP — PDF 자동 생성 라우트가 모든 호출 동선을 잃어 dead 상태. 컬럼/라우트/puppeteer 의존성(@sparticuz/chromium*, puppeteer-core) 일괄 정리. Storage 버킷 'weeklies' 와 정책은 보존 |
+| `037_align_rls_with_ui_matrix.sql` | UI 매트릭스(`src/lib/admin-permissions.ts`)와 RLS 일치. notices / weeklies(+storage) / weekly masters(church_settings·mokjang_entries·servants·support_sections·community_prayers) / events INSERT·UPDATE / event_subscribers SELECT / alimtalk_sent SELECT / chat_inquiries SELECT / new_family_registrations SELECT·UPDATE / storage 'blog-images' 의 staff 정책을 `is_admin_or_master()` 로 좁힘. 공개 SELECT, 작성자 본인 DELETE(021), anon INSERT(chat/new-family) 흐름은 보존 |
