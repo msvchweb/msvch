@@ -16,10 +16,21 @@ export interface UpdateEntry {
 /** "## YYYY-MM-DD — 제목" 헤더 (em-dash, en-dash, hyphen 모두 허용) */
 const HEADER_RE = /^##\s+(\d{4}-\d{2}-\d{2})\s*[—–-]\s*(.+?)\s*$/gm;
 
+/**
+ * 코드 펜스(```...```) 내부 글자를 공백으로 치환해 인덱스를 보존한 채 마스킹한다.
+ * 템플릿/예시 안의 "## YYYY-MM-DD" 헤더가 진짜 항목으로 잡히지 않도록 막는 용도.
+ */
+function maskFencedCode(markdown: string): string {
+  return markdown.replace(/```[\s\S]*?```/g, (block) =>
+    block.replace(/[^\n]/g, " "),
+  );
+}
+
 export function parseUpdates(markdown: string): UpdateEntry[] {
+  const masked = maskFencedCode(markdown);
   const entries: UpdateEntry[] = [];
   const matches: Array<RegExpMatchArray> = [];
-  for (const m of markdown.matchAll(HEADER_RE)) matches.push(m);
+  for (const m of masked.matchAll(HEADER_RE)) matches.push(m);
 
   for (let i = 0; i < matches.length; i++) {
     const m = matches[i];
@@ -27,14 +38,17 @@ export function parseUpdates(markdown: string): UpdateEntry[] {
     const start = m.index + m[0].length;
     const nextIdx = matches[i + 1]?.index;
     const end = nextIdx ?? markdown.length;
+    // 본문은 마스킹 전 원본에서 자른다 — 코드블록 내용도 그대로 보존.
     const body = markdown.slice(start, end).trim();
+    // 메타 주석 검출은 마스킹된 본문에서 — 템플릿 안의 예시 주석이 잘못 잡히지 않게.
+    const bodyMasked = masked.slice(start, end);
 
     entries.push({
       date: m[1],
       title: m[2],
       body,
-      highlight: /<!--\s*highlight\s*-->/i.test(body),
-      staffOnly: /<!--\s*staff-only\s*-->/i.test(body),
+      highlight: /<!--\s*highlight\s*-->/i.test(bodyMasked),
+      staffOnly: /<!--\s*staff-only\s*-->/i.test(bodyMasked),
     });
   }
 
