@@ -1,5 +1,3 @@
-import { LiturgyChip } from "@/components/liturgy/LiturgyChip";
-
 export function PageHeader({
   title,
   description,
@@ -21,7 +19,6 @@ export function PageHeader({
         {description && (
           <p className="mx-auto max-w-xl text-gray-500">{description}</p>
         )}
-        <LiturgyChip className="mt-4" />
       </div>
     </div>
   );
