@@ -385,7 +385,7 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
   return (
     <div className="space-y-1">
       <section>
-        <div className="flex items-baseline justify-between border-b-2 border-blue-800 mb-1">
+        <div className="flex items-baseline justify-between border-b-2 border-liturgy mb-1">
           <h3 className="text-sm font-bold">교회소식</h3>
           <div className="text-[9px] text-gray-600 leading-tight text-right">
             저희 교회를 찾아 주신 모든 분들을 진심으로 사랑하고 환영합니다.
@@ -639,7 +639,7 @@ export function BulletinFrontRight({ data }: { data: FrontData }) {
 
       {/* 주일예배 */}
       <section>
-        <div className="flex items-baseline justify-between border-b-2 border-blue-800 mb-1">
+        <div className="flex items-baseline justify-between border-b-2 border-liturgy mb-1">
           <h3 className="text-sm font-bold">주일예배</h3>
           <span className="text-[10px] font-bold">{data.sundayTimes}</span>
         </div>

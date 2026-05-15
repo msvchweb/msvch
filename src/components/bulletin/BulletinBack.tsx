@@ -389,7 +389,7 @@ export function BulletinBackLeft({ data }: { data: BulletinBackData }) {
       </div>
 
       <section className="mb-1">
-        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-1">
+        <h3 className="text-sm font-bold border-b-2 border-liturgy mb-1">
           새벽 예배(신앙일기)
         </h3>
         <table className="w-full text-xs border-collapse table-fixed">
@@ -435,7 +435,7 @@ export function BulletinBackLeft({ data }: { data: BulletinBackData }) {
       </section>
 
       <section className="mb-1">
-        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-1">
+        <h3 className="text-sm font-bold border-b-2 border-liturgy mb-1">
           교회공동체 기도제목
         </h3>
         <ol className="leading-tight" style={{ fontSize: "11px" }}>
@@ -449,7 +449,7 @@ export function BulletinBackLeft({ data }: { data: BulletinBackData }) {
       </section>
 
       <section className="mb-1">
-        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-1">
+        <h3 className="text-sm font-bold border-b-2 border-liturgy mb-1">
           예배모임 안내
         </h3>
         <table className="w-full text-xs border-collapse" style={{ zoom: 0.95 }}>
@@ -495,7 +495,7 @@ export function BulletinBackRight({ data }: { data: BulletinBackData }) {
   return (
     <div>
       <section className="mb-4">
-        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-2">
+        <h3 className="text-sm font-bold border-b-2 border-liturgy mb-2">
           2026년도 소그룹 목장
         </h3>
         <div className="grid grid-cols-4 gap-x-2 text-[10px]" style={{ zoom: 0.95 }}>
@@ -511,7 +511,7 @@ export function BulletinBackRight({ data }: { data: BulletinBackData }) {
       </section>
 
       <section>
-        <h3 className="text-sm font-bold border-b-2 border-blue-800 mb-2">
+        <h3 className="text-sm font-bold border-b-2 border-liturgy mb-2">
           향기로운 예물
         </h3>
         <div className="space-y-0 text-[11px]" style={{ zoom: 1 }}>
@@ -571,7 +571,7 @@ function ServiceSection({
 }) {
   return (
     <div className="mb-1">
-      <div className="border-b-2 border-blue-800 mb-1">
+      <div className="border-b-2 border-liturgy mb-1">
         <span className="text-sm font-bold">{title}</span>
       </div>
       <div className="text-[10px] text-gray-600 mb-1">{time}&nbsp;/&nbsp;인도 : {leader}</div>
@@ -622,7 +622,7 @@ function ServiceSection({
 function MokjangSection() {
   return (
     <div className="mb-1">
-      <div className="border-b-2 border-blue-800 mb-1">
+      <div className="border-b-2 border-liturgy mb-1">
         <span className="text-sm font-bold">주일오후 찬양예배</span>
       </div>
       <div className="flex flex-col items-center">
