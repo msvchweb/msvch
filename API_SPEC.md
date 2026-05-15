@@ -71,6 +71,43 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 
 ---
 
+### GET `/api/updates`
+
+루트 `UPDATES.md` 파일을 파싱해 업데이트 노트(릴리스 노트)를 JSON으로 반환한다.
+**향후 모바일 앱이 동일 URL을 인증 없이 호출** — 스키마 안정성을 보증한다.
+
+- **인증**: 불필요
+- **쿼리 파라미터** (모두 선택):
+  - `limit` — 1~50 정수, 기본 20
+  - `since` — `YYYY-MM-DD`, 해당 날짜 이후 항목만 (포함)
+- **필터링**: `<!-- staff-only -->` 주석이 있는 항목은 서버에서 **제외** (관리자 대시보드/`/admin/updates` 에만 노출)
+- **응답 (200)**:
+
+```ts
+interface PublicUpdateItem {
+  date: string;     // YYYY-MM-DD (KST 의미)
+  title: string;
+  body: string;     // 마크다운 본문 (메타 주석 제거 후)
+  highlight: boolean;
+}
+
+interface UpdatesResponse {
+  items: PublicUpdateItem[];
+}
+```
+
+- **캐시**: `revalidate = 3600` + `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`
+- **부작용**: 없음 (read-only)
+- **모바일 호환 계약**: 응답 필드 추가는 허용, 삭제/이름 변경/타입 변경 금지
+
+**예시 호출**
+
+```bash
+curl https://msvch.vercel.app/api/updates?limit=10&since=2026-05-01
+```
+
+---
+
 ### POST `/api/revalidate`
 
 온디맨드 ISR 캐시 무효화 (서버-서버용 — naver-blog-sync 스크립트, 외부 cron 등).
@@ -1156,6 +1193,9 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `summarizeSermonFromVideo(sermon)` | `src/lib/gemini.ts` | Gemini 설교 요약 |
 | `callGeminiWithFallback(prompt)` | `src/lib/gemini.ts` | 범용 Gemini 호출 (폴백+재시도) |
 | `requireAdmin()` | `src/lib/admin-auth.ts` | API 라우트 admin 인증 헬퍼 |
+| `loadUpdates()` | `src/lib/updates.ts` | 루트 `UPDATES.md` 파싱 → `UpdateEntry[]` (날짜 내림차순) |
+| `parseUpdates(md)` | `src/lib/updates.ts` | 순수 함수 — 마크다운 문자열을 `UpdateEntry[]`로 |
+| `stripMetaComments(body)` | `src/lib/updates.ts` | `<!-- highlight -->`, `<!-- staff-only -->` 제거 |
 | `getUpcomingEvents(max, days)` | `src/lib/google-calendar.ts` | Google Calendar 다가오는 이벤트 |
 | `getAllEvents(max)` | `src/lib/google-calendar.ts` | 관리자용 이벤트 목록 (과거 30일 포함) |
 | `createCalendarEvent(input)` | `src/lib/google-calendar.ts` | 이벤트 생성 (Service Account) |

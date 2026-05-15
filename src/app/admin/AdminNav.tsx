@@ -79,7 +79,7 @@ function isActive(pathname: string, item: AdminNavItem): boolean {
 export function AdminSidebar({ items }: { items: AdminNavItem[] }) {
   const pathname = usePathname();
   return (
-    <aside className="hidden w-60 shrink-0 border-r border-gray-200 bg-gray-50 p-4 lg:block">
+    <aside className="hidden w-60 shrink-0 border-r border-slate-300 bg-slate-200 p-4 lg:block">
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
         관리자
       </h2>

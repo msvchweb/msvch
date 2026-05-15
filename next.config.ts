@@ -2,6 +2,12 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min"],
+  outputFileTracingIncludes: {
+    "/api/updates": ["./UPDATES.md"],
+    "/admin": ["./UPDATES.md"],
+    "/admin/updates": ["./UPDATES.md"],
+    "/updates": ["./UPDATES.md"],
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.ytimg.com" },

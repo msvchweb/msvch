@@ -42,6 +42,7 @@ src/
 │   │   ├── notice/              # 공지사항
 │   │   ├── sermons/             # 말씀영상
 │   │   ├── staff/               # 섬기는 이들
+│   │   ├── updates/             # 업데이트 노트 (UPDATES.md 파싱, 일반 공개)
 │   │   ├── volunteer-center/    # 봉사센터 (반찬/이미용/문화/탁구)
 │   │   ├── weekly/              # 주보
 │   │   └── worship/             # 예배안내 (시간표 통합)
@@ -58,10 +59,13 @@ src/
 │   │   └── profile/
 │   │
 │   ├── admin/                   # 관리자 전용 (미들웨어 보호 — staff/admin/master)
-│   │   ├── layout.tsx           # PC 사이드바 + 모바일 상단 가로 스크롤 탭
-│   │   ├── AdminNav.tsx         # 사이드바/모바일탭 클라이언트 컴포넌트
+│   │   ├── layout.tsx           # 슬레이트 배경 + 노란 "관리자 모드" 띠 + PC 사이드바 + 모바일 탭
+│   │   ├── AdminNav.tsx         # 사이드바/모바일탭 클라이언트 컴포넌트 (슬레이트 톤)
 │   │   ├── AdminBottomTabBar.tsx# 관리자 하단 탭 (모바일)
 │   │   ├── AdminGroupTabs.tsx   # 그룹 페이지 상단 가로 탭
+│   │   ├── _components/         # 대시보드 전용 서버 컴포넌트
+│   │   │   └── UpdatesCard.tsx  # 업데이트 노트 카드 (UPDATES.md 상위 5개)
+│   │   ├── updates/             # 업데이트 노트 전체 보기 (staff-only 포함)
 │   │   ├── menu/                # 전체 메뉴 (모바일 더보기 진입점, 카드 그리드)
 │   │   ├── guide/               # 관리자 가이드 (공지/갤러리/주보/포스터/문의 사용법)
 │   │   ├── posters/             # 포스터 도구 (PromptBuilder + Finalizer 두 패널)
@@ -822,6 +826,7 @@ admin/boards/[id]/members 페이지
 |------|------|-----|
 | 홈페이지 | ISR | 1시간 (`revalidate: 3600`) |
 | 설교 목록 | ISR (DB read) | 1시간 (`revalidate: 3600`) — YouTube fetch 는 cron 시점만 |
+| 업데이트 노트 (`/api/updates`, `/updates`, 관리자 카드) | ISR (파일 read) | 1시간 (`revalidate: 3600`) |
 | 정적 페이지 (예배, 소개 등) | Static (빌드 시) | - |
 | 공지사항 | Dynamic (매 요청) | - |
 | 온디맨드 무효화 | POST `/api/revalidate` | - |
@@ -857,6 +862,47 @@ admin/boards/[id]/members 페이지
 - `lg` (1024px): 데스크톱 Header nav 표시 / 탭바 숨김
 - `md` (768px): 그리드 레이아웃 변경
 - `sm` (640px): 2열 그리드 시작
+
+---
+
+## 업데이트 노트 시스템
+
+DB 없이 **파일 기반**으로 운영. 진실의 원천은 루트 `UPDATES.md` 하나.
+
+```
+[루트 UPDATES.md]  ← 사람이 직접 편집(또는 Claude가 사용자 지시로 갱신)
+        │
+        │ build/runtime read + parse
+        ▼
+[src/lib/updates.ts]  ← loadUpdates(), parseUpdates(), stripMetaComments()
+        │
+        ├──► [관리자 대시보드 카드]  src/app/admin/_components/UpdatesCard.tsx
+        │     상위 5개 + staff-only 포함
+        │
+        ├──► [관리자 전체보기]  src/app/admin/updates/page.tsx
+        │     전체 목록 + staff-only 포함
+        │
+        ├──► [GET /api/updates]  공개 JSON (staff-only 제외)
+        │     모바일 앱 / 외부 통합 동일 엔드포인트
+        │
+        └──► [공개 페이지 /updates]  src/app/(public)/updates/page.tsx
+              staff-only 제외, 타임라인 UI
+```
+
+**메타 주석**
+
+- `<!-- highlight -->` — 카드/공개 페이지에서 **NEW** 배지 표시
+- `<!-- staff-only -->` — 관리자 전용 (공개 API/공개 페이지에서 제외)
+
+**Vercel 트레이싱**
+
+`next.config.ts` 의 `outputFileTracingIncludes` 에 `UPDATES.md` 경로를 명시 — Vercel Functions
+번들에 파일이 포함되어 production 런타임에서 `fs.readFile` 가 동작한다.
+
+**갱신 절차**
+
+1. `UPDATES.md` 상단에 `## YYYY-MM-DD — 제목` 섹션 추가
+2. 커밋 → push → Vercel 재배포 → 1시간 내 (또는 `/api/revalidate` 호출 후 즉시) 반영
 
 ---
 

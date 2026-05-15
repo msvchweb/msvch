@@ -4,6 +4,14 @@ import { AdminSidebar, type AdminNavItem } from "./AdminNav";
 import { AdminGroupTabs } from "./AdminGroupTabs";
 import { AdminBottomTabBar } from "./AdminBottomTabBar";
 import { AdminTour } from "@/components/admin/AdminTour";
+import { Wrench } from "lucide-react";
+
+function roleLabel(role: string | null): string {
+  if (role === "master") return "최고 관리자";
+  if (role === "admin") return "관리자";
+  if (role === "staff") return "직원";
+  return "관리자";
+}
 
 const baseNav: AdminNavItem[] = [
   { label: "대시보드", href: "/admin", icon: "dashboard" },
@@ -73,14 +81,20 @@ export default async function AdminLayout({
     : baseNav;
 
   return (
-    <div className="lg:flex lg:min-h-[calc(100vh-4rem)]">
-      <AdminSidebar items={adminNav} />
-      <main className="min-w-0 flex-1 pb-20 lg:pb-0">
-        <AdminGroupTabs />
-        <div className="p-4 sm:p-6 lg:p-8">{children}</div>
-      </main>
-      <AdminBottomTabBar />
-      <AdminTour />
+    <div className="min-h-[calc(100vh-4rem)] bg-slate-100">
+      <div className="flex items-center justify-center gap-1.5 bg-amber-400 px-4 py-1.5 text-xs font-semibold text-slate-900">
+        <Wrench size={12} aria-hidden />
+        <span>관리자 모드 · {roleLabel(role)}</span>
+      </div>
+      <div className="lg:flex">
+        <AdminSidebar items={adminNav} />
+        <main className="min-w-0 flex-1 pb-20 lg:pb-0">
+          <AdminGroupTabs />
+          <div className="p-4 sm:p-6 lg:p-8">{children}</div>
+        </main>
+        <AdminBottomTabBar />
+        <AdminTour />
+      </div>
     </div>
   );
 }

@@ -13,6 +13,7 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { AdminTourStartButton } from "@/components/admin/AdminTourStartButton";
+import { UpdatesCard } from "./_components/UpdatesCard";
 
 export const metadata: Metadata = { title: "관리자 대시보드" };
 
@@ -168,6 +169,11 @@ export default async function AdminDashboard() {
             tone={upcomingEventCount > 0 ? "info" : "neutral"}
           />
         </div>
+      </section>
+
+      {/* D — 업데이트 노트 */}
+      <section>
+        <UpdatesCard />
       </section>
 
       {/* C — 빠른 진입 */}
