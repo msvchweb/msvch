@@ -1,6 +1,7 @@
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { getUpcomingEvents } from "@/lib/events";
+import { getLiturgicalEventsInRange } from "@/lib/liturgical/calendar";
 import { CalendarView } from "./CalendarView";
 import type { Metadata } from "next";
 import type { CalendarEvent } from "@/types/calendar";
@@ -35,6 +36,21 @@ export default async function CalendarPage() {
     return key >= rangeStart && key <= rangeEnd;
   });
 
+  // 같은 범위의 절기 가상 이벤트(부활/성탄/대림 등) 합치기. KST 기준.
+  const liturgyEvents = getLiturgicalEventsInRange(rangeStart, rangeEnd);
+
+  const merged: CalendarEvent[] = [...rangeEvents, ...liturgyEvents].sort(
+    (a, b) => {
+      const ak = eventDateKey(a);
+      const bk = eventDateKey(b);
+      if (ak !== bk) return ak.localeCompare(bk);
+      // 같은 날짜에 절기 이벤트를 위로
+      const aLi = a.liturgical ? 0 : 1;
+      const bLi = b.liturgical ? 0 : 1;
+      return aLi - bLi;
+    },
+  );
+
   return (
     <>
       <PageHeader
@@ -44,7 +60,7 @@ export default async function CalendarPage() {
       <Container>
         <div className="mx-auto max-w-3xl">
           <CalendarView
-            events={rangeEvents}
+            events={merged}
             currentYear={currentYear}
             currentMonth={currentMonth}
             nextYear={nextYear}

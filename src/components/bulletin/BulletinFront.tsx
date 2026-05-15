@@ -2,6 +2,9 @@ import Image from "next/image";
 import type { Weekly } from "@/types/notice";
 import type { BulletinMasterData } from "@/types/bulletin-master";
 import { stripLeadingNumber } from "@/components/weekly/form/shared";
+import { getLiturgicalDay } from "@/lib/liturgical/season";
+import { formatLiturgyLabel } from "@/lib/liturgical/format";
+import type { LiturgicalSeason } from "@/lib/liturgical/types";
 
 // 1페이지 주일예배 표: 숫자만 입력해도 라벨에 따라 단위 자동 부여.
 //   "성 시 교 독" → 98 → "98번"
@@ -100,6 +103,10 @@ export interface FrontData {
   volume: string;
   issue: string;
   dateStr: string;
+  /** "사순 4주" / "성탄절" / "평주일" 등 — 주보 발행일(weekly.date) 기반 자동 계산 */
+  liturgyLabel: string;
+  /** CSS data-season 변수 분기용 절기 키 */
+  liturgySeason: LiturgicalSeason;
   vision: { text: string; ref: string; emphasis?: boolean }[];
   topicOfYear: string;
   sundayTimes: string;
@@ -133,6 +140,8 @@ const DEFAULT: FrontData = {
   volume: "47",
   issue: "16",
   dateStr: "2026년 4월 19일",
+  liturgyLabel: "평주일",
+  liturgySeason: "ordinary_after_pentecost",
   vision: [
     { text: "예배는 Life! 생명이다.", ref: "(요 4:23-24)" },
     { text: "제자는 Training! 훈련이다.", ref: "(골 1:28-29)", emphasis: true },
@@ -307,6 +316,11 @@ export function weeklyToFrontData(
   if (w.date) {
     const d = new Date(w.date + "T00:00:00");
     data.dateStr = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일`;
+    // 주보 발행일 기준 절기 계산 (KST). w.date 는 YYYY-MM-DD.
+    const ref = new Date(w.date + "T00:00:00+09:00");
+    const day = getLiturgicalDay(ref);
+    data.liturgyLabel = formatLiturgyLabel(day);
+    data.liturgySeason = day.season;
   }
 
   // ── 마스터 데이터 (live reference)
@@ -356,6 +370,8 @@ export function weeklyToFrontData(
 
 // ⚠️ LAYOUT LOCKED — 이 컴포넌트의 레이아웃·스타일·구조를 임의로 변경하지 말 것.
 // DB 연동 시 데이터만 교체하고 렌더링 코드는 건드리지 않는다.
+// 예외: 페이지 상단 2mm 절기색 띠와 masthead 의 절기 칩 1개는 추가 허용 (절기색 시스템).
+// 그 외 레이아웃·구조 변경은 여전히 금지.
 // slice 상한선은 레이아웃 고정을 위한 안전망이므로 제거하지 말 것.
 /** 페이지 4: 앞면 좌측 — 교회소식 + 섬기는 분들 / 후원하는 분들 */
 export function BulletinFrontLeft({ data }: { data: FrontData }) {
@@ -547,6 +563,8 @@ export function BulletinFrontLeft({ data }: { data: FrontData }) {
 
 // ⚠️ LAYOUT LOCKED — 이 컴포넌트의 레이아웃·스타일·구조를 임의로 변경하지 말 것.
 // DB 연동 시 데이터만 교체하고 렌더링 코드는 건드리지 않는다.
+// 예외: 페이지 상단 2mm 절기색 띠와 masthead 의 절기 칩 1개는 추가 허용 (절기색 시스템).
+// 그 외 레이아웃·구조 변경은 여전히 금지.
 /** 페이지 1: 앞면 우측 — 5대 비전 + 제호 + 주일예배 + 금주 암송말씀 */
 export function BulletinFrontRight({ data }: { data: FrontData }) {
   return (
@@ -577,8 +595,17 @@ export function BulletinFrontRight({ data }: { data: FrontData }) {
 
         {/* 제호 영역 */}
         <div className="text-right flex flex-col">
-          <div className="text-[11px] font-bold mb-1">
-            {data.volume}권 {data.issue}호 &nbsp;/&nbsp; {data.dateStr}
+          <div className="text-[11px] font-bold mb-1 flex items-center justify-end gap-2">
+            <span>{data.volume}권 {data.issue}호 &nbsp;/&nbsp; {data.dateStr}</span>
+            <span
+              className="rounded-sm px-1.5 py-0.5 text-[9px] font-semibold"
+              style={{
+                background: "var(--liturgy-soft)",
+                color: "var(--liturgy-strong)",
+              }}
+            >
+              {data.liturgyLabel}
+            </span>
           </div>
           <div className="flex justify-end mb-1">
             <Image

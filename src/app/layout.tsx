@@ -3,6 +3,7 @@ import { Footer } from "@/components/layout/Footer";
 import { NavigationShell } from "@/components/layout/NavigationShell";
 import { NoticeBanner } from "@/components/layout/NoticeBanner";
 import { ChatBot } from "@/components/chat/ChatBot";
+import { getLiturgicalDay } from "@/lib/liturgical/season";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -37,8 +38,14 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const day = getLiturgicalDay();
   return (
-    <html lang="ko" className="h-full antialiased">
+    <html
+      lang="ko"
+      className="h-full antialiased"
+      data-season={day.season}
+      data-liturgy-week={day.week ?? undefined}
+    >
       <body className="flex min-h-full flex-col font-sans">
         <NavigationShell />
         <main className="flex-1 pb-14 lg:pb-0">{children}</main>

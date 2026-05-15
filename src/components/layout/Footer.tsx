@@ -6,8 +6,8 @@ import { InstagramIcon } from "@/components/icons/InstagramIcon";
 export function Footer() {
   return (
     <footer className="bg-church-dark text-gray-400">
-      {/* Gold accent line */}
-      <div className="h-0.5 bg-gradient-to-r from-transparent via-church-gold to-transparent" />
+      {/* Brand accent line — 평주일엔 church-gold, 절기엔 해당 절기색 */}
+      <div className="h-0.5 bg-gradient-to-r from-transparent via-liturgy-brand to-transparent" />
 
       <div className="mx-auto max-w-7xl px-4 py-14 lg:px-8">
         <div className="grid gap-10 md:grid-cols-3">

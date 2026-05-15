@@ -141,7 +141,7 @@ export function Header() {
               >
                 {item.label}
                 {hasBadge(item, dots) && <RedDot />}
-                <span className="absolute inset-x-3.5 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full bg-primary-600 transition-transform group-hover:scale-x-100" />
+                <span className="absolute inset-x-3.5 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full bg-liturgy-brand transition-transform group-hover:scale-x-100" />
               </Link>
               {item.children && (
                 <div className="invisible absolute left-1/2 top-full z-50 min-w-[180px] -translate-x-1/2 pt-2 opacity-0 transition-all duration-200 group-hover:visible group-hover:opacity-100">

@@ -76,6 +76,8 @@ function Pane({ children }: { children: ReactNode }) {
 
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      {/* 절기색 띠 — 평주일엔 녹색, 절기엔 해당 색 (var(--liturgy-base)) */}
+      <div className="h-1 w-full" style={{ background: "var(--liturgy-base)" }} />
       <div
         ref={outerRef}
         className="relative w-full overflow-hidden"

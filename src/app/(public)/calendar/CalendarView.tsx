@@ -117,19 +117,38 @@ function DayPopover({ events, dateStr, alignRight }: DayPopoverProps) {
       <ul className="space-y-2">
         {events.map((ev) => (
           <li key={ev.id} className="text-sm leading-tight">
-            <p className="font-medium text-gray-900">{ev.title}</p>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
-              <span className="flex items-center gap-1">
-                {ev.isAllDay ? <Calendar size={11} /> : <Clock size={11} />}
-                {formatEventTimeRange(ev)}
-              </span>
-              {ev.location && (
-                <span className="flex items-center gap-1 text-gray-400">
-                  <MapPin size={11} />
-                  {ev.location}
+            {ev.liturgical ? (
+              <p
+                className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 font-semibold"
+                style={{
+                  background: ev.liturgical.colorSoft,
+                  color: ev.liturgical.colorStrong,
+                }}
+              >
+                <span
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{ background: ev.liturgical.colorStrong }}
+                  aria-hidden
+                />
+                {ev.title}
+              </p>
+            ) : (
+              <p className="font-medium text-gray-900">{ev.title}</p>
+            )}
+            {!ev.liturgical && (
+              <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  {ev.isAllDay ? <Calendar size={11} /> : <Clock size={11} />}
+                  {formatEventTimeRange(ev)}
                 </span>
-              )}
-            </p>
+                {ev.location && (
+                  <span className="flex items-center gap-1 text-gray-400">
+                    <MapPin size={11} />
+                    {ev.location}
+                  </span>
+                )}
+              </p>
+            )}
           </li>
         ))}
       </ul>
@@ -204,9 +223,21 @@ function MonthGrid({ year, month, eventsByDate }: MonthGridProps) {
               ) : (
                 day.date
               )}
-              {hasEvents && (
-                <span className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-church-gold" />
-              )}
+              {hasEvents && (() => {
+                // 절기 이벤트가 있으면 절기색 dot, 없으면 기존 골드
+                const liturgicalEv = dayEvents.find((e) => e.liturgical);
+                if (liturgicalEv?.liturgical) {
+                  return (
+                    <span
+                      className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full"
+                      style={{ background: liturgicalEv.liturgical.colorStrong }}
+                    />
+                  );
+                }
+                return (
+                  <span className="absolute bottom-1 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-church-gold" />
+                );
+              })()}
               {isActive && hasEvents && (
                 <DayPopover
                   events={dayEvents}
@@ -227,27 +258,62 @@ function MonthGrid({ year, month, eventsByDate }: MonthGridProps) {
 // ──────────────────────────────────────────────
 
 function EventCard({ event }: { event: CalendarEvent }) {
+  const isLiturgical = !!event.liturgical;
   return (
-    <div className="group relative overflow-hidden rounded-xl bg-white p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-      <div className="absolute left-0 top-0 h-full w-1 rounded-l-xl bg-gradient-to-b from-church-gold to-amber-600" />
+    <div
+      className="group relative overflow-hidden rounded-xl p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+      style={{
+        background: isLiturgical && event.liturgical
+          ? event.liturgical.colorSoft
+          : "#FFFFFF",
+      }}
+    >
+      <div
+        className="absolute left-0 top-0 h-full w-1 rounded-l-xl"
+        style={{
+          background: isLiturgical && event.liturgical
+            ? event.liturgical.colorStrong
+            : undefined,
+        }}
+      >
+        {!isLiturgical && (
+          <div className="h-full w-full rounded-l-xl bg-gradient-to-b from-church-gold to-amber-600" />
+        )}
+      </div>
       <div className="pl-3">
-        <h3 className="font-bold text-gray-900">{event.title}</h3>
-        <div className="mt-2 space-y-1 text-sm">
-          <div className="flex items-center gap-2 text-gray-600">
-            {event.isAllDay ? (
-              <Calendar size={14} className="shrink-0 text-primary-500" />
-            ) : (
-              <Clock size={14} className="shrink-0 text-primary-500" />
-            )}
-            <span>{formatEventTimeRange(event)}</span>
-          </div>
-          {event.location && (
+        <h3
+          className="font-bold"
+          style={{
+            color: isLiturgical && event.liturgical
+              ? event.liturgical.colorStrong
+              : "#111827",
+          }}
+        >
+          {event.title}
+        </h3>
+        {!isLiturgical && (
+          <div className="mt-2 space-y-1 text-sm">
             <div className="flex items-center gap-2 text-gray-600">
-              <MapPin size={14} className="shrink-0 text-primary-500" />
-              <span>{event.location}</span>
+              {event.isAllDay ? (
+                <Calendar size={14} className="shrink-0 text-primary-500" />
+              ) : (
+                <Clock size={14} className="shrink-0 text-primary-500" />
+              )}
+              <span>{formatEventTimeRange(event)}</span>
             </div>
-          )}
-        </div>
+            {event.location && (
+              <div className="flex items-center gap-2 text-gray-600">
+                <MapPin size={14} className="shrink-0 text-primary-500" />
+                <span>{event.location}</span>
+              </div>
+            )}
+          </div>
+        )}
+        {isLiturgical && (
+          <p className="mt-1 text-xs font-medium" style={{ color: event.liturgical?.colorStrong }}>
+            교회 절기
+          </p>
+        )}
         {event.description && (
           <p className="mt-3 line-clamp-3 whitespace-pre-line text-sm text-gray-500">
             {event.description}

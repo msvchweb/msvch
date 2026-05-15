@@ -33,6 +33,76 @@
   --animate-fade-up: fade-up 0.6s ease-out both;
   --animate-slide-down: slide-down 0.3s ease-out both;
   --animate-slide-up: slide-up 0.2s ease-out both;
+
+  /* ─── 절기색 토큰: 전절기 능동 (평주일에도 녹색 표시) ─── */
+  --color-liturgy: var(--liturgy-base, #5C2E91);
+  --color-liturgy-soft: var(--liturgy-soft, #EEE5F7);
+  --color-liturgy-strong: var(--liturgy-strong, #3F1F66);
+  --color-liturgy-on: var(--liturgy-on, #FFFFFF);
+
+  /* ─── 브랜드 액센트: 평주일에는 church-gold 로 fallback ─── */
+  --color-liturgy-brand: var(--liturgy-brand-base, #C9A84C);
+  --color-liturgy-brand-soft: var(--liturgy-brand-soft, #F5EDDA);
+  --color-liturgy-brand-strong: var(--liturgy-brand-strong, #8E7325);
+}
+
+/* ─── 절기별 변수 분기 (root <html data-season=...>) ─── */
+[data-season="advent"],
+[data-season="lent"],
+[data-season="holy_week"] {
+  --liturgy-base: #5C2E91;
+  --liturgy-soft: #EEE5F7;
+  --liturgy-strong: #3F1F66;
+  --liturgy-on: #FFFFFF;
+  --liturgy-brand-base: #5C2E91;
+  --liturgy-brand-soft: #EEE5F7;
+  --liturgy-brand-strong: #3F1F66;
+}
+
+[data-season="christmas"],
+[data-season="epiphany"],
+[data-season="easter"],
+[data-season="trinity"] {
+  --liturgy-base: #C9A84C;
+  --liturgy-soft: #F5EDDA;
+  --liturgy-strong: #8E7325;
+  --liturgy-on: #1A1A1A;
+  --liturgy-brand-base: #C9A84C;
+  --liturgy-brand-soft: #F5EDDA;
+  --liturgy-brand-strong: #8E7325;
+}
+
+[data-season="pentecost"],
+[data-season="reformation"] {
+  --liturgy-base: #B91C1C;
+  --liturgy-soft: #FCE7E7;
+  --liturgy-strong: #7F1D1D;
+  --liturgy-on: #FFFFFF;
+  --liturgy-brand-base: #B91C1C;
+  --liturgy-brand-soft: #FCE7E7;
+  --liturgy-brand-strong: #7F1D1D;
+}
+
+[data-season="good_friday"] {
+  --liturgy-base: #1A1A1A;
+  --liturgy-soft: #E5E5E5;
+  --liturgy-strong: #000000;
+  --liturgy-on: #FFFFFF;
+  --liturgy-brand-base: #1A1A1A;
+  --liturgy-brand-soft: #E5E5E5;
+  --liturgy-brand-strong: #000000;
+}
+
+/* 평주일 — 결정 #4: 핵심 액센트는 church-gold 유지, 절기 표시 토큰은 녹색 */
+[data-season="ordinary_after_epiphany"],
+[data-season="ordinary_after_pentecost"] {
+  --liturgy-base: #2E7D32;
+  --liturgy-soft: #E3F1E4;
+  --liturgy-strong: #1B5E20;
+  --liturgy-on: #FFFFFF;
+  --liturgy-brand-base: #C9A84C;
+  --liturgy-brand-soft: #F5EDDA;
+  --liturgy-brand-strong: #8E7325;
 }
 
 @keyframes fade-in {

@@ -25,11 +25,13 @@ export default function Bulletin({
       <div className="bulletin-print">
         <section className="page">
           <div className="a5-cell">
+            <div className="liturgy-strip" />
             <div className="bulletin-fit text-[10px] leading-tight text-gray-800">
               <BulletinFrontLeft data={frontData} />
             </div>
           </div>
           <div className="a5-cell">
+            <div className="liturgy-strip" />
             <div className="bulletin-fit text-[10px] leading-tight text-gray-800">
               <BulletinFrontRight data={frontData} />
             </div>
@@ -37,11 +39,13 @@ export default function Bulletin({
         </section>
         <section className="page">
           <div className="a5-cell">
+            <div className="liturgy-strip" />
             <div className="bulletin-fit text-[11px] leading-tight text-gray-800">
               <BulletinBackLeft data={backData} />
             </div>
           </div>
           <div className="a5-cell">
+            <div className="liturgy-strip" />
             <div className="bulletin-fit text-[11px] leading-tight text-gray-800">
               <BulletinBackRight data={backData} />
             </div>

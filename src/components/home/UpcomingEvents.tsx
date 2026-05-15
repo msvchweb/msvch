@@ -54,7 +54,13 @@ export function UpcomingEvents({ events }: { events: CalendarEvent[] }) {
               }`}
             >
               <div className="flex items-center gap-3">
-                <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-medium text-amber-700">
+                <span
+                  className="flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium"
+                  style={{
+                    background: "var(--liturgy-brand-soft, #fffbeb)",
+                    color: "var(--liturgy-brand-strong, #b45309)",
+                  }}
+                >
                   <Calendar size={10} />
                   일정
                 </span>

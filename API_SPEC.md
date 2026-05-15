@@ -71,6 +71,55 @@ Gemini AI로 설교 요약을 생성한다. 선택적으로 공지사항으로 �
 
 ---
 
+### GET `/api/liturgical/today`
+
+오늘(KST) 기준 절기와 색상 토큰. 인증 불필요. 모바일 호환 안정 스키마.
+
+- **인증**: 불필요
+- **쿼리 파라미터**: 없음
+- **응답 (200)**:
+
+```ts
+interface LiturgicalTodayResponse {
+  date: string;          // YYYY-MM-DD (KST)
+  season: LiturgicalSeason;
+  seasonKo: string;
+  week: number | null;   // "사순 4주"의 4
+  isOrdinary: boolean;
+  color: { base: string; soft: string; strong: string; onBase: string };
+  /** 브랜드 액센트용. 평주일에는 church-gold 로 fallback */
+  brand: { base: string; soft: string; strong: string };
+  rangeStart: string;
+  rangeEnd: string;
+}
+
+type LiturgicalSeason =
+  | "advent" | "christmas" | "epiphany" | "ordinary_after_epiphany"
+  | "lent" | "holy_week" | "good_friday" | "easter"
+  | "pentecost" | "trinity" | "ordinary_after_pentecost" | "reformation";
+```
+
+- **캐시**: `revalidate=3600` + `Cache-Control: public, s-maxage=3600, stale-while-revalidate=86400`
+- **모바일 호환 계약**: 응답 필드 추가는 허용, 삭제·이름·타입 변경 금지
+
+---
+
+### GET `/api/liturgical/events`
+
+지정 범위의 큰 절기(부활/성탄/대림 등) 가상 캘린더 이벤트.
+
+- **인증**: 불필요
+- **쿼리 파라미터**:
+  - `start` (필수) — `YYYY-MM-DD`
+  - `end` (필수) — `YYYY-MM-DD`, `start` 이상
+- **응답 (200)**: `{ items: CalendarEvent[] }` — 각 아이템에 `liturgical: { season, colorSoft, colorStrong }` 옵션 채워짐
+- **응답 (400)**: `{ error: string }` — 파라미터 형식 오류
+- **캐시**: 동일
+- **부작용**: 없음 (계산 전용, DB 무접근)
+- **호환 노트**: 응답 아이템이 `CalendarEvent` 스키마이므로 모바일 캘린더가 일반 이벤트로 그대로 표시 가능. `liturgical` 필드 무시해도 안전.
+
+---
+
 ### GET `/api/updates`
 
 루트 `UPDATES.md` 파일을 파싱해 업데이트 노트(릴리스 노트)를 JSON으로 반환한다.
@@ -1199,6 +1248,13 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 | `loadUpdates()` | `src/lib/updates.ts` | 루트 `UPDATES.md` 파싱 → `UpdateEntry[]` (날짜 내림차순) |
 | `parseUpdates(md)` | `src/lib/updates.ts` | 순수 함수 — 마크다운 문자열을 `UpdateEntry[]`로 |
 | `stripMetaComments(body)` | `src/lib/updates.ts` | `<!-- highlight -->`, `<!-- staff-only -->` 제거 |
+| `easterSundayUtc(year)` | `src/lib/liturgical/easter.ts` | Anonymous Gregorian Algorithm 부활주일 |
+| `getLiturgicalDay(date)` | `src/lib/liturgical/season.ts` | 입력 일자의 절기 + 한국어명 + 주차 |
+| `isOrdinary(season)` | `src/lib/liturgical/season.ts` | 평주일 여부 |
+| `getLiturgicalEventsForYear(year)` | `src/lib/liturgical/calendar.ts` | 해당 연도 큰 절기 9~10개 (`CalendarEvent[]`) |
+| `getLiturgicalEventsInRange(s, e)` | `src/lib/liturgical/calendar.ts` | YMD 범위 가상 이벤트 |
+| `formatLiturgyLabel(day)` | `src/lib/liturgical/format.ts` | UI 라벨("사순 4주") |
+| `brandTokens(season)` | `src/lib/liturgical/colors.ts` | 브랜드 액센트(평주일 = church-gold) |
 | `getUpcomingEvents(max, days)` | `src/lib/google-calendar.ts` | Google Calendar 다가오는 이벤트 |
 | `getAllEvents(max)` | `src/lib/google-calendar.ts` | 관리자용 이벤트 목록 (과거 30일 포함) |
 | `createCalendarEvent(input)` | `src/lib/google-calendar.ts` | 이벤트 생성 (Service Account) |

@@ -2,9 +2,9 @@
 
 Supabase (PostgreSQL) 기반. 모든 테이블에 Row Level Security(RLS) 적용.
 
-> **DB 외 영속 데이터**: 업데이트 노트(릴리스 노트)는 의도적으로 DB가 아닌
-> 루트 `UPDATES.md` 파일에 저장. 단순성·Git history audit·검토 용이성을 우선한 결정.
-> 자세한 흐름은 `ARCHIT.md` "업데이트 노트 시스템" 섹션 참고.
+> **DB 외 영속 데이터 / 순수 계산**: 다음 두 시스템은 의도적으로 DB 컬럼/테이블을 두지 않는다.
+> - **업데이트 노트(릴리스 노트)**: 루트 `UPDATES.md` 파일 — 단순성·Git history audit·검토 용이성 우선. 자세한 흐름은 `ARCHIT.md` "업데이트 노트 시스템" 섹션.
+> - **절기색 시스템**: 절기 판정·9~10개 가상 캘린더 이벤트·색 토큰 모두 **순수 계산** (`src/lib/liturgical/*`). 부활절은 Anonymous Gregorian Algorithm. DB 컬럼/테이블 추가 없음. 자세한 흐름은 `ARCHIT.md` "절기색 자동 적용 시스템" 섹션.
 >
 > **UI 권한 ≈ RLS (037 이후 정렬 완료)**: 관리자 페이지의 가시성과 RLS 가
 > admin/master 등급에서 일치한다 — 마이그레이션 037 적용 후. 페이지가 admin+ 인

@@ -93,6 +93,19 @@ export default async function WeeklyPrintPage({
           align-items: flex-start;
           justify-content: center;
           box-sizing: border-box;
+          position: relative;
+        }
+        /* 절기색 띠 — 셀 상단 2mm. 평주일 녹색, 절기엔 절기색 (data-season inherited). */
+        .liturgy-strip {
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          height: 2mm;
+          background: var(--liturgy-base);
+          z-index: 1;
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
         }
         /* 주보 컴포넌트의 자연 디자인 폭(133×189mm) → zoom 1.11 로 A5 (148×210mm) 채움 */
         .bulletin-print .bulletin-fit {

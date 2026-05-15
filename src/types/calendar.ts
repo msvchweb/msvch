@@ -22,6 +22,32 @@ export interface CalendarEvent {
   recurrence: string | null;
   /** 알림톡 발송 대상 일정 여부 (관리 UI 표시용) */
   notify: boolean;
+  /**
+   * 절기 가상 이벤트일 때만 채워짐(예: 부활주일·성탄절·종교개혁주일).
+   * `liturgical: undefined` 이면 일반 사용자 이벤트.
+   *
+   * 추가형 필드 — 기존 모바일/웹 클라이언트가 안 봐도 동작 무변화.
+   * 모바일 호환 보증: 필드 삭제·이름·타입 변경 금지.
+   */
+  liturgical?: {
+    season:
+      | "advent"
+      | "christmas"
+      | "epiphany"
+      | "ordinary_after_epiphany"
+      | "lent"
+      | "holy_week"
+      | "good_friday"
+      | "easter"
+      | "pentecost"
+      | "trinity"
+      | "ordinary_after_pentecost"
+      | "reformation";
+    /** HEX #RRGGBB — 배경용 (soft tone) */
+    colorSoft: string;
+    /** HEX #RRGGBB — 텍스트용 (strong tone) */
+    colorStrong: string;
+  };
 }
 
 /** 이벤트 생성/수정 요청 — 단일 날짜 v1 */

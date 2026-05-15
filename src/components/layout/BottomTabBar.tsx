@@ -84,12 +84,12 @@ export function BottomTabBar() {
                   className={cn(
                     "relative flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 transition-colors",
                     isSchoolActive || showDepts
-                      ? "text-primary-600"
+                      ? "text-liturgy-brand"
                       : "text-gray-400 active:text-gray-600"
                   )}
                 >
                   {isSchoolActive && (
-                    <span className="absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary-600" />
+                    <span className="absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-liturgy-brand" />
                   )}
                   {Icon && <Icon size={22} strokeWidth={isSchoolActive || showDepts ? 2.2 : 1.5} />}
                   <span
@@ -113,12 +113,12 @@ export function BottomTabBar() {
                 className={cn(
                   "relative flex flex-col items-center justify-center gap-0.5 px-3 py-1.5 transition-colors",
                   isActive
-                    ? "text-primary-600"
+                    ? "text-liturgy-brand"
                     : "text-gray-400 active:text-gray-600"
                 )}
               >
                 {isActive && (
-                  <span className="absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-primary-600" />
+                  <span className="absolute -top-px left-1/2 h-0.5 w-8 -translate-x-1/2 rounded-full bg-liturgy-brand" />
                 )}
                 <span className="relative">
                   {Icon && (

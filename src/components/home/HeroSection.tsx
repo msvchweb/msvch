@@ -117,7 +117,7 @@ export function HeroSection({ slides }: { slides: HeroSlide[] }) {
                     width: i === idx ? 36 : 14,
                     background:
                       i === idx
-                        ? "rgba(255,255,255,0.95)"
+                        ? "var(--liturgy-brand-base, rgba(255,255,255,0.95))"
                         : "rgba(255,255,255,0.35)",
                   }}
                 />

@@ -827,6 +827,7 @@ admin/boards/[id]/members 페이지
 | 홈페이지 | ISR | 1시간 (`revalidate: 3600`) |
 | 설교 목록 | ISR (DB read) | 1시간 (`revalidate: 3600`) — YouTube fetch 는 cron 시점만 |
 | 업데이트 노트 (`/api/updates`, `/updates`, 관리자 카드) | ISR (파일 read) | 1시간 (`revalidate: 3600`) |
+| 절기색 (`<html data-season>`, `/api/liturgical/today`, `/events`) | ISR (계산) | 1시간 (`revalidate: 3600`) — 자정 직후 최대 1시간 stale 허용 |
 | 정적 페이지 (예배, 소개 등) | Static (빌드 시) | - |
 | 공지사항 | Dynamic (매 요청) | - |
 | 온디맨드 무효화 | POST `/api/revalidate` | - |
@@ -892,6 +893,70 @@ admin/boards/[id]/members 페이지
 5. **API 라우트** (`src/lib/admin-auth.ts`) — `requireAdmin(request?)` 는 staff 통과(현 사양). 향후 더 세밀한 admin-only API 가 필요하면 `requireMinRole(request, "admin")` 헬퍼 추가 검토.
 
 `RLS` 는 별도 보안층이며 UI 권한과 일치하지 않을 수 있다(예: `new_family_registrations` 는 staff SELECT 허용). UI 가시성은 위 매트릭스가, DB 접근 가능성은 RLS 가 결정한다.
+
+---
+
+## 절기색 자동 적용 시스템
+
+대한예수교장로회(통합) 「예배·예식서」 기반의 5색 + 보조 금색 체계가 사이트 전반에 자동 반영된다.
+
+### 데이터 흐름
+
+```
+[KST 현재 날짜]
+    ↓
+[src/lib/liturgical/easter.ts] easterSundayUtc(year)
+    ↓
+[src/lib/liturgical/season.ts] getLiturgicalDay(date)
+    → { season, ko, week, rangeStart, rangeEnd }
+    ↓
+[루트 src/app/layout.tsx] <html data-season="lent">
+    ↓ (CSS 변수 분기)
+[globals.css] [data-season="lent"] { --liturgy-base: ... }
+    ↓ (Tailwind v4 @theme 토큰)
+모든 컴포넌트가 bg-liturgy, text-liturgy, border-liturgy,
+bg-liturgy-soft, bg-liturgy-brand 등 클래스 사용
+```
+
+### 두 종류의 토큰
+
+- `liturgy-*` — 전절기 능동. **평주일에도 녹색**으로 표시. 절기 chip / 캘린더 마커 / 주보 띠·칩 / 절기 표시 그 자체용.
+- `liturgy-brand-*` — 브랜드 액센트. **평주일에는 church-gold 로 fallback**. Footer 골드 라인 / Header active 색 등 핵심 사이트 톤이 평주일에 깨지지 않도록.
+
+### 절기 색 매트릭스 (HEX)
+
+| 절기 | base | soft | strong | onBase |
+|---|---|---|---|---|
+| 대림·사순·성주간 | `#5C2E91` (자색) | `#EEE5F7` | `#3F1F66` | `#FFFFFF` |
+| 성탄·주현·부활·삼위일체 | `#C9A84C` (금색) | `#F5EDDA` | `#8E7325` | `#1A1A1A` |
+| 성령강림·종교개혁 | `#B91C1C` (적색) | `#FCE7E7` | `#7F1D1D` | `#FFFFFF` |
+| 성금요일 | `#1A1A1A` (흑) | `#E5E5E5` | `#000000` | `#FFFFFF` |
+| 평주일 (주현후·성령강림후) | `#2E7D32` (녹색) | `#E3F1E4` | `#1B5E20` | `#FFFFFF` |
+
+### 적용 표면
+
+- **Footer** — 골드 액센트 라인 (평주일 골드 유지, 절기엔 절기색)
+- **Header** — desktop nav hover 밑줄, mobile 탭 active 색
+- **PageHeader** — 장식 원 톤
+- **HeroSection** — 슬라이드 dot 활성 색
+- **UpcomingEvents** — 일정 칩
+- **LiturgyChip** (`src/components/liturgy/LiturgyChip.tsx`) — PageHeader 안 표시
+- **주보** (Bulletin) — 4면 각각 상단 2mm 띠 + masthead 옆 절기 칩 (LAYOUT LOCKED 예외)
+- **캘린더** — 큰 절기 9~10건 가상 이벤트 자동 주입, 셀 dot 색 + EventCard 색 분기
+
+### 절기 판정 알고리즘
+
+부활절 = Anonymous Gregorian Algorithm (Meeus / Jones / Butcher).
+파생: Ash Wed = Easter -46, Palm Sun = -7, Good Fri = -2, Pentecost = +49, Trinity = +56.
+고정: 12/25 성탄, 1/6 주현, 10월 마지막 일요일 종교개혁.
+대림 1주 = 12/25 직전(또는 당일이 일요일이면 그) 일요일 -21일.
+
+DB 변경 없음. 100% 순수 계산.
+
+### 공개 API (모바일 호환)
+
+- `GET /api/liturgical/today` — 오늘 절기 + 색 토큰
+- `GET /api/liturgical/events?start&end` — 범위 가상 이벤트 (응답 아이템이 `CalendarEvent` 스키마이므로 모바일 캘린더가 일반 이벤트로 표시 가능)
 
 ---
 
