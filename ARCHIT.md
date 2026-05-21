@@ -85,8 +85,9 @@ src/
 │   └── api/                     # API 라우트
 │       ├── admin/
 │       │   ├── cron/
-│       │   │   ├── alimtalk-events/ # Vercel Cron — D-1 일정 알림톡 발송 (KST 06:00)
-│       │   │   └── sync-sermons/    # Vercel Cron — YouTube 50개 → sermon_videos upsert (KST 15:00)
+│       │   │   ├── alimtalk-events/         # Vercel Cron — D-1 일정 알림톡 발송 (KST 06:00)
+│       │   │   ├── sync-sermons/            # Vercel Cron — YouTube 50개 → sermon_videos upsert (KST 15:00)
+│       │   │   └── cleanup-weekly-imports/  # Vercel Cron — 주보 import 7일 정리 (KST 04:00, 마이그 038)
 │       │   ├── event-subscribers/   # 일정 알림 수신자 CRUD (master)
 │       │   │   └── [id]/
 │       │   ├── new-families/        # 새가족 등록 GET 목록 + [id] PATCH/DELETE
@@ -97,8 +98,12 @@ src/
 │       │   ├── calendar/
 │       │   │   └── batch/           # AI 추출 검수 통과 일정 일괄 INSERT (마이그 034)
 │       │   ├── weeklies/
-│       │   │   └── [id]/
-│       │   │       └── extract-events/ # 주보 news → Gemini → 일정 후보 (마이그 034)
+│       │   │   ├── [id]/
+│       │   │   │   └── extract-events/   # 주보 news → Gemini → 일정 후보 (마이그 034)
+│       │   │   ├── import-hwpx/          # POST — .hwpx 직파싱 + Gemini 구조화 (마이그 038)
+│       │   │   ├── import-hwp/           # POST — .hwp Storage 업로드 + GH Actions dispatch
+│       │   │   ├── import-hwp-finalize/  # POST — runner 가 변환 후 호출 (CRON_SECRET)
+│       │   │   └── imports/[id]/         # GET — 비동기 변환·파싱 polling
 │       │   ├── members/             # PATCH (master 전용 role 변경)
 │       │   └── revalidate/          # 세션 인증 ISR 무효화
 │       ├── calendar/            # 교회 일정 CRUD (자체 DB, 모바일 호환)
@@ -417,6 +422,104 @@ GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
         ▼
     캘린더 페이지에 즉시 반영 + (notify=true 항목은) D-1 cron 발송 대상
 ```
+
+---
+
+## 주보 HWP/HWPX 자동 채우기 (마이그레이션 038)
+
+전도사가 한컴에서 작성한 주보를 업로드하면 표·교회소식·정기모임을 자동으로 추출해
+WeeklyForm 폼을 채워 준다. 자동 저장은 하지 않으며, 사용자가 검수 후 직접 발행한다.
+
+### 두 가지 입력 경로
+
+```
+[A] HWPX 직파싱 (권장 — 동기 흐름)
+    /admin/weeklies/new 또는 edit → "📄 주보 파일에서 자동 채우기" 카드
+        │  WeeklyImportModal 열림 → .hwpx 선택
+        ▼
+    POST /api/admin/weeklies/import-hwpx (multipart, ≤ 10MB)
+        │  requireAdmin + admin/master 가드
+        │  ZIP 매직 검증 → weekly_imports INSERT status='parsing'
+        │  → Storage 'weeklies/imports/{id}.hwpx' 업로드
+        ▼
+    src/lib/hwpx-parser.ts
+        │  adm-zip 으로 ZIP 해제 (path traversal 방어)
+        │  Contents/section*.xml → fast-xml-parser 트리화
+        │  hp:tbl / hp:p 노드 추출 → HwpxRawDoc { tables, paragraphs }
+        ▼
+    src/lib/weekly-import-extractor.ts
+        │  ① 휴리스틱 표 매핑 — date · worship_items(16행) · offerings(10) ·
+        │     dawn_readings(6) · guide_committee(3) · next_week_prayer
+        │  ② callGeminiWithFallback → 자유 텍스트(news, meetings, newFamily,
+        │     sermonTitle, sermonPastor) 구조화 + FreeFormSchema(Zod) 검증
+        │  ③ loadBulletinMaster() 와 비교 — 다르면 warnings 만 (Q3=B)
+        ▼
+    weekly_imports UPDATE status='parsed' parsed_json=WeeklyImportResult
+        ▼
+    응답 { importId, result } → WeeklyImportModal 검수 단계
+        │  필드별 체크박스 (confidence ≥ 0.7 자동 ON, < 0.6 amber 경고)
+        │  사용자가 "N개 항목 채우기" → onApply(patch)
+        ▼
+    WeeklyForm.applyImportPatch(patch)
+        │  setForm(prev => normalizeFixedSlots({ ...prev, ...patch }))
+        │  고정 슬롯(예배순서/헌금/새벽/안내/다음주기도) 길이 자동 정합
+        ▼
+    [폼이 채워진 상태] → 사용자가 검토 → "임시저장" / "발행하기" (자동 저장 X — Q2=A)
+
+[B] HWP 비동기 변환 (.hwp 그대로 받기, Phase 2)
+    WeeklyImportModal 에서 .hwp 선택
+        ▼
+    POST /api/admin/weeklies/import-hwp (multipart, ≤ 15MB)
+        │  weekly_imports INSERT status='converting'
+        │  Storage 'weeklies/imports/{id}.hwp' 업로드
+        │  GitHub Actions workflow_dispatch (GITHUB_PAT)
+        │     workflow: .github/workflows/hwp-convert.yml
+        │     inputs: { importId, storagePath }
+        │  응답 202 { importId, status: 'converting' }
+        ▼
+    프론트 polling: GET /api/admin/weeklies/imports/{id} (2s × ≤90회)
+        ▼
+    [GitHub Actions runner — ubuntu-latest]
+        │  ① libreoffice 설치
+        │  ② curl → Supabase Storage 에서 .hwp 다운로드 (service_role)
+        │  ③ soffice --headless --convert-to hwpx
+        │  ④ 변환된 .hwpx 를 imports/{id}.hwpx 로 업로드
+        │  ⑤ POST /api/admin/weeklies/import-hwp-finalize (CRON_SECRET)
+        ▼
+    import-hwp-finalize (service_role)
+        │  Storage 에서 변환된 .hwpx 다운로드
+        │  parseHwpxBuffer + extractWeeklyFromHwpx (위 A 와 동일 파이프라인)
+        │  weekly_imports UPDATE status='parsed' parsed_json=...
+        ▼
+    polling 응답 status='parsed' → 검수 모달 review 단계 진입 (이후 A 와 동일)
+```
+
+### 보존 / 정리
+
+- 업로드한 원본 + 변환된 .hwpx 는 `weeklies` 버킷 `imports/` 폴더에 7일간 보존 (Q4=B).
+- 매일 04:00 KST `GET /api/admin/cron/cleanup-weekly-imports` (service_role) 가
+  `created_at < now() - 7 days` 인 행을 Storage 객체와 함께 삭제.
+
+### 외부 의존성
+
+| 패키지 | 용도 | 위치 |
+|---|---|---|
+| `adm-zip` | HWPX(ZIP) 해제 + path traversal 방어 | `src/lib/hwpx-parser.ts` |
+| `fast-xml-parser` | OWPML section XML 트리화 (namespace `hp:tbl`, `hp:p`) | 동일 |
+| LibreOffice headless (`soffice`) | .hwp → .hwpx 변환 (Phase 2, GitHub Actions runner) | `.github/workflows/hwp-convert.yml` |
+| Gemini (`callGeminiWithFallback`) | 자유 텍스트 → `FreeFormSchema` 구조화 | `src/lib/weekly-import-extractor.ts` |
+
+### 권한 / 인증
+
+| 라우트 | 인증 |
+|---|---|
+| `POST /api/admin/weeklies/import-hwpx` | `requireAdmin` + admin/master 가드 (037 일치) |
+| `POST /api/admin/weeklies/import-hwp` | 동일 + `GITHUB_PAT` 필요 |
+| `POST /api/admin/weeklies/import-hwp-finalize` | `Authorization: Bearer <CRON_SECRET>` (runner 전용) |
+| `GET /api/admin/weeklies/imports/[id]` | `requireAdmin` + admin/master |
+| `GET /api/admin/cron/cleanup-weekly-imports` | `x-cron-secret` (Vercel Cron) |
+
+RLS 의 `weekly_imports` 정책(038)은 admin/master 만 통과. cron/finalize 는 service_role 우회.
 
 ---
 
@@ -888,6 +991,7 @@ admin/boards/[id]/members 페이지
 |------|--------------|------|
 | `/api/admin/cron/alimtalk-events` | `0 21 * * *` (KST 06:00) | D-1 일정 알림톡 발송 |
 | `/api/admin/cron/sync-sermons` | `0 6 * * *` (KST 15:00) | YouTube → sermon_videos upsert (50개 누적) |
+| `/api/admin/cron/cleanup-weekly-imports` | `0 19 * * *` (KST 04:00) | 주보 HWP/HWPX 업로드 7일 보존 후 Storage + DB 삭제 (마이그 038) |
 
 ---
 
@@ -1055,8 +1159,8 @@ DB 없이 **파일 기반**으로 운영. 진실의 원천은 루트 `UPDATES.md
 
 - **플랫폼**: Vercel (GitHub 자동 배포)
 - **빌드**: `npm run build` → Next.js static + dynamic
-- **CI/CD**: GitHub Actions (쇼츠 생성 파이프라인)
+- **CI/CD**: GitHub Actions (쇼츠 생성 파이프라인, 주보 HWP→HWPX 변환)
 - **환경변수 (Vercel — 일상 트래픽)**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_GOOGLE_MAPS_KEY`, `REVALIDATE_SECRET`, `GITHUB_PAT`, `CRON_SECRET`
 - **환경변수 (선택, 카카오 비즈 승인 후 추가)**: `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY`, `KAKAO_BIZ_API_URL`
 - **환경변수 (마이그레이션 1회용 — 사용 후 제거 권장)**: `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY`
-- **GitHub Secrets**: `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- **GitHub Secrets**: `YOUTUBE_API_KEY`, `GEMINI_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `CRON_SECRET`, `APP_URL` (예: `https://msvch.vercel.app` — 주보 HWP 변환 후 콜백용)

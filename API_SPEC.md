@@ -1205,6 +1205,115 @@ Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. b
 
 ---
 
+## 주보 HWP/HWPX 자동 채우기 (마이그레이션 038)
+
+전도사가 한컴에서 작성한 주보 파일을 업로드해 폼을 자동 채우는 흐름.
+파싱 결과는 `weekly_imports` 테이블에 7일간 보존되며, cron 으로 자동 정리.
+
+### 공용 DTO
+
+```ts
+type WeeklyImportStatus =
+  | "uploaded" | "converting" | "parsing" | "parsed" | "failed";
+
+type WeeklyImportSourceFormat = "hwp" | "hwpx";
+
+interface ImportField<T> {
+  value: T;
+  confidence: number; // 0.0~1.0
+}
+
+interface WeeklyImportResult {
+  date?: ImportField<string>;
+  worshipItems?: ImportField<WorshipItemRow[]>;
+  offerings?: ImportField<OfferingCategoryRow[]>;
+  dawnReadings?: ImportField<DawnReading[]>;
+  guideCommittee?: ImportField<GuideCommitteeRow[]>;
+  nextWeekPrayer?: ImportField<string[]>;
+  news?: ImportField<NewsItem[]>;
+  meetings?: ImportField<MeetingRow[]>;
+  newFamily?: ImportField<NewMemberRow[]>;
+  sermonTitle?: ImportField<string>;
+  sermonPastor?: ImportField<string>;
+  warnings: string[]; // 마스터와 다른 값, 인식 실패 등
+}
+
+interface WeeklyImportRecord {
+  id: string;
+  fileName: string;
+  sourceFormat: WeeklyImportSourceFormat;
+  status: WeeklyImportStatus;
+  errorMessage: string | null;
+  result: WeeklyImportResult | null;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
+### POST `/api/admin/weeklies/import-hwpx`
+
+한컴 .hwpx 를 업로드해 서버 안에서 직접 파싱 + Gemini 자유 텍스트 구조화.
+
+- **인증**: `requireAdmin(request)` + admin/master 추가 가드 (RLS 와 일치)
+- **maxDuration**: 60s
+- **요청**: `multipart/form-data` — `file: <.hwpx>` (≤ 10MB, ZIP 매직 검증)
+- **응답 (200)**:
+  ```ts
+  { importId: string; result: WeeklyImportResult }
+  ```
+- **에러**:
+  - `400` — 파일 누락 / 형식 오류 / 크기 초과 / ZIP 매직 불일치
+  - `401` / `403` — 권한
+  - `422` — `.hwp` 업로드 시 변환 안내 (`hint` 필드 포함). 파싱 자체 실패도 422.
+  - `503` — Gemini 폴백 전체 실패 (`GeminiUnavailableError`)
+
+### POST `/api/admin/weeklies/import-hwp`
+
+한컴 .hwp 를 업로드 → Storage 보관 후 GitHub Actions(LibreOffice headless)에 변환 작업을 큐잉.
+
+- **인증**: `requireAdmin(request)` + admin/master 추가 가드
+- **요청**: `multipart/form-data` — `file: <.hwp>` (≤ 15MB)
+- **응답 (202)**:
+  ```ts
+  { importId: string; status: "converting" }
+  ```
+- **에러**:
+  - `400` — 파일 누락 / 확장자 불일치
+  - `401` / `403` — 권한
+  - `500` — `GITHUB_PAT` 환경변수 누락 / Storage 업로드 실패
+  - `502` — GitHub Actions workflow_dispatch 실패
+- **후속 흐름**: runner 가 변환을 마치면 `POST /api/admin/weeklies/import-hwp-finalize` 를 호출.
+  클라이언트는 polling 라우트로 결과 수신.
+
+### POST `/api/admin/weeklies/import-hwp-finalize`
+
+GitHub Actions runner 가 .hwp → .hwpx 변환 + Storage 업로드 후 본 라우트를 호출해 파싱 단계 재진입.
+
+- **인증**: `Authorization: Bearer <CRON_SECRET>` 또는 `x-cron-secret` 헤더 (사용자 세션 X)
+- **maxDuration**: 60s
+- **요청 본문**: `{ importId: string }`
+- **동작**: Storage `weeklies/imports/{importId}.hwpx` 다운로드 → 파싱 → `WeeklyImportResult` 를 `weekly_imports.parsed_json` 에 저장.
+- **응답 (200)**: `{ importId, status: "parsed" }`
+- **에러**: `401` (시크릿), `400` (importId 누락), `404` (행 없음), `422` (파싱 실패), `503` (Gemini)
+
+### GET `/api/admin/weeklies/imports/[id]`
+
+업로드한 import 의 상태/결과를 폴링.
+
+- **인증**: `requireAdmin(request)` + admin/master 가드
+- **응답 (200)**: `WeeklyImportRecord`
+- **사용**: 클라이언트(검수 모달)가 .hwp 비동기 변환을 기다릴 때 2초 간격으로 호출.
+
+### GET `/api/admin/cron/cleanup-weekly-imports`
+
+Vercel Cron — 매일 04:00 KST (UTC 19:00). 7일 초과한 weekly_imports 행과 Storage 객체 동시 삭제.
+
+- **인증**: `x-cron-secret` 헤더 또는 `Authorization: Bearer <CRON_SECRET>`
+- **응답 (200)**: `{ scanned, storage_removed, rows_removed }`
+- **에러**: `401`, `500`
+
+---
+
 ## 입력 검증
 
 모든 API 라우트의 입력 검증은 `src/lib/validation.ts`에 정의된 Zod 스키마로 수행.
@@ -1363,5 +1472,6 @@ API 라우트(`/api/admin/*`)는 위 페이지 매트릭스와 **별개**로 `re
 | Google Maps Embed | 찾아오시는 길 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` |
 | Google Calendar API v3 | 1회 마이그레이션 스크립트(`scripts/migrate-google-calendar.ts`)에서만 사용 — 일상 트래픽 의존 없음 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY` (마이그레이션 후 제거 권장) |
 | GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |
-| Vercel Cron | (1) 일정 알림톡 D-1 발송 `/api/admin/cron/alimtalk-events` 매일 06:00 KST · (2) 설교 영상 동기화 `/api/admin/cron/sync-sermons` 매일 15:00 KST | `CRON_SECRET` |
+| Vercel Cron | (1) 일정 알림톡 D-1 발송 `/api/admin/cron/alimtalk-events` 매일 06:00 KST · (2) 설교 영상 동기화 `/api/admin/cron/sync-sermons` 매일 15:00 KST · (3) 주보 import 7일 정리 `/api/admin/cron/cleanup-weekly-imports` 매일 04:00 KST | `CRON_SECRET` |
+| GitHub Actions (LibreOffice headless) | `.hwp → .hwpx` 변환 — `/api/admin/weeklies/import-hwp` 가 워크플로우(`.github/workflows/hwp-convert.yml`) 를 dispatch. runner 가 변환 후 `/api/admin/weeklies/import-hwp-finalize` 호출 | `GITHUB_PAT`, `APP_URL` (Actions secret), `CRON_SECRET` |
 | 카카오 비즈니스 알림톡 (중계사 — NHN Cloud / Aligo / Solapi 등) | 일정 알림톡 발송 — 비즈 승인 후 환경변수 채우면 동작 | `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY`, `KAKAO_BIZ_API_URL` |

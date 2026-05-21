@@ -1,0 +1,93 @@
+name: Convert HWP to HWPX
+
+on:
+  workflow_dispatch:
+    inputs:
+      importId:
+        description: "Supabase weekly_imports.id"
+        required: true
+      storagePath:
+        description: "Storage path of the uploaded .hwp file (relative to 'weeklies' bucket)"
+        required: true
+
+concurrency:
+  group: hwp-convert-${{ inputs.importId }}
+  cancel-in-progress: false
+
+jobs:
+  convert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Install LibreOffice
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y --no-install-recommends libreoffice
+          soffice --version
+
+      - name: Download .hwp from Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          STORAGE_PATH: ${{ inputs.storagePath }}
+        run: |
+          mkdir -p work
+          curl -sS -f \
+            -H "Authorization: Bearer $SERVICE_ROLE" \
+            -H "apikey: $SERVICE_ROLE" \
+            "$SUPABASE_URL/storage/v1/object/weeklies/$STORAGE_PATH" \
+            -o work/input.hwp
+          ls -la work
+
+      - name: Convert .hwp → .hwpx
+        run: |
+          cd work
+          soffice --headless --convert-to hwpx input.hwp || true
+          if [ ! -f input.hwpx ]; then
+            echo "::error::soffice 가 .hwpx 출력을 생성하지 못했습니다."
+            exit 1
+          fi
+          ls -la
+
+      - name: Upload .hwpx back to Supabase Storage
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IMPORT_ID: ${{ inputs.importId }}
+        run: |
+          # 같은 imports/ 폴더에 동일 id 의 .hwpx 로 업로드 (upsert)
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer $SERVICE_ROLE" \
+            -H "apikey: $SERVICE_ROLE" \
+            -H "x-upsert: true" \
+            -H "Content-Type: application/vnd.hancom.hwpx+zip" \
+            --data-binary "@work/input.hwpx" \
+            "$SUPABASE_URL/storage/v1/object/weeklies/imports/$IMPORT_ID.hwpx"
+
+      - name: Notify backend to parse the converted .hwpx
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          IMPORT_ID: ${{ inputs.importId }}
+        run: |
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "{\"importId\":\"$IMPORT_ID\"}" \
+            "$APP_URL/api/admin/weeklies/import-hwp-finalize"
+
+      - name: Mark failed (on error)
+        if: failure()
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IMPORT_ID: ${{ inputs.importId }}
+        run: |
+          curl -sS -X PATCH \
+            -H "Authorization: Bearer $SERVICE_ROLE" \
+            -H "apikey: $SERVICE_ROLE" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            --data '{"status":"failed","error_message":"GitHub Actions 변환 실패 — 작업 로그 참조"}' \
+            "$SUPABASE_URL/rest/v1/weekly_imports?id=eq.$IMPORT_ID"

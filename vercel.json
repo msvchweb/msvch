@@ -7,6 +7,10 @@
     {
       "path": "/api/admin/cron/sync-sermons",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/admin/cron/cleanup-weekly-imports",
+      "schedule": "0 19 * * *"
     }
   ]
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles } from "lucide-react";
+import { Sparkles, FileUp } from "lucide-react";
 import type {
   NewsItem,
   MeetingRow,
@@ -11,6 +11,7 @@ import type {
 } from "@/types/notice";
 import type { WeeklyContentInput } from "@/lib/validation";
 import { EventExtractionModal } from "@/components/admin/event-extraction/EventExtractionModal";
+import { WeeklyImportModal } from "@/components/admin/weekly-import/WeeklyImportModal";
 import { FormTabs, type FormTab } from "./form/FormTabs";
 import { DynamicArrayField } from "./form/DynamicArrayField";
 import { TopicEditor } from "./masters/TopicEditor";
@@ -231,6 +232,7 @@ export function WeeklyForm({
 }: Props) {
   const [form, setForm] = useState<WeeklyContentInput>(() => normalizeFixedSlots(initial));
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<string, string>>>({});
+  const [showImport, setShowImport] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
 
@@ -262,6 +264,15 @@ export function WeeklyForm({
     value: WeeklyContentInput[K],
   ) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  /**
+   * HWP/HWPX 검수 모달이 채워 보낸 patch 를 form 에 병합한다.
+   * normalizeFixedSlots 가 고정 슬롯(예배순서·헌금·새벽·안내·다음주기도) 길이를 다시 맞춰 줘
+   * 부분 patch 가 들어와도 폼이 깨지지 않는다.
+   */
+  function applyImportPatch(patch: Partial<WeeklyContentInput>) {
+    setForm((prev) => normalizeFixedSlots({ ...prev, ...patch }));
   }
 
   async function handleSubmit(publish: boolean) {
@@ -329,6 +340,33 @@ export function WeeklyForm({
 
   return (
     <div className="space-y-6">
+      {/* ─── 한컴 주보 파일에서 자동 채우기 ──────────────────── */}
+      <div className="flex flex-col gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-amber-900">
+            📄 주보 파일에서 자동 채우기 (베타)
+          </p>
+          <p className="mt-0.5 text-xs text-amber-800/80">
+            한컴 .hwp / .hwpx 파일을 올리면 표·교회소식·정기모임을 자동 추출해 폼에 채웁니다.
+            검수 후 적용되며, 저장은 직접 눌러야 발행됩니다.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowImport(true)}
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-2 text-xs font-medium text-white hover:bg-amber-700"
+        >
+          <FileUp size={14} />
+          파일에서 채우기
+        </button>
+      </div>
+
+      <WeeklyImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onApply={(patch) => applyImportPatch(patch)}
+      />
+
       <FormTabs tabs={tabs} onActiveChange={onTabChange} />
 
       <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 pt-6 pb-8">

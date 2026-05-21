@@ -324,6 +324,45 @@ interface HeroSlide {
 
 ---
 
+### `weekly_imports`
+
+주보 HWP/HWPX 자동 채우기의 업로드·변환·파싱 추적 테이블 (마이그레이션 038).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `uploaded_by` | `uuid` | `auth.users.id` FK (ON DELETE SET NULL) |
+| `file_name` | `text NOT NULL` | 원본 파일명 (1~300자) |
+| `file_path` | `text NOT NULL` | Storage 'weeklies' 버킷 내 경로 (`imports/{id}.{hwp\|hwpx}`) |
+| `source_format` | `text NOT NULL` | `'hwp'` 또는 `'hwpx'` |
+| `status` | `text NOT NULL DEFAULT 'uploaded'` | `'uploaded'`, `'converting'` (.hwp 변환 중), `'parsing'`, `'parsed'`, `'failed'` |
+| `error_message` | `text` | 실패 사유 (≤2000자) |
+| `parsed_json` | `jsonb` | `WeeklyImportResult` (성공 시) |
+| `raw_text_excerpt` | `text` | 본문 텍스트 처음 10K 자 (디버깅용) |
+| `applied_to_weekly_id` | `uuid` | 검수 후 어느 `weeklies` 행에 반영됐는지 (옵션) |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | 업로드 시각 (cleanup 기준) |
+| `updated_at` | `timestamptz NOT NULL DEFAULT now()` | trigger 자동 갱신 |
+
+**RLS 정책** (038, 037 매트릭스와 일치):
+- admin/master: SELECT/INSERT/UPDATE/DELETE 모두 가능
+- staff 이하: 차단 (단, `import-hwp-finalize` 라우트는 service_role 로 우회)
+
+**인덱스**:
+- `idx_weekly_imports_created_at` — cleanup cron 의 7일 retention 조회용
+- `idx_weekly_imports_status` — polling 시 status 필터
+
+**Storage**:
+- 원본 + 변환된 .hwpx 모두 기존 `weeklies` 버킷의 `imports/` 폴더에 저장 (037 정책 그대로 적용 — admin/master upload/delete).
+- 별도 storage 정책 변경 없음.
+
+**보존 정책**:
+- `created_at < now() - 7 days` 인 행은 매일 04:00 KST cron 으로 Storage 객체 + DB 행 동시 삭제.
+
+**관련 마이그레이션**:
+- `038_weekly_imports.sql` — 테이블·RLS·인덱스·`touch_weekly_imports_updated_at()` 트리거.
+
+---
+
 ### `gallery_albums`
 
 갤러리 앨범.
@@ -966,3 +1005,4 @@ interface ShortsClip {
 | `035_profiles_lock_down.sql` | profiles SELECT 정책 좁히기 — 본인 행 OR staff 만 SELECT 가능. anon 의 전 회원 정보 조회 차단 (PIPA 위반 차단) |
 | `036_drop_weeklies_pdf_url.sql` | weeklies.pdf_url 컬럼 DROP — PDF 자동 생성 라우트가 모든 호출 동선을 잃어 dead 상태. 컬럼/라우트/puppeteer 의존성(@sparticuz/chromium*, puppeteer-core) 일괄 정리. Storage 버킷 'weeklies' 와 정책은 보존 |
 | `037_align_rls_with_ui_matrix.sql` | UI 매트릭스(`src/lib/admin-permissions.ts`)와 RLS 일치. notices / weeklies(+storage) / weekly masters(church_settings·mokjang_entries·servants·support_sections·community_prayers) / events INSERT·UPDATE / event_subscribers SELECT / alimtalk_sent SELECT / chat_inquiries SELECT / new_family_registrations SELECT·UPDATE / storage 'blog-images' 의 staff 정책을 `is_admin_or_master()` 로 좁힘. 공개 SELECT, 작성자 본인 DELETE(021), anon INSERT(chat/new-family) 흐름은 보존 |
+| `038_weekly_imports.sql` | `weekly_imports` 테이블 — 주보 HWP/HWPX 자동 채우기 업로드·변환·파싱 추적. status enum 5개 (uploaded/converting/parsing/parsed/failed), source_format CHECK (hwp/hwpx), RLS admin/master 전용 (037 매트릭스 일치), `touch_weekly_imports_updated_at()` 트리거, retention/status 인덱스. Storage 는 기존 'weeklies' 버킷의 `imports/` 폴더 재사용. 7일 초과는 매일 04:00 KST cron 으로 정리 |
