@@ -416,6 +416,51 @@ GET /api/gallery?tag=봉사센터&limit=5             → 제한
 
 ---
 
+### GET `/api/gallery/[id]/images`
+
+특정 앨범의 이미지 목록.
+
+- **인증**: 불필요 (RLS 가 공개 SELECT)
+- **응답**: `GalleryImage[]` — `sort_order ASC`
+
+---
+
+### POST `/api/chat`
+
+Gemini 기반 챗봇 — 최근 공지 10건을 system prompt 에 동적으로 주입.
+
+- **인증**: 불필요
+- **Rate limit** (`src/lib/rate-limit.ts`): IP 당 분당 10건 / 일 100건. 초과 시 `429 Retry-After`
+- **메시지 한도**: 1건당 500자, 히스토리 최대 20턴 (초과 시 자동 슬라이스)
+- **모델 폴백**: `gemini-2.5-flash` → `gemini-2.5-flash-lite` → `gemini-flash-latest`, 각 모델 429/5xx 시 exponential backoff 3회
+- **요청 본문**:
+  ```ts
+  { messages: { role: "user" | "model"; content: string }[] }
+  ```
+- **응답 (200)**: `{ reply: string }`
+- **응답 (400)**: 메시지 없음 / 형식 오류 / 길이 초과
+- **응답 (429)**: rate limit 초과
+- **응답 (503)**: Gemini 폴백 전체 실패 (`GeminiUnavailableError`)
+
+---
+
+### POST `/api/chat/inquiry`
+
+챗봇 안에서 "문의 남기기" 클릭 시 사용. `chat_inquiries` INSERT + (`RESEND_API_KEY` 설정 시) Resend 이메일 알림.
+
+- **인증**: 불필요 (service_role INSERT, RLS anon INSERT 허용)
+- **Rate limit**: IP 당 분당 2건 / 일 10건 (`windowKey: "inquiry"`, 챗봇 본문보다 타이트)
+- **요청 본문** (Zod):
+  ```ts
+  { name: string;       // 1~50
+    phone: string;      // 9~20
+    message?: string }  // ≤ 500
+  ```
+- **응답 (200)**: `{ ok: true }`
+- **이메일 알림**: `RESEND_API_KEY` 가 있을 때만. 모든 사용자 입력은 `escapeHtml` 통과(인젝션 차단). 실패 시 silent (DB 저장은 성공으로 처리)
+
+---
+
 ### GET `/api/shorts`
 
 쇼츠 작업 목록 조회. 각 job에 clips 배열 포함.
@@ -1314,6 +1359,5 @@ API 라우트(`/api/admin/*`)는 위 페이지 매트릭스와 **별개**로 `re
 | Google Maps Embed | 찾아오시는 길 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` |
 | Google Calendar API v3 | 1회 마이그레이션 스크립트(`scripts/migrate-google-calendar.ts`)에서만 사용 — 일상 트래픽 의존 없음 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY` (마이그레이션 후 제거 권장) |
 | GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |
-| Puppeteer + @sparticuz/chromium | 주보 PDF 자동 생성 | `CHROME_EXECUTABLE_PATH` (개발 환경만, 선택) |
 | Vercel Cron | (1) 일정 알림톡 D-1 발송 `/api/admin/cron/alimtalk-events` 매일 06:00 KST · (2) 설교 영상 동기화 `/api/admin/cron/sync-sermons` 매일 15:00 KST | `CRON_SECRET` |
 | 카카오 비즈니스 알림톡 (중계사 — NHN Cloud / Aligo / Solapi 등) | 일정 알림톡 발송 — 비즈 승인 후 환경변수 채우면 동작 | `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY`, `KAKAO_BIZ_API_URL` |
