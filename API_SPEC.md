@@ -414,6 +414,10 @@ GET /api/gallery?anyTag=예배&anyTag=교회행사      → OR 필터
 GET /api/gallery?tag=봉사센터&limit=5             → 제한
 ```
 
+> ℹ️ 카테고리 / 하위부서 목록은 `src/lib/gallery-categories.ts` 가 단일 출처. 관리자 페이지의
+> 앨범 메타 편집은 별도 REST 라우트 없이 클라이언트 supabase 가 `gallery_albums` 를
+> 직접 UPDATE 한다 (RLS: staff 통과 + UI: `canEdit` 으로 작성자/admin+ 게이트).
+
 ---
 
 ### GET `/api/gallery/[id]/images`

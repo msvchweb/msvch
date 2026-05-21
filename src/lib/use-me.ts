@@ -67,3 +67,20 @@ export function canDelete(
   if (!me.userId) return false;
   return authorId === me.userId;
 }
+
+/**
+ * 특정 컨텐츠를 현재 사용자가 수정할 수 있는지.
+ *   - admin/master 는 모든 글 수정 가능
+ *   - 그 외 staff 는 본인이 작성한 글만 수정 가능
+ *
+ * RLS 는 staff 이면 UPDATE 통과시키지만, 작성자가 아닌 staff 가 임의로 메타 정보를
+ * 바꾸지 못하도록 UI 측에서 더 좁게 가드한다 (021 패턴의 UI 거울).
+ */
+export function canEdit(
+  me: MeResponse,
+  authorId: string | null | undefined,
+): boolean {
+  if (me.isAdminOrMaster) return true;
+  if (!me.userId) return false;
+  return authorId === me.userId;
+}

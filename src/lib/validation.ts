@@ -124,12 +124,34 @@ export const NoticeSchema = z.object({
   date: z.string().optional(),
 });
 
-/** 갤러리 앨범 */
+/** 갤러리 앨범 — 생성 */
 export const GalleryAlbumSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지"),
   category: z.string().min(1),
   date: z.string().optional(),
 });
+
+/**
+ * 갤러리 앨범 — 수정 (모든 필드 옵셔널, 최소 1개 변경)
+ * 카테고리 변경 시 admin/gallery 페이지가 tags 배열을 재구성한 뒤 함께 전송한다.
+ */
+export const GalleryAlbumUpdateSchema = z
+  .object({
+    title: z.string().min(1, "제목을 입력하세요").max(200, "제목은 200자까지").optional(),
+    category: z.string().min(1).optional(),
+    subCategory: z.string().max(50).optional().nullable(),
+    date: z.string().optional().nullable(),
+    isPublic: z.boolean().optional(),
+  })
+  .refine(
+    (v) =>
+      v.title !== undefined ||
+      v.category !== undefined ||
+      v.subCategory !== undefined ||
+      v.date !== undefined ||
+      v.isPublic !== undefined,
+    { message: "변경할 항목이 없습니다." },
+  );
 
 /** 주보 기본 */
 export const WeeklySchema = z.object({

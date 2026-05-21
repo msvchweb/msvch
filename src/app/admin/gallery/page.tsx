@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
-import { Upload, Trash2, Plus, Eye, EyeOff, ChevronDown, ChevronRight, AlertCircle } from "lucide-react";
+import { Upload, Trash2, Plus, Eye, EyeOff, ChevronDown, ChevronRight, AlertCircle, Pencil, Star } from "lucide-react";
 import {
   validateFile,
   safeExtension,
@@ -11,10 +11,18 @@ import {
   MAX_IMAGE_SIZE,
   MAX_UPLOAD_FILES,
   GalleryAlbumSchema,
+  GalleryAlbumUpdateSchema,
 } from "@/lib/validation";
 import { compressImage } from "@/lib/image-compress";
 import { fetchAuthorRecordMap, type ContentAuthor } from "@/lib/content-authors";
-import { useMe, canDelete } from "@/lib/use-me";
+import { useMe, canDelete, canEdit } from "@/lib/use-me";
+import {
+  GALLERY_CATEGORIES,
+  buildTagsFromCategory,
+  getSubCategories,
+  hasSubCategories,
+  splitTagsToCategoryAndSub,
+} from "@/lib/gallery-categories";
 import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
 
 /** 압축 전 절대 상한 — 브라우저 OOM 방지 */
@@ -22,13 +30,6 @@ const HARD_MAX_BYTES = 50 * 1024 * 1024;
 
 /** 관리자 갤러리 1페이지당 앨범 수 — 초기 로딩 부담 완화 */
 const PAGE_SIZE = 20;
-
-const CATEGORIES = ["예배", "교회학교", "교회행사", "봉사센터", "새가족"] as const;
-
-const SUB_CATEGORIES: Record<string, string[]> = {
-  교회학교: ["영유치부", "아동부", "청소년부", "청년부"],
-  봉사센터: ["반찬", "이미용", "비전문화", "탁구"],
-};
 
 /** 사용자 친화 사전검증 — HEIC 등 흔한 비호환 형식 안내 */
 function preflightCheck(file: File): { ok: true } | { ok: false; reason: string } {
@@ -55,13 +56,22 @@ export default function AdminGalleryPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState("");
-  const [category, setCategory] = useState<string>(CATEGORIES[0]);
+  const [category, setCategory] = useState<string>(GALLERY_CATEGORIES[0]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [subCategory, setSubCategory] = useState<string>("");
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{ done: number; total: number } | null>(null);
   /** 업로드 실패 내역 — albumId 별로 누적, 사용자가 명시적으로 닫기 전까지 표시 */
   const [uploadFailures, setUploadFailures] = useState<Record<string, string[]>>({});
+  /** 현재 편집 중인 앨범 id (한 번에 1개만) */
+  const [editingId, setEditingId] = useState<string | null>(null);
+  /** 편집 폼 임시 상태 */
+  const [editTitle, setEditTitle] = useState("");
+  const [editCategory, setEditCategory] = useState<string>(GALLERY_CATEGORIES[0]);
+  const [editSubCategory, setEditSubCategory] = useState<string>("");
+  const [editDate, setEditDate] = useState<string>("");
+  const [editIsPublic, setEditIsPublic] = useState(false);
+  const [editSaving, setEditSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const supabase = createClient();
 
@@ -230,8 +240,7 @@ export default function AdminGalleryPage() {
       return;
     }
 
-    const tags: string[] = [category];
-    if (subCategory) tags.push(subCategory);
+    const tags = buildTagsFromCategory(category, subCategory || null);
 
     const { error } = await supabase.from("gallery_albums").insert({
       title: check.data.title,
@@ -451,6 +460,83 @@ export default function AdminGalleryPage() {
     await refreshAlbumImages(albumId);
   }
 
+  function startEdit(album: GalleryAlbum) {
+    const { category: initCat, subCategory: initSub } = splitTagsToCategoryAndSub(
+      album.tags,
+      album.category,
+    );
+    setEditingId(album.id);
+    setEditTitle(album.title);
+    setEditCategory(initCat);
+    setEditSubCategory(initSub);
+    setEditDate(album.date ?? "");
+    setEditIsPublic(album.is_public);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditTitle("");
+    setEditCategory(GALLERY_CATEGORIES[0]);
+    setEditSubCategory("");
+    setEditDate("");
+    setEditIsPublic(false);
+  }
+
+  async function saveEdit(albumId: string) {
+    const subSafe = hasSubCategories(editCategory) ? editSubCategory || null : null;
+    const check = GalleryAlbumUpdateSchema.safeParse({
+      title: editTitle,
+      category: editCategory,
+      subCategory: subSafe,
+      date: editDate || null,
+      isPublic: editIsPublic,
+    });
+    if (!check.success) {
+      alert(check.error.issues[0].message);
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const tags = buildTagsFromCategory(editCategory, subSafe);
+      const { error } = await supabase
+        .from("gallery_albums")
+        .update({
+          title: editTitle,
+          category: editCategory,
+          tags,
+          date: editDate || null,
+          is_public: editIsPublic,
+        })
+        .eq("id", albumId);
+
+      if (error) {
+        alert(`수정 실패: ${error.message}`);
+        return;
+      }
+
+      cancelEdit();
+      await loadAlbums();
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function setAsThumbnail(albumId: string, imageUrl: string) {
+    const { error } = await supabase
+      .from("gallery_albums")
+      .update({ thumbnail_url: imageUrl })
+      .eq("id", albumId);
+    if (error) {
+      alert(`썸네일 변경 실패: ${error.message}`);
+      return;
+    }
+    // 헤더 썸네일은 albums 상태에 들어 있으므로 in-place 갱신
+    setAlbums((prev) =>
+      prev.map((a) => (a.id === albumId ? { ...a, thumbnail_url: imageUrl } : a)),
+    );
+  }
+
   function dismissFailures(albumId: string) {
     setUploadFailures((prev) => {
       const next = { ...prev };
@@ -504,17 +590,20 @@ export default function AdminGalleryPage() {
               </label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setSubCategory("");
+                }}
                 className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
               >
-                {CATEGORIES.map((c) => (
+                {GALLERY_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
                     {c}
                   </option>
                 ))}
               </select>
             </div>
-            {SUB_CATEGORIES[category] && (
+            {hasSubCategories(category) && (
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   하위부서
@@ -525,7 +614,7 @@ export default function AdminGalleryPage() {
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
                 >
                   <option value="">선택 안함</option>
-                  {SUB_CATEGORIES[category].map((sub) => (
+                  {getSubCategories(category).map((sub) => (
                     <option key={sub} value={sub}>{sub}</option>
                   ))}
                 </select>
@@ -623,6 +712,21 @@ export default function AdminGalleryPage() {
                         : "업로드 중..."
                       : `사진 추가 (최대 ${MAX_UPLOAD_FILES}장)`}
                   </button>
+                  {canEdit(me, authorMap[album.id]?.id) && (
+                    <button
+                      onClick={() =>
+                        editingId === album.id ? cancelEdit() : startEdit(album)
+                      }
+                      className={`flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-medium ${
+                        editingId === album.id
+                          ? "bg-gray-200 text-gray-700"
+                          : "bg-amber-50 text-amber-700 hover:bg-amber-100"
+                      }`}
+                    >
+                      <Pencil size={14} />
+                      {editingId === album.id ? "수정 취소" : "수정"}
+                    </button>
+                  )}
                   {canDelete(me, authorMap[album.id]?.id) && (
                     <button
                       onClick={() => deleteAlbum(album.id)}
@@ -634,6 +738,98 @@ export default function AdminGalleryPage() {
                   )}
                 </div>
               </div>
+
+              {editingId === album.id && (
+                <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="sm:col-span-2 lg:col-span-2">
+                      <label className="mb-1 block text-xs font-medium text-gray-700">
+                        제목
+                      </label>
+                      <input
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-700">
+                        카테고리
+                      </label>
+                      <select
+                        value={editCategory}
+                        onChange={(e) => {
+                          setEditCategory(e.target.value);
+                          setEditSubCategory("");
+                        }}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      >
+                        {GALLERY_CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {hasSubCategories(editCategory) ? (
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-700">
+                          하위부서
+                        </label>
+                        <select
+                          value={editSubCategory}
+                          onChange={(e) => setEditSubCategory(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                        >
+                          <option value="">선택 안함</option>
+                          {getSubCategories(editCategory).map((sub) => (
+                            <option key={sub} value={sub}>{sub}</option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div />
+                    )}
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-gray-700">
+                        날짜
+                      </label>
+                      <input
+                        type="date"
+                        value={editDate}
+                        onChange={(e) => setEditDate(e.target.value)}
+                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 sm:col-span-2 lg:col-span-3">
+                      <input
+                        type="checkbox"
+                        checked={editIsPublic}
+                        onChange={(e) => setEditIsPublic(e.target.checked)}
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      홈페이지에 공개
+                    </label>
+                  </div>
+                  <div className="mt-4 flex justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={cancelEdit}
+                      className="rounded-lg border border-gray-300 bg-white px-4 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                    >
+                      취소
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => saveEdit(album.id)}
+                      disabled={editSaving}
+                      className="rounded-lg bg-amber-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-amber-700 disabled:opacity-50"
+                    >
+                      {editSaving ? "저장 중..." : "저장"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {failures && failures.length > 0 && (
                 <div className="mt-4 rounded-lg border border-red-200 bg-red-50 p-3">
@@ -665,25 +861,46 @@ export default function AdminGalleryPage() {
                     </p>
                   ) : images.length > 0 ? (
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 md:grid-cols-8">
-                      {images.map((img) => (
-                        <div key={img.id} className="group relative aspect-square">
-                          <Image
-                            src={img.image_url}
-                            alt=""
-                            fill
-                            className="rounded-lg object-cover"
-                            sizes="100px"
-                          />
-                          {canDelete(me, authorMap[album.id]?.id) && (
-                            <button
-                              onClick={() => deleteImage(img.id, img.image_url, album.id)}
-                              className="absolute right-1 top-1 hidden rounded-full bg-red-500 p-1 text-white group-hover:block"
-                            >
-                              <Trash2 size={12} />
-                            </button>
-                          )}
-                        </div>
-                      ))}
+                      {images.map((img) => {
+                        const isCurrentThumbnail = album.thumbnail_url === img.image_url;
+                        return (
+                          <div key={img.id} className="group relative aspect-square">
+                            <Image
+                              src={img.image_url}
+                              alt=""
+                              fill
+                              className="rounded-lg object-cover"
+                              sizes="100px"
+                            />
+                            {isCurrentThumbnail && (
+                              <span
+                                className="absolute left-1 top-1 flex items-center gap-0.5 rounded bg-amber-500/90 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                                title="현재 썸네일"
+                              >
+                                <Star size={10} className="fill-white" />
+                                썸네일
+                              </span>
+                            )}
+                            {canEdit(me, authorMap[album.id]?.id) && !isCurrentThumbnail && (
+                              <button
+                                onClick={() => setAsThumbnail(album.id, img.image_url)}
+                                className="absolute left-1 top-1 hidden rounded-full bg-amber-500 p-1 text-white group-hover:block"
+                                title="썸네일로 지정"
+                              >
+                                <Star size={12} />
+                              </button>
+                            )}
+                            {canDelete(me, authorMap[album.id]?.id) && (
+                              <button
+                                onClick={() => deleteImage(img.id, img.image_url, album.id)}
+                                className="absolute right-1 top-1 hidden rounded-full bg-red-500 p-1 text-white group-hover:block"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="py-4 text-center text-sm text-gray-400">

@@ -502,6 +502,56 @@ DELETE USING (is_admin_or_master() OR is_content_author(type, id))
 - 적용 테이블: `notices`, `weeklies`, `gallery_albums`, `gallery_images` (gallery_images 는 부모 앨범의 작성자 권한을 따름)
 - UI 측: `canDelete(me, authorId)` 로 삭제 버튼을 사전에 숨김
 
+### 컨텐츠 수정 권한 (UI ≤ RLS — UI 가 더 좁음)
+
+RLS 의 UPDATE 정책은 staff 또는 admin/master 까지 허용하지만, 일부 컨텐츠는 UI 가 한 단계 더 좁혀
+**작성자 본인이 아닌 staff 가 임의로 다른 사람의 글을 수정하지 못하도록** 가드한다.
+
+- `canEdit(me, authorId)` (`src/lib/use-me.ts`) — admin/master OR 작성자 본인만 true.
+- 적용 표면:
+  - `/admin/gallery` 의 앨범 메타 수정(제목·카테고리·하위부서·날짜·공개여부·썸네일) 인라인 폼 — 수정 버튼·썸네일 지정 버튼이 `canEdit` 으로 게이트.
+- 게시판은 본인 글 외에는 멤버라도 수정 불가하므로 별도 `canEdit` 게이트가 필요 없다.
+
+---
+
+## 갤러리 카테고리 시스템
+
+### 단일 출처
+
+`src/lib/gallery-categories.ts` — 카테고리 5개(예배·교회학교·교회행사·봉사센터·새가족),
+하위부서(교회학교·봉사센터에만 존재), 그리고 다음 헬퍼들을 export.
+
+- `buildTagsFromCategory(category, sub?)` — `tags: [category, sub?]` 형태로 단일 진실.
+- `hasSubCategories(category)` / `getSubCategories(category)` — UI 의 select 분기.
+- `splitTagsToCategoryAndSub(tags, fallback)` — 기존 행을 편집 폼 초기값으로 풀어내는 역연산.
+
+관리자 페이지(`/admin/gallery`)와 공개 그리드(`GalleryGrid.tsx`) 가 모두 이 한 모듈만 import 한다.
+새 카테고리·부서 추가 시 여기 한 곳만 수정하면 양쪽이 동시에 갱신된다.
+
+### 앨범 수정 흐름
+
+```
+/admin/gallery — 인라인 편집 모드
+    │  앨범 헤더 우측 "수정" 버튼 (canEdit 게이트)
+    │   → 카드 본문에 amber 톤 폼 전개 (제목·카테고리·하위부서·날짜·공개)
+    ▼
+GalleryAlbumUpdateSchema (validation.ts) safeParse
+    │  refine: 1개 이상 변경 필수
+    ▼
+buildTagsFromCategory(category, sub)
+    │  → tags 배열 재구성 (이전 [교회학교, 영유치부] → [교회행사] 등)
+    ▼
+supabase.from("gallery_albums").update({ title, category, tags, date, is_public })
+    │  RLS: UPDATE staff 허용 (021)
+    ▼
+loadAlbums() → 헤더·필터·공개 페이지(ISR 1h) 반영
+
+펼친 이미지 그리드:
+    각 이미지 우상단에 (canEdit 일 때) ⭐ "썸네일로 지정" 버튼
+    현재 썸네일에는 같은 위치에 amber 칩으로 "썸네일" 표시
+    → supabase.from("gallery_albums").update({ thumbnail_url }) → in-place 상태 갱신
+```
+
 ---
 
 ## 주보 데이터 아키텍처

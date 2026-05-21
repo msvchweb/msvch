@@ -5,22 +5,21 @@ import Image from "next/image";
 import Lightbox from "yet-another-react-lightbox";
 import "yet-another-react-lightbox/styles.css";
 import type { GalleryAlbum, GalleryImage } from "@/types/gallery";
+import {
+  GALLERY_CATEGORIES,
+  GALLERY_SUB_CATEGORIES,
+} from "@/lib/gallery-categories";
 
 const PAGE_SIZE = 20;
 
-const categories = [
-  "전체",
-  "예배",
-  "교회학교",
-  "교회행사",
-  "봉사센터",
-  "새가족",
-];
+const categories = ["전체", ...GALLERY_CATEGORIES] as const;
 
-const subCategories: Record<string, string[]> = {
-  교회학교: ["전체", "영유치부", "아동부", "청소년부", "청년부"],
-  봉사센터: ["전체", "반찬", "이미용", "비전문화", "탁구"],
-};
+const subCategories: Record<string, readonly string[]> = Object.fromEntries(
+  Object.entries(GALLERY_SUB_CATEGORIES).map(([cat, subs]) => [
+    cat,
+    ["전체", ...subs],
+  ]),
+);
 
 interface GalleryGridProps {
   albums: GalleryAlbum[];

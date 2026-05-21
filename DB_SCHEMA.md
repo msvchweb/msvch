@@ -341,12 +341,20 @@ interface HeroSlide {
 
 **RLS 정책** (002 + 015 + 021):
 - 공개 앨범(`is_public=true`): 모든 사용자 SELECT 가능
-- staff: SELECT 모두, INSERT, UPDATE
+- staff: SELECT 모두, INSERT, UPDATE (메타·tags·thumbnail_url 변경 포함)
 - DELETE: **작성자 본인 OR admin OR master**
+
+**UI 가드 (RLS 보다 좁음)**: 메타 수정·썸네일 지정 버튼은 `canEdit(me, authorId)` 로 게이트되어
+**작성자 본인 또는 admin/master** 에서만 노출 (`src/lib/use-me.ts`). 다른 staff 가 임의로 타인 앨범의
+제목/카테고리/공개여부를 바꾸지 못하게 한다.
 
 **작성자 추적**: INSERT 시 `record_content_author('gallery_album')` 트리거 (020)
 
 **인덱스**: `idx_gallery_albums_tags` — GIN 인덱스 (tags 배열 검색)
+
+**tags 의미**: 1차 카테고리 + (옵션) 하위부서를 `[category, sub?]` 형태로 저장. 단일 출처는
+`src/lib/gallery-categories.ts` 의 `buildTagsFromCategory()`. 공개 그리드와 관리자 폼 양쪽이
+이 헬퍼만 호출하므로 tags 의 형식은 항상 일관된다.
 
 **TypeScript 타입** (`src/types/gallery.ts`):
 ```ts
