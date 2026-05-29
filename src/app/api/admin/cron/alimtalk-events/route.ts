@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/api";
 import { timingSafeEqual } from "crypto";
 import {
   sendAlimtalk,
@@ -96,18 +97,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
-  if (!supabaseUrl || !serviceKey) {
+  let supabase: SupabaseClient;
+  try {
+    supabase = createServiceClient();
+  } catch {
     return NextResponse.json(
       { error: "supabase env missing" },
       { status: 500 },
     );
   }
-
-  const supabase = createClient(supabaseUrl, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
-  });
 
   const targetDate = dateOffsetKST(1); // D-1 = 내일
   const template = "event_d1";

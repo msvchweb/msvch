@@ -14,7 +14,8 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/api";
 import { parseHwpxBuffer, isZipMagic } from "@/lib/hwpx-parser";
 import {
   extractWeeklyFromHwpx,
@@ -69,15 +70,15 @@ export async function POST(
     );
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
+  let supabase: SupabaseClient;
+  try {
+    supabase = createServiceClient();
+  } catch {
     return NextResponse.json<ErrorResponse>(
       { error: "Supabase 환경변수 누락" },
       { status: 500 },
     );
   }
-  const supabase = createServiceClient(supabaseUrl, serviceKey);
 
   // ── 행 + Storage 객체 로드 ─────────────────────────────
   const { data: row, error: rowErr } = await supabase

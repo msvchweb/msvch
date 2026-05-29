@@ -5,6 +5,24 @@ import type { NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
+ * Service role 클라이언트.
+ *
+ * RLS 우회가 필요한 무인증 공개 라우트 (챗봇, 새가족 등록 등) 와
+ * cron 잡에서 공용으로 사용. 호출자가 환경변수 누락에 대해 자체 처리할 수 있도록
+ * 이 함수는 누락 시 Error 를 던진다.
+ */
+export function createServiceClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+  if (!url || !key) {
+    throw new Error("Supabase service role 환경변수가 누락되었습니다");
+  }
+  return createBareClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
+/**
  * API 라우트용 Supabase 클라이언트.
  *
  * - 요청에 `Authorization: Bearer <access_token>` 헤더가 있으면 그 토큰을 사용 (모바일 앱).

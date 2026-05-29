@@ -8,7 +8,8 @@
  */
 
 import { NextResponse, type NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/api";
 import { timingSafeEqual } from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -44,15 +45,15 @@ export async function GET(
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceKey) {
+  let supabase: SupabaseClient;
+  try {
+    supabase = createServiceClient();
+  } catch {
     return NextResponse.json(
       { error: "Supabase 환경변수 누락" },
       { status: 500 },
     );
   }
-  const supabase = createClient(supabaseUrl, serviceKey);
 
   const cutoff = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString();
 

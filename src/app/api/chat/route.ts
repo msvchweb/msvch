@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { createServiceClient } from "@/lib/supabase/api";
 import { GeminiUnavailableError } from "@/lib/gemini";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 
@@ -30,15 +31,10 @@ interface GeminiResponse {
   }[];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabase: any = null;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function getSupabase(): any {
+let _supabase: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
   if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+    _supabase = createServiceClient();
   }
   return _supabase;
 }
