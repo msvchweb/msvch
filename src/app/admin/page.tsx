@@ -98,6 +98,7 @@ export default async function AdminDashboard() {
     recentNewFamilyRes,
     recentInquiryRes,
     recentBoardPostsRes,
+    mediaBoardRes,
   ] = await Promise.all([
     supabase
       .from("new_family_registrations")
@@ -135,6 +136,13 @@ export default async function AdminDashboard() {
       .select("id, title, author_name, board_id, created_at")
       .order("created_at", { ascending: false })
       .limit(5),
+    // 미디어선교부 게시판 id — 최근 글 링크를 /media-board 로 분기하기 위함
+    // (RLS 상 비멤버에겐 null → 일반 게시판 경로로 폴백)
+    supabase
+      .from("boards")
+      .select("id")
+      .eq("is_media_dept", true)
+      .maybeSingle<{ id: string }>(),
   ]);
 
   const newFamilyPending = newFamilyPendingRes.count ?? 0;
@@ -144,6 +152,7 @@ export default async function AdminDashboard() {
   const recentNewFamily = (recentNewFamilyRes.data ?? []) as RecentNewFamily[];
   const recentInquiry = (recentInquiryRes.data ?? []) as RecentInquiry[];
   const recentBoardPosts = (recentBoardPostsRes.data ?? []) as RecentBoardPost[];
+  const mediaBoardId = mediaBoardRes.data?.id ?? null;
 
   return (
     <div className="space-y-8">
@@ -286,7 +295,10 @@ export default async function AdminDashboard() {
                 id: p.id,
                 primary: p.title,
                 secondary: `${p.author_name} · ${formatRelative(p.created_at)}`,
-                href: "/admin/boards",
+                href:
+                  mediaBoardId && p.board_id === mediaBoardId
+                    ? `/media-board/${p.id}`
+                    : `/boards/${p.board_id}/${p.id}`,
               }))}
             />
           )}

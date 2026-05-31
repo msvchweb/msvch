@@ -14,10 +14,12 @@ import {
   UserPlus,
   Users,
   Palette,
+  Clapperboard,
   type LucideIcon,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { canAccessAdminPath } from "@/lib/admin-permissions";
+import { isMediaDeptMember } from "@/lib/boards";
 import { navTourKey } from "@/components/admin/nav-tour-keys";
 
 interface MenuItem {
@@ -176,6 +178,22 @@ export default async function AdminMenuPage() {
       items: g.items.filter((it) => canAccessAdminPath(role, it.href)),
     }))
     .filter((g) => g.items.length > 0);
+
+  // 미디어선교부 게시판 — 권한 매트릭스가 아닌 멤버십(멤버 OR admin/master)으로
+  // 게이팅. (사이드바·기존 Header 조건과 동일)
+  if (await isMediaDeptMember(supabase)) {
+    groups.push({
+      title: "미디어선교부",
+      items: [
+        {
+          label: "미디어선교부",
+          href: "/media-board",
+          description: "미디어선교부 전용 게시판",
+          icon: Clapperboard,
+        },
+      ],
+    });
+  }
 
   return (
     <div>

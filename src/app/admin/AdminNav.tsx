@@ -17,6 +17,7 @@ import {
   UserPlus,
   Layers,
   Palette,
+  Clapperboard,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -36,7 +37,8 @@ export type AdminIconKey =
   | "subscribers"
   | "newFamily"
   | "boards"
-  | "posters";
+  | "posters"
+  | "mediaBoard";
 
 const ICONS: Record<AdminIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
@@ -53,6 +55,7 @@ const ICONS: Record<AdminIconKey, LucideIcon> = {
   newFamily: UserPlus,
   boards: Layers,
   posters: Palette,
+  mediaBoard: Clapperboard,
 };
 
 export interface AdminNavItem {

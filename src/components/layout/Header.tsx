@@ -15,7 +15,6 @@ import {
   ImageIcon,
   GraduationCap,
   HandHeart,
-  Clapperboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { InstagramIcon } from "@/components/icons/InstagramIcon";
@@ -69,7 +68,7 @@ export function Header() {
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { dots } = useNewContent();
-  const { isStaff, isMediaDeptMember } = useMe();
+  const { isStaff } = useMe();
 
   useEffect(() => {
     setMounted(true);
@@ -162,18 +161,6 @@ export function Header() {
               )}
             </div>
           ))}
-          {/* 미디어선교부 — 멤버(+admin/master)에게만 조건부 렌더 (O4) */}
-          {isMediaDeptMember && (
-            <div className="group relative">
-              <Link
-                href="/media-board"
-                className="relative rounded-lg px-3.5 py-2 text-[0.9rem] font-medium text-gray-600 transition-colors hover:text-gray-900"
-              >
-                미디어선교부
-                <span className="absolute inset-x-3.5 -bottom-0.5 h-0.5 origin-left scale-x-0 rounded-full bg-liturgy-brand transition-transform group-hover:scale-x-100" />
-              </Link>
-            </div>
-          )}
         </nav>
 
         {/* Desktop right: admin + auth + Instagram */}
@@ -401,41 +388,6 @@ export function Header() {
                   </Link>
                 );
               })}
-
-              {/* 미디어선교부 — 멤버(+admin/master)에게만 조건부 렌더 (O4) */}
-              {isMediaDeptMember && (
-                <Link
-                  href="/media-board"
-                  onClick={closeMenu}
-                  className={cn(
-                    "flex w-full items-center gap-3 rounded-xl px-3 py-3 transition-colors",
-                    pathname.startsWith("/media-board")
-                      ? "bg-primary-50"
-                      : "hover:bg-gray-50 active:bg-gray-100",
-                  )}
-                >
-                  <div
-                    className={cn(
-                      "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl",
-                      pathname.startsWith("/media-board")
-                        ? "bg-primary-100 text-primary-700"
-                        : "bg-gray-100 text-gray-600",
-                    )}
-                  >
-                    <Clapperboard size={20} />
-                  </div>
-                  <span
-                    className={cn(
-                      "flex-1 text-[0.95rem] font-semibold",
-                      pathname.startsWith("/media-board")
-                        ? "text-primary-700"
-                        : "text-gray-900",
-                    )}
-                  >
-                    미디어선교부
-                  </span>
-                </Link>
-              )}
             </nav>
           </div>
         </div>,
