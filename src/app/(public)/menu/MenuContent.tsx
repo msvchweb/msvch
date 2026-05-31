@@ -11,10 +11,12 @@ import {
   Scissors,
   Users,
   HandHeart,
+  Clapperboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ContentKey } from "@/app/api/new-content/route";
 import { useNewContent } from "@/lib/new-content-provider";
+import { useMe } from "@/lib/use-me";
 
 interface MenuItem {
   label: string;
@@ -63,12 +65,31 @@ const menuSections: MenuSection[] = [
 
 export function MenuContent() {
   const { dots } = useNewContent();
+  const { isMediaDeptMember } = useMe();
+
+  // 미디어선교부 — 멤버(+admin/master)에게만 조건부 주입 (O4). 정적 배열 하드코딩 X.
+  const sections: MenuSection[] = isMediaDeptMember
+    ? [
+        ...menuSections,
+        {
+          title: "미디어선교부",
+          items: [
+            {
+              label: "미디어선교부 게시판",
+              href: "/media-board",
+              icon: Clapperboard,
+              description: "회의록·자료 공유",
+            },
+          ],
+        },
+      ]
+    : menuSections;
 
   return (
     <div className="mx-auto max-w-lg px-4 py-8">
       <h1 className="text-2xl font-bold text-gray-900">메뉴</h1>
       <div className="mt-6 space-y-8">
-        {menuSections.map((section) => (
+        {sections.map((section) => (
           <div key={section.title}>
             <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
               {section.title}

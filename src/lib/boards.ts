@@ -18,9 +18,14 @@ interface BoardRow {
   title: string;
   description: string | null;
   is_visible: boolean;
+  is_media_dept: boolean;
   created_at: string;
   updated_at: string;
 }
+
+/** boards SELECT 공통 컬럼 — is_media_dept 포함 (마이그 039) */
+const BOARD_COLUMNS =
+  "id, title, description, is_visible, is_media_dept, created_at, updated_at";
 
 interface BoardPostRow {
   id: string;
@@ -58,6 +63,7 @@ export function toBoardDto(
     title: row.title,
     description: row.description,
     isVisible: row.is_visible,
+    isMediaDept: row.is_media_dept,
     memberCount,
     postCount,
     createdAt: row.created_at,
@@ -163,7 +169,9 @@ export async function listVisibleBoards(
 ): Promise<Board[]> {
   const { data: rows } = await supabase
     .from("boards")
-    .select("id, title, description, is_visible, created_at, updated_at")
+    .select(BOARD_COLUMNS)
+    // 미디어선교부 전용 게시판은 별도 라우트(/media-board)로 분리 — 일반 목록에서 제외 (마이그 039)
+    .eq("is_media_dept", false)
     .order("created_at", { ascending: false })
     .returns<BoardRow[]>();
 
@@ -195,7 +203,7 @@ export async function getBoardById(
 ): Promise<Board | null> {
   const { data } = await supabase
     .from("boards")
-    .select("id, title, description, is_visible, created_at, updated_at")
+    .select(BOARD_COLUMNS)
     .eq("id", id)
     .maybeSingle<BoardRow>();
 
@@ -207,6 +215,59 @@ export async function getBoardById(
     id,
   ]);
   return toBoardDto(data, memberCounts[id] ?? 0, postCounts[id] ?? 0);
+}
+
+/**
+ * 미디어선교부 전용 게시판 단건 조회 (is_media_dept=true).
+ * RLS 가 멤버십 게이트 — 비멤버(non admin/master)에게는 null 이 반환된다.
+ * 마이그 039 의 title 매칭이 0건이었으면(전용 게시판 미지정) 역시 null.
+ */
+export async function getMediaDeptBoard(
+  supabase: SupabaseClient,
+): Promise<Board | null> {
+  const { data } = await supabase
+    .from("boards")
+    .select(BOARD_COLUMNS)
+    .eq("is_media_dept", true)
+    .maybeSingle<BoardRow>();
+
+  if (!data) return null;
+  const memberCounts = await fetchCounts(supabase, "board_members", "board_id", [
+    data.id,
+  ]);
+  const postCounts = await fetchCounts(supabase, "board_posts", "board_id", [
+    data.id,
+  ]);
+  return toBoardDto(
+    data,
+    memberCounts[data.id] ?? 0,
+    postCounts[data.id] ?? 0,
+  );
+}
+
+/**
+ * 현재 사용자가 미디어선교부 전용 게시판에 접근 가능한지 (네비 노출 조건 O4).
+ * = 전용 게시판의 board_member 이거나 admin/master.
+ *
+ * RLS(can_view_board)가 멤버/admin 에게만 board row 를 노출하므로,
+ * 전용 게시판 row 가 조회되면 곧 접근 권한이 있다는 의미.
+ * 전용 게시판이 지정되지 않았거나(0건) 비멤버이면 false.
+ */
+export async function isMediaDeptMember(
+  supabase: SupabaseClient,
+): Promise<boolean> {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data } = await supabase
+    .from("boards")
+    .select("id")
+    .eq("is_media_dept", true)
+    .maybeSingle<{ id: string }>();
+
+  return data !== null;
 }
 
 /** 게시판 글 목록 — cursor 페이지네이션 */

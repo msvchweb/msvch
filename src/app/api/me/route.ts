@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createApiClient } from "@/lib/supabase/api";
 import { hasStaffAccess } from "@/lib/admin-auth";
+import { isMediaDeptMember } from "@/lib/boards";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,8 @@ export interface MeResponse {
   isStaff: boolean;
   /** admin OR master — 모든 컨텐츠 삭제 권한 */
   isAdminOrMaster: boolean;
+  /** 미디어선교부 전용 게시판 접근 가능 여부 (멤버 OR admin/master) — 네비 노출 조건 (O4) */
+  isMediaDeptMember: boolean;
 }
 
 export async function GET(request: NextRequest) {
@@ -27,6 +30,7 @@ export async function GET(request: NextRequest) {
         role: null,
         isStaff: false,
         isAdminOrMaster: false,
+        isMediaDeptMember: false,
       },
       { headers: { "Cache-Control": "no-store" } },
     );
@@ -39,6 +43,7 @@ export async function GET(request: NextRequest) {
     .single<{ role: string }>();
 
   const role = profile?.role ?? null;
+  const mediaDeptMember = await isMediaDeptMember(supabase);
 
   return NextResponse.json<MeResponse>(
     {
@@ -47,6 +52,7 @@ export async function GET(request: NextRequest) {
       role,
       isStaff: hasStaffAccess(role),
       isAdminOrMaster: role === "admin" || role === "master",
+      isMediaDeptMember: mediaDeptMember,
     },
     { headers: { "Cache-Control": "no-store" } },
   );

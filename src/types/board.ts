@@ -10,6 +10,8 @@ export interface Board {
   title: string;
   description: string | null;
   isVisible: boolean;
+  /** 미디어선교부 전용 게시판 여부 (마이그 039 — 환경 독립 식별, 모바일 호환 DTO) */
+  isMediaDept: boolean;
   /** 멤버 수 (서버 합성) */
   memberCount: number;
   /** 글 수 (서버 합성) */

@@ -520,10 +520,11 @@ const BOARD_IMAGE_URL_FRAGMENT =
 
 export const BoardPostSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(150, "제목은 150자까지"),
+  // 회의록(표/이미지 마커 포함) 대응으로 30000 자 — 마이그 039 board_posts_content_check 와 동기화.
   content: z
     .string()
     .min(1, "내용을 입력하세요")
-    .max(10000, "내용은 10,000자까지"),
+    .max(30000, "내용은 30,000자까지"),
   images: z
     .array(
       z

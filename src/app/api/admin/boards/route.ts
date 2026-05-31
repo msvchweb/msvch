@@ -12,6 +12,7 @@ interface InsertedBoardRow {
   title: string;
   description: string | null;
   is_visible: boolean;
+  is_media_dept: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -52,7 +53,9 @@ export async function POST(request: NextRequest) {
         description: parsed.data.description ?? null,
         created_by: userId,
       })
-      .select("id, title, description, is_visible, created_at, updated_at")
+      .select(
+        "id, title, description, is_visible, is_media_dept, created_at, updated_at",
+      )
       .single<InsertedBoardRow>();
 
     if (error || !row) {

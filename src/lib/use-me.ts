@@ -10,6 +10,7 @@ const EMPTY: MeResponse = {
   role: null,
   isStaff: false,
   isAdminOrMaster: false,
+  isMediaDeptMember: false,
 };
 
 /**
