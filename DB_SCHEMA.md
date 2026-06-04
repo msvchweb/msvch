@@ -622,6 +622,7 @@ interface NewFamilyRegistration {
 | `title` | `text NOT NULL` (1~100자) | 게시판 제목 |
 | `description` | `text` (≤500자) | 설명 (선택) |
 | `is_visible` | `boolean NOT NULL DEFAULT true` | false = 숨김 (멤버에게도 안 보임, admin/master 만 노출) |
+| `is_media_dept` | `boolean NOT NULL DEFAULT false` | 미디어선교부 전용 게시판 여부 (마이그레이션 039) |
 | `created_by` | `uuid` | `auth.users.id` ON DELETE SET NULL |
 | `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
 | `updated_at` | `timestamptz NOT NULL DEFAULT now()` | 자동 갱신 트리거 |
@@ -665,7 +666,7 @@ interface NewFamilyRegistration {
 | `author_id` | `uuid` | `auth.users.id` ON DELETE SET NULL (탈퇴해도 글 보존) |
 | `author_name` | `text NOT NULL` | 작성 시점 닉네임 스냅샷 |
 | `title` | `text NOT NULL` (1~150자) | |
-| `content` | `text NOT NULL` (1~10,000자) | 본문 (HTML/Markdown 미사용 — `whitespace-pre-wrap` 텍스트) |
+| `content` | `text NOT NULL` (1~30,000자) | 본문 (마이그레이션 039에서 10,000 → 30,000 상한 완화. 미디어선교부는 마크다운 사용) |
 | `images` | `text[] NOT NULL DEFAULT '{}'` | Supabase Storage `board-images` public URL 배열 |
 | `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
 | `updated_at` | `timestamptz NOT NULL DEFAULT now()` | 자동 갱신 트리거 |

@@ -19,6 +19,12 @@
 
 ---
 
+## 개발 워크플로우
+
+본 프로젝트는 AI 협업을 위해 `_workspace/` 디렉토리와 연계된 4단계 하네스(Planner, Implementer, QA, Scribe)를 사용합니다. 상세한 행동 규칙과 기술 표준은 [`GEMINI.md`](./GEMINI.md)를 참조하십시오.
+
+---
+
 ## 디렉토리 구조
 
 ```

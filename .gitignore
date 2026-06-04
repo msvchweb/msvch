@@ -55,6 +55,9 @@ CLAUDE.md
 AGENTS.md
 PLAN*.md
 
+# feature-sprint working artifacts (planner/implementer/qa/scribe)
+_workspace/
+
 # vercel
 .vercel
 

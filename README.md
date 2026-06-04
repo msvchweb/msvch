@@ -80,8 +80,9 @@ npm run lint       # eslint
 | [`API_SPEC.md`](./API_SPEC.md) | 모든 API 라우트 입출력 명세 |
 | [`DB_SCHEMA.md`](./DB_SCHEMA.md) | Supabase 테이블·RLS·헬퍼 함수·마이그레이션 이력 |
 | [`UPDATES.md`](./UPDATES.md) | 사용자용 변경사항 노트 (`/updates` 페이지 + 관리자 카드의 원본) |
+| [`GEMINI.md`](./GEMINI.md) | Gemini CLI 전용 워크플로우·컨벤션 (4단계 하네스) |
 | [`AGENTS.md`](./AGENTS.md) | 본 레포에서 작업하는 AI/에이전트의 행동 규칙 |
-| [`CLAUDE.md`](./CLAUDE.md) | Claude Code 전용 워크플로우·컨벤션 |
+| [`CLAUDE.md`](./CLAUDE.md) | (Legacy) Claude Code 전용 워크플로우·컨벤션 |
 | [`menucategory.md`](./menucategory.md) | (archive) 2025-04 초기 메뉴/콘텐츠 기획서 |
 
 ---
