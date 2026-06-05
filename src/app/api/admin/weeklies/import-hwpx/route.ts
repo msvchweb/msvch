@@ -104,28 +104,27 @@ export async function POST(
     }
 
     // ── weekly_imports 행 생성 (status='parsing') ─────────
+    const importId = crypto.randomUUID();
+    const storagePath = `imports/${importId}.hwpx`;
     const fileName = file.name.slice(0, 300);
-    const { data: importRow, error: insertErr } = await supabase
+
+    const { error: insertErr } = await supabase
       .from("weekly_imports")
       .insert({
+        id: importId,
         uploaded_by: userId,
         file_name: fileName,
-        file_path: "", // 업로드 후 갱신
+        file_path: storagePath,
         source_format: "hwpx",
         status: "parsing",
-      })
-      .select("id")
-      .single<{ id: string }>();
+      });
 
-    if (insertErr || !importRow) {
+    if (insertErr) {
       return NextResponse.json<ErrorResponse>(
-        { error: `import 행 생성 실패: ${insertErr?.message ?? "unknown"}` },
+        { error: `import 행 생성 실패: ${insertErr.message}` },
         { status: 500 },
       );
     }
-
-    const importId = importRow.id;
-    const storagePath = `imports/${importId}.hwpx`;
 
     // ── Storage 업로드 ────────────────────────────────────
     const { error: storageErr } = await supabase.storage
@@ -145,11 +144,6 @@ export async function POST(
         { status: 500 },
       );
     }
-
-    await supabase
-      .from("weekly_imports")
-      .update({ file_path: storagePath })
-      .eq("id", importId);
 
     // ── 파싱 + 추출 ───────────────────────────────────────
     let result: WeeklyImportResult;

@@ -87,27 +87,26 @@ export async function POST(
     const buffer = Buffer.from(await file.arrayBuffer());
     const fileName = file.name.slice(0, 300);
 
-    const { data: importRow, error: insertErr } = await supabase
+    const importId = crypto.randomUUID();
+    const storagePath = `imports/${importId}.hwp`;
+
+    const { error: insertErr } = await supabase
       .from("weekly_imports")
       .insert({
+        id: importId,
         uploaded_by: userId,
         file_name: fileName,
-        file_path: "",
+        file_path: storagePath,
         source_format: "hwp",
         status: "converting",
-      })
-      .select("id")
-      .single<{ id: string }>();
+      });
 
-    if (insertErr || !importRow) {
+    if (insertErr) {
       return NextResponse.json<ErrorResponse>(
-        { error: `import 행 생성 실패: ${insertErr?.message ?? "unknown"}` },
+        { error: `import 행 생성 실패: ${insertErr.message}` },
         { status: 500 },
       );
     }
-
-    const importId = importRow.id;
-    const storagePath = `imports/${importId}.hwp`;
 
     const { error: storageErr } = await supabase.storage
       .from("weeklies")
@@ -125,10 +124,6 @@ export async function POST(
         { status: 500 },
       );
     }
-    await supabase
-      .from("weekly_imports")
-      .update({ file_path: storagePath })
-      .eq("id", importId);
 
     // ── GitHub Actions workflow_dispatch ───────────────────
     const ghToken = process.env.GITHUB_PAT;
