@@ -1,9 +1,15 @@
+import { execSync } from "child_process";
+import { existsSync, readdirSync } from "fs";
+import path from "path";
 import { supabase } from "./lib/supabase";
 import { download } from "./download";
+import { transcribeWithGroq } from "./transcribe";
 import { selectHighlights } from "./highlight";
 import { editClips } from "./edit";
 import { generateMetadata } from "./metadata";
 import { uploadClips } from "./upload";
+
+const WORK_DIR = "/tmp/shorts";
 
 async function updateJob(
   jobId: string,
@@ -25,6 +31,53 @@ function parseArg(args: string[], prefix: string): string | undefined {
   return match?.slice(prefix.length);
 }
 
+/**
+ * Groq Whisper 전사로 json3 자막을 생성한다.
+ * 실패 시 YouTube 자동자막(json3) 으로 graceful fallback 하여 파이프라인이 죽지 않게 한다.
+ * 폴백 자막도 없으면 throw → 호출부에서 failed 처리.
+ */
+async function runTranscription(
+  videoId: string,
+  audioPath: string,
+  jobId: string,
+): Promise<string> {
+  const outPath = path.join(WORK_DIR, `${videoId}.json3`);
+  try {
+    return await transcribeWithGroq(audioPath, outPath);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn(`[shorts] Groq 전사 실패 → YouTube 자동자막 폴백: ${msg}`);
+
+    // 영상 재수신 없이 ko 자동자막만 재다운로드
+    execSync(
+      [
+        "yt-dlp",
+        "--skip-download",
+        "--write-auto-sub",
+        "--sub-lang ko",
+        "--sub-format json3",
+        `-o "${path.join(WORK_DIR, videoId)}"`,
+        "--no-playlist",
+        `"https://www.youtube.com/watch?v=${videoId}"`,
+      ].join(" "),
+      { stdio: "inherit", timeout: 300_000 },
+    );
+
+    const subFile = readdirSync(WORK_DIR).find(
+      (f) => f.startsWith(videoId) && f.endsWith(".json3"),
+    );
+    if (!subFile) {
+      throw new Error(
+        "Groq 전사 실패 후 YouTube 자동자막도 찾을 수 없습니다.",
+      );
+    }
+
+    // 폴백 사유를 error 컬럼에 메모 (status 는 곧 selecting 으로 덮어씀 → 파이프라인 계속)
+    await updateJob(jobId, "transcribing", "groq_failed_fallback_youtube");
+    return path.join(WORK_DIR, subFile);
+  }
+}
+
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const videoId = parseArg(args, "--videoId=");
@@ -38,28 +91,33 @@ async function main(): Promise<void> {
   console.log(`[shorts] 시작: videoId=${videoId}, jobId=${jobId}`);
 
   try {
-    // 1. 다운로드 + 자막 추출
-    console.log("[shorts] 1/5 다운로드 시작");
+    // 1. 다운로드 + 오디오 추출
+    console.log("[shorts] 1/6 다운로드 시작");
     await updateJob(jobId, "downloading");
-    const { videoPath, subtitlePath } = download(videoId);
+    const { videoPath, audioPath } = download(videoId);
 
-    // 2. 자막 파싱 + 하이라���트 선정
-    console.log("[shorts] 2/5 하이라이트 선정");
+    // 2. 전사 (Groq Whisper → json3, 실패 시 자동자막 폴백)
+    console.log("[shorts] 2/6 전사 시작");
+    await updateJob(jobId, "transcribing");
+    const subtitlePath = await runTranscription(videoId, audioPath, jobId);
+
+    // 3. 자막 파싱 + 하이라이트 선정
+    console.log("[shorts] 3/6 하이라이트 선정");
     await updateJob(jobId, "selecting");
     const highlights = await selectHighlights(subtitlePath);
     console.log(`[shorts] 하이라이트 ${highlights.length}개 선정 완료`);
 
-    // 3. FFmpeg 편집
-    console.log("[shorts] 3/5 영상 편집");
+    // 4. FFmpeg 편집
+    console.log("[shorts] 4/6 영상 편집");
     await updateJob(jobId, "editing");
     const clipPaths = editClips(videoPath, subtitlePath, highlights);
 
-    // 4. 메타데이터 생성
-    console.log("[shorts] 4/5 메타데이터 생성");
+    // 5. 메타데이터 생성
+    console.log("[shorts] 5/6 메타데이터 생성");
     const metadata = await generateMetadata(highlights);
 
-    // 5. Supabase 업로드 + DB 저장
-    console.log("[shorts] 5/5 업로드");
+    // 6. Supabase 업로드 + DB 저장
+    console.log("[shorts] 6/6 업로드");
     const clips = await uploadClips(jobId, clipPaths, highlights, metadata);
 
     await updateJob(jobId, "ready_for_review");

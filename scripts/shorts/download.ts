@@ -1,26 +1,24 @@
 import { execSync } from "child_process";
-import { existsSync, readdirSync } from "fs";
+import { existsSync } from "fs";
 import path from "path";
 
 const WORK_DIR = "/tmp/shorts";
 
 export interface DownloadResult {
-  videoPath: string;
-  subtitlePath: string;
+  videoPath: string; // /tmp/shorts/<videoId>.mp4
+  audioPath: string; // /tmp/shorts/<videoId>.mp3  (16kHz mono)
 }
 
 export function download(videoId: string): DownloadResult {
   execSync(`mkdir -p ${WORK_DIR}`);
 
   const videoPath = path.join(WORK_DIR, `${videoId}.mp4`);
+  const audioPath = path.join(WORK_DIR, `${videoId}.mp3`);
 
-  // 영상 + 한국어 자동 자막 다운로드
+  // 영상 다운로드 (자막 동시 수신 제거 — 자막은 transcribe 단계에서 Groq 로 생성)
   execSync(
     [
       "yt-dlp",
-      "--write-auto-sub",
-      "--sub-lang ko",
-      "--sub-format json3",
       '-f "bv*[height<=1080]+ba/b[height<=1080]"',
       "--merge-output-format mp4",
       `-o "${videoPath}"`,
@@ -34,20 +32,27 @@ export function download(videoId: string): DownloadResult {
     throw new Error("영상 다운로드 실패");
   }
 
-  // yt-dlp는 자막 파일명에 .ko 를 붙임
-  const files = readdirSync(WORK_DIR);
-  const subFile = files.find(
-    (f) => f.startsWith(videoId) && f.endsWith(".json3"),
+  // 다운로드한 영상에서 16kHz mono 32kbps mp3 추출 (2차 네트워크 다운로드 없음)
+  execSync(
+    [
+      "ffmpeg -y",
+      `-i "${videoPath}"`,
+      "-vn",
+      "-ac 1",
+      "-ar 16000",
+      "-c:a libmp3lame",
+      "-b:a 32k",
+      `"${audioPath}"`,
+    ].join(" "),
+    { stdio: "inherit", timeout: 300_000 },
   );
 
-  if (!subFile) {
-    throw new Error(
-      "한국어 자막을 찾을 수 없습니다. 이 영상에는 자동 자막이 없을 수 있습니다.",
-    );
+  if (!existsSync(audioPath)) {
+    throw new Error("오디오 추출 실패");
   }
 
   return {
     videoPath,
-    subtitlePath: path.join(WORK_DIR, subFile),
+    audioPath,
   };
 }
