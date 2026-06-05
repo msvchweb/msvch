@@ -63,6 +63,7 @@ function inputToWeekly(input: WeeklyContentInput, weeklyId?: string): Weekly {
     front_toggles: input.front_toggles,
     week_total: input.week_total,
     cumulative_total: input.cumulative_total,
+    photo_images: input.photo_images,
   };
 }
 

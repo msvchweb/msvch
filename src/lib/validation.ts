@@ -19,6 +19,13 @@ export const MAX_IMAGE_SIZE = 10 * 1024 * 1024; // 10 MB (gallery)
 export const MAX_BLOG_IMAGE_SIZE = 5 * 1024 * 1024; // 5 MB (blog-images 버킷 제한과 일치)
 export const MAX_UPLOAD_FILES = 30;
 
+/** 이미지형 주보 — 사진 첨부 최대 장수 (폼/스키마 공유, 마이그 040) */
+export const MAX_WEEKLY_PHOTOS = 20;
+
+/** weeklies 버킷 public URL 만 허용 — 외부 URL 끼워넣기 차단 */
+export const WEEKLY_PHOTO_URL_FRAGMENT =
+  "/storage/v1/object/public/weeklies/";
+
 // ──────────────────────────────────────────────
 //  파일 검증
 // ──────────────────────────────────────────────
@@ -273,6 +280,19 @@ export const WeeklyContentSchema = z.object({
   }),
   week_total: z.string().max(40).default(""),
   cumulative_total: z.string().max(40).default(""),
+  // ── 이미지형 주보 (마이그 040) — weeklies 버킷 public URL 만 허용, 최대 MAX_WEEKLY_PHOTOS 장
+  photo_images: z
+    .array(
+      z
+        .string()
+        .url()
+        .refine(
+          (u) => u.includes(WEEKLY_PHOTO_URL_FRAGMENT),
+          "허용되지 않은 이미지 URL",
+        ),
+    )
+    .max(MAX_WEEKLY_PHOTOS, `사진은 최대 ${MAX_WEEKLY_PHOTOS}장`)
+    .default([]),
 });
 
 // ── 마스터 데이터 스키마 (admin/masters CRUD 에서 사용) ───────────────
@@ -365,6 +385,7 @@ export function createEmptyWeeklyInput(): WeeklyContentInput {
     },
     week_total: "",
     cumulative_total: "",
+    photo_images: [],
   };
 }
 

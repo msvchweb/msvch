@@ -161,4 +161,9 @@ export interface Weekly {
   };
   week_total: string | null;
   cumulative_total: string | null;
+  /**
+   * 이미지형 주보 — 업로드한 사진들의 Storage public URL 배열 (마이그 040).
+   * 비어있지 않으면 공개 상세뷰에서 구조화 렌더링 대신 사진을 표시. DB default '{}' 라 항상 배열.
+   */
+  photo_images: string[];
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Sparkles, FileUp } from "lucide-react";
+import { Sparkles, FileUp, ImagePlus, X, Loader2 } from "lucide-react";
 import type {
   NewsItem,
   MeetingRow,
@@ -9,7 +9,16 @@ import type {
   WorshipItemRow,
   WorshipSubRow,
 } from "@/types/notice";
-import type { WeeklyContentInput } from "@/lib/validation";
+import {
+  type WeeklyContentInput,
+  ALLOWED_IMAGE_EXTENSIONS,
+  MAX_BLOG_IMAGE_SIZE,
+  MAX_WEEKLY_PHOTOS,
+  validateFile,
+  safeExtension,
+} from "@/lib/validation";
+import { createClient } from "@/lib/supabase/client";
+import { compressImage } from "@/lib/image-compress";
 import { EventExtractionModal } from "@/components/admin/event-extraction/EventExtractionModal";
 import { WeeklyImportModal } from "@/components/admin/weekly-import/WeeklyImportModal";
 import { FormTabs, type FormTab } from "./form/FormTabs";
@@ -35,6 +44,10 @@ import {
   emptyNextWeekPrayer,
   buildDawnReadings,
 } from "./form/constants";
+
+/** 이미지형 주보 사진 업로드 — 절대 상한(브라우저 OOM 방지) 및 버킷/경로 컨벤션 */
+const PHOTO_HARD_MAX = 50 * 1024 * 1024; // 50MB 절대 상한
+const WEEKLY_BUCKET = "weeklies";
 
 interface Props {
   initial: WeeklyContentInput;
@@ -236,6 +249,74 @@ export function WeeklyForm({
   const titleRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
 
+  // ── 이미지형 주보 사진 업로드 (마이그 040) ─────────────────
+  const supabase = useMemo(() => createClient(), []);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  // 신규 작성 시 weeklyId 가 아직 없으므로, 마운트 시 1회 생성한 UUID 를 업로드 디렉토리로 사용
+  const [draftId] = useState(() => crypto.randomUUID());
+  const photoFileRef = useRef<HTMLInputElement>(null);
+
+  async function handlePhotoFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const current = form.photo_images;
+    if (current.length + files.length > MAX_WEEKLY_PHOTOS) {
+      alert(`사진은 최대 ${MAX_WEEKLY_PHOTOS}장까지 첨부할 수 있습니다.`);
+      return;
+    }
+    setPhotoUploading(true);
+    try {
+      const newUrls: string[] = [];
+      for (const file of Array.from(files)) {
+        const baseCheck = validateFile(file, ALLOWED_IMAGE_EXTENSIONS, PHOTO_HARD_MAX);
+        if (!baseCheck.ok) {
+          alert(`${file.name}: ${baseCheck.reason}`);
+          continue;
+        }
+
+        let toUpload: File = file;
+        if (file.size > MAX_BLOG_IMAGE_SIZE) {
+          try {
+            const result = await compressImage(file, MAX_BLOG_IMAGE_SIZE);
+            toUpload = result.file;
+          } catch (e) {
+            const reason = e instanceof Error ? e.message : "압축 실패";
+            alert(`${file.name}: ${reason}`);
+            continue;
+          }
+        }
+
+        const ext = safeExtension(toUpload.name, ALLOWED_IMAGE_EXTENSIONS);
+        const path = `photos/${draftId}/${crypto.randomUUID()}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from(WEEKLY_BUCKET)
+          .upload(path, toUpload, { contentType: toUpload.type });
+        if (upErr) {
+          alert(`${file.name}: ${upErr.message}`);
+          continue;
+        }
+        const { data } = supabase.storage.from(WEEKLY_BUCKET).getPublicUrl(path);
+        newUrls.push(data.publicUrl);
+      }
+      if (newUrls.length > 0) {
+        setForm((prev) => ({
+          ...prev,
+          photo_images: [...prev.photo_images, ...newUrls],
+        }));
+      }
+    } finally {
+      setPhotoUploading(false);
+      if (photoFileRef.current) photoFileRef.current.value = "";
+    }
+  }
+
+  function removePhoto(idx: number) {
+    // 폼 상태에서만 제거. Storage 객체 즉시 삭제는 하지 않음(미저장 취소·되돌리기 대비, 고아 객체 허용).
+    setForm((prev) => ({
+      ...prev,
+      photo_images: prev.photo_images.filter((_, i) => i !== idx),
+    }));
+  }
+
   // 날짜 변경 시 새벽예배 일자 자동 재생성 (본문은 유지)
   const currentDate = form.date;
   useEffect(() => {
@@ -366,6 +447,64 @@ export function WeeklyForm({
         onClose={() => setShowImport(false)}
         onApply={(patch) => applyImportPatch(patch)}
       />
+
+      {/* ─── 사진으로 주보 올리기 (이미지형 주보) ──────────────── */}
+      <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-sky-900">
+              🖼️ 사진으로 주보 올리기
+            </p>
+            <p className="mt-0.5 text-xs text-sky-800/80">
+              주보 사진(여러 장)을 올리면 공개 웹 상세 페이지에 사진이 그대로 표시됩니다.
+              <strong> 사진이 있으면 공개 페이지에서 사진이 우선 표시됩니다.</strong>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => photoFileRef.current?.click()}
+            disabled={photoUploading || form.photo_images.length >= MAX_WEEKLY_PHOTOS}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg bg-sky-600 px-3 py-2 text-xs font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+          >
+            {photoUploading ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <ImagePlus size={14} />
+            )}
+            사진 추가 ({form.photo_images.length}/{MAX_WEEKLY_PHOTOS})
+          </button>
+        </div>
+        <input
+          ref={photoFileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          hidden
+          onChange={(e) => handlePhotoFiles(e.target.files)}
+        />
+        {form.photo_images.length > 0 && (
+          <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
+            {form.photo_images.map((url, i) => (
+              <div key={url} className="relative">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={url}
+                  alt={`주보 사진 ${i + 1}`}
+                  className="aspect-square w-full rounded-lg border border-sky-200 object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePhoto(i)}
+                  className="absolute -right-1 -top-1 rounded-full bg-red-600 p-0.5 text-white"
+                  aria-label="사진 제거"
+                >
+                  <X size={10} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
 
       <FormTabs tabs={tabs} onActiveChange={onTabChange} />
 

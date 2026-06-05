@@ -12,6 +12,7 @@ import {
   weeklyToBackData,
 } from "./BulletinBack";
 import { ProtectedView } from "./ProtectedView";
+import { WeeklyPhotoView } from "./WeeklyPhotoView";
 import type { Weekly } from "@/types/notice";
 import type { BulletinMasterData } from "@/types/bulletin-master";
 
@@ -25,6 +26,11 @@ interface Props {
  * 각 면은 컨테이너 폭에 맞춰 자동 스케일되어 가로 스크롤 없이 보이게 한다.
  */
 export function BulletinWebView({ weekly, master }: Props) {
+  // 이미지형 주보 (마이그 040): 사진이 첨부돼 있으면 구조화 렌더링 대신 사진을 그대로 표시.
+  if (weekly.photo_images && weekly.photo_images.length > 0) {
+    return <WeeklyPhotoView images={weekly.photo_images} title={weekly.title} />;
+  }
+
   const frontData = weeklyToFrontData(weekly, master);
   const backData = weeklyToBackData(weekly, master);
 
