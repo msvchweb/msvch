@@ -1,9 +1,8 @@
 import { execSync } from "child_process";
-import { readdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
 import path from "path";
 import { z } from "zod";
-
-const WORK_DIR = "/tmp/shorts";
+import { WORK_DIR } from "./lib/paths";
 
 // ── 상수 (turbo 전환은 이 한 줄 교체) ─────────────────────
 export const GROQ_STT_MODEL = "whisper-large-v3";
@@ -106,6 +105,8 @@ function serializeToJson3(segments: GroqSegment[]): Json3Subtitle {
 
 /** 24MB 초과 오디오를 10분 단위로 분할. 각 청크의 offsetSec 동봉. */
 function chunkAudio(audioPath: string): { path: string; offsetSec: number }[] {
+  // 방어적: 단독 실행/테스트 내성. 정상 파이프라인에선 download 가 선행 생성.
+  mkdirSync(WORK_DIR, { recursive: true });
   const base = path.basename(audioPath, path.extname(audioPath));
   const pattern = path.join(WORK_DIR, `${base}_chunk_%03d.mp3`);
 

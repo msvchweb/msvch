@@ -1,16 +1,15 @@
 import { execSync } from "child_process";
-import { existsSync } from "fs";
+import { existsSync, mkdirSync } from "fs";
 import path from "path";
-
-const WORK_DIR = "/tmp/shorts";
+import { WORK_DIR } from "./lib/paths";
 
 export interface DownloadResult {
-  videoPath: string; // /tmp/shorts/<videoId>.mp4
-  audioPath: string; // /tmp/shorts/<videoId>.mp3  (16kHz mono)
+  videoPath: string; // WORK_DIR/<videoId>.mp4
+  audioPath: string; // WORK_DIR/<videoId>.mp3  (16kHz mono)
 }
 
 export function download(videoId: string): DownloadResult {
-  execSync(`mkdir -p ${WORK_DIR}`);
+  mkdirSync(WORK_DIR, { recursive: true });
 
   const videoPath = path.join(WORK_DIR, `${videoId}.mp4`);
   const audioPath = path.join(WORK_DIR, `${videoId}.mp3`);

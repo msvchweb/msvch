@@ -2,8 +2,8 @@ import { execSync } from "child_process";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import type { HighlightSegment, VoicedChunk, Mood } from "./highlight";
+import { WORK_DIR } from "./lib/paths";
 
-const WORK_DIR = "/tmp/shorts";
 const BGM_DIR = path.join(process.cwd(), "scripts/shorts/bgm");
 
 /** mood → BGM 파일 경로. 해당 무드 음원 없으면 다른 무드라도 있으면 사용. 모두 없으면 null. */

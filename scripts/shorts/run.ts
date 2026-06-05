@@ -8,8 +8,7 @@ import { selectHighlights } from "./highlight";
 import { editClips } from "./edit";
 import { generateMetadata } from "./metadata";
 import { uploadClips } from "./upload";
-
-const WORK_DIR = "/tmp/shorts";
+import { WORK_DIR } from "./lib/paths";
 
 async function updateJob(
   jobId: string,

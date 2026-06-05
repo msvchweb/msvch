@@ -7,9 +7,8 @@
 import { readFileSync, writeFileSync, existsSync, readdirSync } from "fs";
 import { execSync } from "child_process";
 import path from "path";
-import os from "os";
+import { WORK_DIR } from "./lib/paths";
 
-const WORK_DIR = path.join(os.tmpdir(), "shorts");
 const VIDEO_ID = "AZn08S-GlCQ";
 const BGM_DIR = path.join(process.cwd(), "scripts/shorts/bgm");
 
