@@ -196,98 +196,124 @@ function escapeFilterPath(p: string): string {
   return p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
 }
 
+/** editClips 성공 결과 — 출력 경로와 그 클립의 highlight 짝. 다운스트림 인덱스 정합 보존용. */
+export interface EditedClip {
+  outputPath: string;
+  highlight: HighlightSegment;
+}
+
 export function editClips(
   videoPath: string,
   subtitlePath: string,
   highlights: HighlightSegment[],
-): string[] {
-  const outputPaths: string[] = [];
+): EditedClip[] {
+  const result: EditedClip[] = [];
 
   for (let i = 0; i < highlights.length; i++) {
     const h = highlights[i];
-    const assContent = generateASS(
-      subtitlePath,
-      h.start_sec,
-      h.end_sec,
-      h.keywords,
-      h.card_text,
-      h.voiced,
-    );
-    const assPath = path.join(WORK_DIR, `clip_${i}.ass`);
-    const outputPath = path.join(WORK_DIR, `clip_${i}.mp4`);
 
-    writeFileSync(assPath, assContent, "utf-8");
-
-    const assRef = escapeFilterPath(assPath);
-    const bgmPath = getBgmPath(h.mood);
-    const logoPath = path.join(process.cwd(), "scripts/shorts/banner.png");
-    const useCut = !isFullClip(h.voiced, h.start_sec, h.end_sec);
-    const logoInputIdx = bgmPath ? 2 : 1;
-
-    // 비디오 체인:
-    //   (옵션) select: 침묵 컷 적용 → [vcut]
-    //   color 1080x1920 검정 캔버스 [bg]
-    //   영상 1:1 정사각 crop → [fg]
-    //   overlay y=350 [merged] → ass 자막/카드 번인 → [captioned]
-    //   로고 overlay (하단 가운데) → [vout]
-    const videoFilters: string[] = [];
-    if (useCut) {
-      videoFilters.push(`[0:v]select='${buildSelectExpr(h.voiced, h.start_sec)}',setpts=N/FRAME_RATE/TB[vcut]`);
-    }
-    const fgSource = useCut ? "[vcut]" : "[0:v]";
-    videoFilters.push("color=c=black:s=1080x1920:d=1[bg]");
-    videoFilters.push(`${fgSource}crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]`);
-    videoFilters.push("[bg][fg]overlay=0:350[merged]");
-    videoFilters.push(`[merged]ass='${assRef}'[captioned]`);
-    videoFilters.push(`[${logoInputIdx}:v]scale=400:-1[logo]`);
-    videoFilters.push(`[captioned][logo]overlay=(W-w)/2:H-h-30:shortest=1[vout]`);
-
-    // 오디오 체인:
-    //   (옵션) aselect: 침묵 컷 적용 → [acut]
-    //   (옵션) BGM amix → [aout], 없으면 sermon audio 그대로
-    const audioFilters: string[] = [];
-    if (useCut) {
-      audioFilters.push(`[0:a]aselect='${buildSelectExpr(h.voiced, h.start_sec)}',asetpts=N/SR/TB[acut]`);
-    }
-    const sermonAudio = useCut ? "[acut]" : "[0:a]";
-    if (bgmPath) {
-      audioFilters.push("[1:a]volume=0.08,afade=t=in:d=0.5[bgm]");
-      audioFilters.push(`${sermonAudio}[bgm]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
-    } else if (useCut) {
-      // BGM 없고 cut 적용 — sermon audio (cut) 만 [aout] 로 통일
-      audioFilters.push(`${sermonAudio}anull[aout]`);
+    // 이중 방어선: 파트 1이 무력화돼도 ffmpeg -to < -ss 재발 차단.
+    const dur = h.end_sec - h.start_sec;
+    if (!(dur > 0)) {
+      console.error(
+        `[shorts] clip ${i} 비정상 시간 (skip): start=${h.start_sec} end=${h.end_sec} dur=${dur}`,
+      );
+      continue;
     }
 
-    const filterComplex = [...videoFilters, ...audioFilters].join(";");
+    try {
+      const assContent = generateASS(
+        subtitlePath,
+        h.start_sec,
+        h.end_sec,
+        h.keywords,
+        h.card_text,
+        h.voiced,
+      );
+      const assPath = path.join(WORK_DIR, `clip_${i}.ass`);
+      const outputPath = path.join(WORK_DIR, `clip_${i}.mp4`);
 
-    // BGM 없고 cut 도 없으면 [0:a] 그대로 map
-    const audioMap = bgmPath || useCut ? '-map "[aout]"' : "-map 0:a";
+      writeFileSync(assPath, assContent, "utf-8");
 
-    const sermonInput = `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
-    const bgmInput = bgmPath ? `-i "${bgmPath}"` : "";
-    const logoInput = `-loop 1 -i "${logoPath}"`;
-    const inputs = [sermonInput, bgmInput, logoInput].filter(Boolean).join(" ");
+      const assRef = escapeFilterPath(assPath);
+      const bgmPath = getBgmPath(h.mood);
+      const logoPath = path.join(process.cwd(), "scripts/shorts/banner.png");
+      const useCut = !isFullClip(h.voiced, h.start_sec, h.end_sec);
+      const logoInputIdx = bgmPath ? 2 : 1;
 
-    execSync(
-      [
-        "ffmpeg -y",
-        inputs,
-        `-filter_complex "${filterComplex}"`,
-        `-map "[vout]" ${audioMap}`,
-        "-c:v libx264 -preset medium -crf 23",
-        "-c:a aac -b:a 128k",
-        "-movflags +faststart",
-        `"${outputPath}"`,
-      ].join(" "),
-      { stdio: "inherit", timeout: 180_000 },
-    );
+      // 비디오 체인:
+      //   (옵션) select: 침묵 컷 적용 → [vcut]
+      //   color 1080x1920 검정 캔버스 [bg]
+      //   영상 1:1 정사각 crop → [fg]
+      //   overlay y=350 [merged] → ass 자막/카드 번인 → [captioned]
+      //   로고 overlay (하단 가운데) → [vout]
+      const videoFilters: string[] = [];
+      if (useCut) {
+        videoFilters.push(`[0:v]select='${buildSelectExpr(h.voiced, h.start_sec)}',setpts=N/FRAME_RATE/TB[vcut]`);
+      }
+      const fgSource = useCut ? "[vcut]" : "[0:v]";
+      videoFilters.push("color=c=black:s=1080x1920:d=1[bg]");
+      videoFilters.push(`${fgSource}crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]`);
+      videoFilters.push("[bg][fg]overlay=0:350[merged]");
+      videoFilters.push(`[merged]ass='${assRef}'[captioned]`);
+      videoFilters.push(`[${logoInputIdx}:v]scale=400:-1[logo]`);
+      videoFilters.push(`[captioned][logo]overlay=(W-w)/2:H-h-30:shortest=1[vout]`);
 
-    console.log(
-      `[shorts] clip ${i}: mood=${h.mood}, cut=${useCut ? `${h.voiced.length}chunks` : "none"}, bgm=${bgmPath ? path.basename(bgmPath) : "none"}`,
-    );
+      // 오디오 체인:
+      //   (옵션) aselect: 침묵 컷 적용 → [acut]
+      //   (옵션) BGM amix → [aout], 없으면 sermon audio 그대로
+      const audioFilters: string[] = [];
+      if (useCut) {
+        audioFilters.push(`[0:a]aselect='${buildSelectExpr(h.voiced, h.start_sec)}',asetpts=N/SR/TB[acut]`);
+      }
+      const sermonAudio = useCut ? "[acut]" : "[0:a]";
+      if (bgmPath) {
+        audioFilters.push("[1:a]volume=0.08,afade=t=in:d=0.5[bgm]");
+        audioFilters.push(`${sermonAudio}[bgm]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
+      } else if (useCut) {
+        // BGM 없고 cut 적용 — sermon audio (cut) 만 [aout] 로 통일
+        audioFilters.push(`${sermonAudio}anull[aout]`);
+      }
 
-    outputPaths.push(outputPath);
+      const filterComplex = [...videoFilters, ...audioFilters].join(";");
+
+      // BGM 없고 cut 도 없으면 [0:a] 그대로 map
+      const audioMap = bgmPath || useCut ? '-map "[aout]"' : "-map 0:a";
+
+      const sermonInput = `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
+      const bgmInput = bgmPath ? `-i "${bgmPath}"` : "";
+      const logoInput = `-loop 1 -i "${logoPath}"`;
+      const inputs = [sermonInput, bgmInput, logoInput].filter(Boolean).join(" ");
+
+      execSync(
+        [
+          "ffmpeg -y",
+          inputs,
+          `-filter_complex "${filterComplex}"`,
+          `-map "[vout]" ${audioMap}`,
+          "-c:v libx264 -preset medium -crf 23",
+          "-c:a aac -b:a 128k",
+          "-movflags +faststart",
+          `"${outputPath}"`,
+        ].join(" "),
+        { stdio: "inherit", timeout: 180_000 },
+      );
+
+      console.log(
+        `[shorts] clip ${i}: mood=${h.mood}, cut=${useCut ? `${h.voiced.length}chunks` : "none"}, bgm=${bgmPath ? path.basename(bgmPath) : "none"}`,
+      );
+
+      result.push({ outputPath, highlight: h });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[shorts] clip ${i} 렌더 실패 (skip): ${msg}`);
+      continue;
+    }
   }
 
-  return outputPaths;
+  if (result.length === 0) {
+    throw new Error("모든 클립 렌더 실패");
+  }
+
+  return result;
 }

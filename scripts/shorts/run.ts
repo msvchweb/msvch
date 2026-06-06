@@ -109,15 +109,18 @@ async function main(): Promise<void> {
     // 4. FFmpeg 편집
     console.log("[shorts] 4/6 영상 편집");
     await updateJob(jobId, "editing");
-    const clipPaths = editClips(videoPath, subtitlePath, highlights);
+    const edited = editClips(videoPath, subtitlePath, highlights);
+    const clipPaths = edited.map((e) => e.outputPath);
+    const succeededHighlights = edited.map((e) => e.highlight);
+    console.log(`[shorts] 렌더 성공 ${edited.length}/${highlights.length}개`);
 
-    // 5. 메타데이터 생성
+    // 5. 메타데이터 생성 (성공한 클립 기준 — clipPaths 와 인덱스 정합)
     console.log("[shorts] 5/6 메타데이터 생성");
-    const metadata = await generateMetadata(highlights);
+    const metadata = await generateMetadata(succeededHighlights);
 
     // 6. Supabase 업로드 + DB 저장
     console.log("[shorts] 6/6 업로드");
-    const clips = await uploadClips(jobId, clipPaths, highlights, metadata);
+    const clips = await uploadClips(jobId, clipPaths, succeededHighlights, metadata);
 
     await updateJob(jobId, "ready_for_review");
     console.log(`[shorts] 완료: ${clips.length}개 클립 생성`);

@@ -3,6 +3,10 @@ import { readFileSync } from "fs";
 export type Mood = "solemn" | "uplifting" | "peaceful" | "reflective";
 const MOODS: Mood[] = ["solemn", "uplifting", "peaceful", "reflective"];
 
+/** 하이라이트 클립 길이 허용 범위 (초). 범위 밖/비정상 시간은 skip. */
+const MIN_CLIP_SEC = 20;
+const MAX_CLIP_SEC = 70;
+
 /** 침묵 컷 후 남는 음성 chunk (절대 시간, 초). */
 export interface VoicedChunk {
   start: number;
@@ -192,7 +196,7 @@ ${transcript}`;
   const parsed = JSON.parse(text) as GeminiHighlightResult;
 
   // 타임스탬프 스냅 + keywords/card_text/mood 안전 기본값 + voiced chunks 산출
-  return parsed.highlights.map((h) => {
+  const snapped = parsed.highlights.map((h) => {
     const startSeg = segments.reduce((best, s) =>
       Math.abs(s.startMs / 1000 - h.start_sec) <
       Math.abs(best.startMs / 1000 - h.start_sec)
@@ -220,4 +224,33 @@ ${transcript}`;
       voiced: computeVoicedChunks(segments, startSec, endSec),
     };
   });
+
+  // 비정상 시간 하이라이트 검증/필터 (end_sec ≤ start_sec, 길이 범위 밖, 음수/비유한 → skip)
+  const valid = snapped.filter((h) => {
+    const dur = h.end_sec - h.start_sec;
+    const bad =
+      !Number.isFinite(h.start_sec) ||
+      !Number.isFinite(h.end_sec) ||
+      h.start_sec < 0 ||
+      dur < MIN_CLIP_SEC ||
+      dur > MAX_CLIP_SEC;
+    if (bad) {
+      console.warn(
+        `[shorts] 하이라이트 버림: "${h.title}" start=${h.start_sec} end=${h.end_sec} dur=${dur}`,
+      );
+    }
+    return !bad;
+  });
+
+  if (valid.length === 0) {
+    throw new Error(
+      "유효한 하이라이트가 없습니다 (모두 시간 비정상). Gemini 응답 확인 필요.",
+    );
+  }
+
+  console.log(
+    `[shorts] 유효 하이라이트 ${valid.length}/${parsed.highlights.length}개`,
+  );
+
+  return valid;
 }
