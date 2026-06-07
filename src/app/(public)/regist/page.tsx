@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import { Loader2, CheckCircle2, User, Phone, Instagram, Calendar, Users } from "lucide-react";
-import { PRIVACY_POLICY_TEXT } from "../(public)/new-family/privacy-policy";
+import { PRIVACY_POLICY_TEXT } from "../new-family/privacy-policy";
 
 type Step = "intro" | "form" | "done";
 
