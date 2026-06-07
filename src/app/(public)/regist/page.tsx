@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
-import { Loader2, CheckCircle2, User, Phone, Instagram, Calendar, Users } from "lucide-react";
+import { Loader2, CheckCircle2, User, Phone, Camera, Calendar, Users } from "lucide-react";
 import { PRIVACY_POLICY_TEXT } from "../new-family/privacy-policy";
 
 type Step = "intro" | "form" | "done";
@@ -193,7 +193,7 @@ export default function QuickRegistPage() {
             {/* 연락처 선택 */}
             <div>
               <label className="mb-2 flex items-center gap-2 text-sm font-semibold text-gray-700">
-                {contactType === "phone" ? <Phone size={16} className="text-gray-400" /> : <Instagram size={16} className="text-gray-400" />}
+                {contactType === "phone" ? <Phone size={16} className="text-gray-400" /> : <Camera size={16} className="text-gray-400" />}
                 연락처
               </label>
               <div className="mb-3 flex gap-2">
