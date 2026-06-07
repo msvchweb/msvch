@@ -461,22 +461,20 @@ export const NewFamilyRegistrationSchema = z.object({
         "etc",
       ]),
     )
-    .max(5),
+    .max(5)
+    .optional()
+    .default([]),
   visitPathsEtc: z.string().max(200).optional(),
-  faithStatus: z.enum(["accepted", "not_yet", "unsure"]),
+  faithStatus: z.enum(["accepted", "not_yet", "unsure"]).optional(),
   name: z
     .string()
     .min(1, "이름을 입력하세요")
     .max(50, "이름은 50자까지"),
   gender: z.enum(["male", "female"]),
-  birth: z
-    .string()
-    .min(1, "생년월일을 입력하세요")
-    .max(40, "생년월일은 40자까지"),
-  phone: z
-    .string()
-    .min(1, "연락처를 입력하세요")
-    .max(20, "연락처 형식 오류"),
+  birth: z.string().max(40).optional(),
+  ageGroup: z.string().max(40).optional(),
+  phone: z.string().max(20).optional(),
+  instagramId: z.string().max(50).optional(),
   region: z.string().max(100).optional(),
   churchHistory: z.enum([
     "never",
@@ -484,12 +482,15 @@ export const NewFamilyRegistrationSchema = z.object({
     "baptized_inactive",
     "baptized_active",
     "etc",
-  ]),
+  ]).optional(),
   churchHistoryEtc: z.string().max(200).optional(),
   message: z.string().max(2000).optional(),
   privacyConsent: z.literal(true, {
     message: "개인정보 수집 및 이용에 동의해야 합니다.",
   }),
+}).refine(data => data.phone || data.instagramId, {
+  message: "연락처(전화번호) 또는 인스타그램 아이디 중 하나는 입력해야 합니다.",
+  path: ["phone"],
 });
 
 /** PATCH /api/admin/new-families/[id] — 처리 상태/메모 수정 */

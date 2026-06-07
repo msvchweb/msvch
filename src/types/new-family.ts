@@ -25,15 +25,17 @@ export type NewFamilyStatus = "new" | "contacted" | "assigned" | "done";
 
 /** 공개 폼 → 서버 전송 페이로드 */
 export interface NewFamilyRegistrationInput {
-  visitPaths: NewFamilyVisitPath[];
+  visitPaths?: NewFamilyVisitPath[];
   visitPathsEtc?: string;
-  faithStatus: NewFamilyFaithStatus;
+  faithStatus?: NewFamilyFaithStatus;
   name: string;
   gender: NewFamilyGender;
-  birth: string;
-  phone: string;
+  birth?: string;
+  ageGroup?: string;
+  phone?: string;
+  instagramId?: string;
   region?: string;
-  churchHistory: NewFamilyChurchHistory;
+  churchHistory?: NewFamilyChurchHistory;
   churchHistoryEtc?: string;
   message?: string;
   privacyConsent: true;
@@ -44,13 +46,15 @@ export interface NewFamilyRegistration {
   id: string;
   visitPaths: NewFamilyVisitPath[];
   visitPathsEtc: string | null;
-  faithStatus: NewFamilyFaithStatus;
+  faithStatus: NewFamilyFaithStatus | null;
   name: string;
   gender: NewFamilyGender;
-  birth: string;
-  phone: string;
+  birth: string | null;
+  ageGroup: string | null;
+  phone: string | null;
+  instagramId: string | null;
   region: string | null;
-  churchHistory: NewFamilyChurchHistory;
+  churchHistory: NewFamilyChurchHistory | null;
   churchHistoryEtc: string | null;
   message: string | null;
   privacyConsent: boolean;

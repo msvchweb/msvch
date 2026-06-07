@@ -16,13 +16,15 @@ interface NewFamilyRow {
   id: string;
   visit_paths: NewFamilyVisitPath[];
   visit_paths_etc: string | null;
-  faith_status: NewFamilyFaithStatus;
+  faith_status: NewFamilyFaithStatus | null;
   name: string;
   gender: NewFamilyGender;
-  birth: string;
-  phone: string;
+  birth: string | null;
+  age_group: string | null;
+  phone: string | null;
+  instagram_id: string | null;
   region: string | null;
-  church_history: NewFamilyChurchHistory;
+  church_history: NewFamilyChurchHistory | null;
   church_history_etc: string | null;
   message: string | null;
   privacy_consent: boolean;
@@ -42,7 +44,9 @@ export function toDto(row: NewFamilyRow): NewFamilyRegistration {
     name: row.name,
     gender: row.gender,
     birth: row.birth,
+    ageGroup: row.age_group,
     phone: row.phone,
+    instagramId: row.instagram_id,
     region: row.region,
     churchHistory: row.church_history,
     churchHistoryEtc: row.church_history_etc,
@@ -57,7 +61,7 @@ export function toDto(row: NewFamilyRow): NewFamilyRegistration {
 }
 
 const SELECT_COLS =
-  "id, visit_paths, visit_paths_etc, faith_status, name, gender, birth, phone, region, church_history, church_history_etc, message, privacy_consent, privacy_consented_at, status, admin_note, created_at, updated_at";
+  "id, visit_paths, visit_paths_etc, faith_status, name, gender, birth, age_group, phone, instagram_id, region, church_history, church_history_etc, message, privacy_consent, privacy_consented_at, status, admin_note, created_at, updated_at";
 
 export async function GET(request: NextRequest) {
   try {

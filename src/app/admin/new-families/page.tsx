@@ -225,7 +225,7 @@ function Row({
           </span>
           <span className="font-medium text-gray-900">{item.name}</span>
           <span className="text-sm text-gray-500">
-            {GENDER_LABELS[item.gender]} · {item.birth}
+            {GENDER_LABELS[item.gender]} · {item.ageGroup ?? item.birth ?? "—"}
           </span>
           <span className="ml-auto hidden text-xs text-gray-400 sm:inline">
             {new Date(item.createdAt).toLocaleString("ko-KR")}
@@ -242,28 +242,46 @@ function Row({
         <div className="space-y-4 border-t border-gray-100 bg-gray-50/50 px-4 py-4 sm:px-5">
           <div className="grid gap-3 text-sm sm:grid-cols-2">
             <Field label="연락처">
-              <a href={`tel:${item.phone}`} className="text-primary-600 hover:underline">
-                {item.phone}
-              </a>
+              {item.phone ? (
+                <a href={`tel:${item.phone}`} className="text-primary-600 hover:underline">
+                  {item.phone}
+                </a>
+              ) : (
+                "—"
+              )}
             </Field>
+            <Field label="인스타그램">
+              {item.instagramId ? (
+                <span className="text-pink-600">{item.instagramId}</span>
+              ) : (
+                "—"
+              )}
+            </Field>
+            <Field label="연령대/생일">{item.ageGroup ?? item.birth ?? "—"}</Field>
             <Field label="거주 지역">{item.region ?? "—"}</Field>
             <Field label="예수님 영접 여부">
-              {FAITH_STATUS_LABELS[item.faithStatus]}
+              {item.faithStatus ? FAITH_STATUS_LABELS[item.faithStatus] : "—"}
             </Field>
             <Field label="신앙생활 여부">
               {item.churchHistory === "etc"
                 ? `기타 — ${item.churchHistoryEtc ?? ""}`
-                : CHURCH_HISTORY_LABELS[item.churchHistory]}
+                : item.churchHistory
+                ? CHURCH_HISTORY_LABELS[item.churchHistory]
+                : "—"}
             </Field>
             <Field label="방문 경로" full>
               <div className="space-y-0.5">
-                {item.visitPaths.map((p) => (
-                  <div key={p}>
-                    {p === "etc"
-                      ? `기타 — ${item.visitPathsEtc ?? ""}`
-                      : VISIT_PATH_LABELS[p]}
-                  </div>
-                ))}
+                {item.visitPaths.length > 0 ? (
+                  item.visitPaths.map((p) => (
+                    <div key={p}>
+                      {p === "etc"
+                        ? `기타 — ${item.visitPathsEtc ?? ""}`
+                        : VISIT_PATH_LABELS[p]}
+                    </div>
+                  ))
+                ) : (
+                  "—"
+                )}
               </div>
             </Field>
             <Field label="동의 시각">

@@ -41,17 +41,19 @@ export async function POST(request: NextRequest) {
   const supabase = createServiceClient();
 
   const { error } = await supabase.from("new_family_registrations").insert({
-    visit_paths: data.visitPaths,
-    visit_paths_etc: data.visitPaths.includes("etc")
+    visit_paths: data.visitPaths ?? [],
+    visit_paths_etc: data.visitPaths?.includes("etc")
       ? data.visitPathsEtc?.trim() ?? null
       : null,
-    faith_status: data.faithStatus,
+    faith_status: data.faithStatus ?? null,
     name: data.name.trim(),
     gender: data.gender,
-    birth: data.birth.trim(),
-    phone: data.phone.trim(),
+    birth: data.birth?.trim() ?? null,
+    age_group: data.ageGroup?.trim() ?? null,
+    phone: data.phone?.trim() ?? null,
+    instagram_id: data.instagramId?.trim() ?? null,
     region: data.region?.trim() || null,
-    church_history: data.churchHistory,
+    church_history: data.churchHistory ?? null,
     church_history_etc:
       data.churchHistory === "etc"
         ? data.churchHistoryEtc?.trim() ?? null
