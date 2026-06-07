@@ -122,8 +122,8 @@ export default function QuickRegistPage() {
     <div className="min-h-screen bg-gray-50 px-6 py-12">
       <div className="mx-auto max-w-md">
         <div className="mb-10 text-center">
-          <h2 className="text-2xl font-bold text-gray-900">환영 카드</h2>
-          <p className="mt-2 text-sm text-gray-500">정보를 남겨주시면 소중히 안내하겠습니다.</p>
+          <h2 className="text-2xl font-bold text-gray-900">예수님에 대해 더 알고 싶나요?</h2>
+          <p className="mt-2 text-sm text-gray-500">소중한 정보를 남겨주시면 정성껏 안내하겠습니다.</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -138,7 +138,7 @@ export default function QuickRegistPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="홍길동"
+                placeholder=""
                 className="w-full rounded-xl border-gray-200 bg-gray-50 px-4 py-3 text-gray-900 focus:border-primary-500 focus:bg-white focus:ring-primary-500 transition"
               />
             </div>
