@@ -11,16 +11,67 @@ const FALLBACK: HeroSlide = {
   eyebrow: "환영합니다",
   title: "꿈이 있는 건강한 교회",
   subtitle: "",
-  image: "/images/main.jpg",
+  image: "/images/church.jpg",
   href: "/worship",
   date: null,
 };
 
+function NoticeCard({ slides, activeIdx, onSelect }: { 
+  slides: HeroSlide[], 
+  activeIdx: number,
+  onSelect: (idx: number) => void 
+}) {
+  const active = slides[activeIdx];
+  
+  return (
+    <div className="absolute bottom-10 right-10 z-10 hidden w-[340px] overflow-hidden rounded-2xl border border-white/20 bg-white/10 shadow-2xl backdrop-blur-xl md:block lg:bottom-16 lg:right-16">
+      <div className="relative h-[160px] overflow-hidden">
+        <Image
+          src={active.image}
+          alt=""
+          fill
+          className="object-cover transition-transform duration-700"
+          sizes="340px"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+        <span className="absolute left-4 top-4 rounded-full bg-white/90 px-3 py-1 text-[10px] font-bold tracking-wider text-church-dark">
+          공지사항
+        </span>
+        <div className="absolute inset-x-4 bottom-4 text-white">
+          <div className="mb-1 text-[10px] font-medium uppercase tracking-[0.2em] opacity-80">
+            {active.eyebrow || "NEWS"}
+          </div>
+          <div className="line-clamp-2 text-base font-semibold tracking-tight">
+            {active.title}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center justify-between px-4 py-3.5">
+        <div className="flex gap-2">
+          {slides.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => onSelect(i)}
+              aria-label={`슬라이드 ${i + 1}`}
+              className="h-1.5 rounded-full transition-all"
+              style={{
+                width: i === activeIdx ? 24 : 6,
+                background: i === activeIdx ? "white" : "rgba(255,255,255,0.3)",
+              }}
+            />
+          ))}
+        </div>
+        <div className="text-[10px] tabular-nums tracking-widest text-white/60">
+          {String(activeIdx + 1).padStart(2, '0')} / {String(slides.length).padStart(2, '0')}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function HeroSection({ slides }: { slides: HeroSlide[] }) {
   const list: HeroSlide[] = slides.length > 0 ? slides : [FALLBACK];
   const [idx, setIdx] = useState(0);
-  const active = list[idx];
-  const isFallback = active.id === "fallback";
 
   useEffect(() => {
     if (list.length <= 1) return;
@@ -32,100 +83,83 @@ export function HeroSection({ slides }: { slides: HeroSlide[] }) {
   }, [list.length]);
 
   return (
-    <section className="relative h-[82vh] min-h-[560px] overflow-hidden sm:min-h-[640px]">
-      <div className="absolute inset-0">
-        <div
-          className="flex h-full w-full transition-transform duration-700 ease-out"
-          style={{ transform: `translateX(-${idx * 100}%)` }}
-        >
-          {list.map((slide, i) => (
-            <div key={slide.id} className="relative h-full w-full shrink-0">
-              <Image
-                src={slide.image}
-                alt={slide.title}
-                fill
-                sizes="100vw"
-                className="object-cover"
-                priority={i === 0}
-                unoptimized={slide.image.startsWith("http")}
-              />
-            </div>
-          ))}
-        </div>
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(0,0,0,0.55)_0%,rgba(0,0,0,0.15)_35%,rgba(0,0,0,0.2)_65%,rgba(0,0,0,0.78)_100%)]" />
-      </div>
+    <section className="relative h-[85vh] min-h-[640px] overflow-hidden bg-church-dark">
+      {/* Background Image - Church Building */}
+      <Image
+        src="/images/church.jpg"
+        alt="명성비전교회 전경"
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover transition-transform duration-[10s] hover:scale-105"
+        style={{ objectPosition: "center 40%" }}
+      />
+      
+      {/* Dynamic Overlay for Readability */}
+      <div
+        className="absolute inset-0 transition-opacity duration-1000"
+        style={{
+          background: "linear-gradient(105deg, rgba(17,24,39,0.92) 0%, rgba(17,24,39,0.7) 35%, rgba(17,24,39,0.2) 65%, rgba(17,24,39,0.05) 100%)",
+        }}
+      />
 
-      <div className="relative z-10 flex h-full flex-col justify-between px-6 pt-24 pb-10 sm:px-16 sm:pt-32 sm:pb-12">
-        <div className="max-w-[920px]">
-          <p className="mb-5 text-[11px] font-medium uppercase tracking-[0.28em] text-white/70">
+      <div className="relative z-10 flex h-full max-w-7xl flex-col justify-center px-8 sm:px-16 lg:px-24">
+        <div className="max-w-[800px] text-white">
+          <div className="mb-8 flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.4em] opacity-80 sm:text-sm">
+            <span className="h-[2px] w-10 bg-liturgy-brand" />
             Welcome
-          </p>
-          <h1 className="text-4xl font-semibold leading-[1.05] tracking-[-0.04em] text-white sm:text-6xl md:text-[80px]">
-            꿈이 있는 건강한 교회
+          </div>
+          
+          <h1 className="mb-10 text-5xl font-bold leading-[1.08] tracking-[-0.05em] sm:text-7xl md:text-[92px]">
+            꿈이 있는
             <br />
-            <span className="font-light text-white/90">명성비전교회</span>
+            <span className="font-light text-white/90">건강한 교회</span>
           </h1>
-          <div className="mt-9 flex flex-wrap gap-x-8 gap-y-3">
+          
+          <p className="mb-12 max-w-[480px] text-lg leading-relaxed tracking-tight text-white/70 sm:text-xl">
+            복음의 열매를 맺는 교회{"\n"}제자들의 훈련과 헌신이 있는 명성비전교회입니다.
+          </p>
+
+          <div className="flex flex-wrap items-center gap-8 sm:gap-12">
             <Link
               href="/worship"
-              className="group inline-flex items-center gap-1.5 text-sm font-medium text-white"
+              className="group relative flex items-center gap-3 border-b-2 border-white/90 pb-2 text-lg font-semibold transition-all hover:border-liturgy-brand"
             >
               예배 안내
               <ArrowRight
-                size={16}
-                className="transition-transform group-hover:translate-x-1"
+                size={20}
+                className="transition-transform group-hover:translate-x-2"
               />
             </Link>
             <Link
               href="/greetings"
-              className="group inline-flex items-center gap-1.5 text-sm font-medium text-white/75 hover:text-white"
+              className="text-lg font-medium text-white/60 transition-colors hover:text-white"
             >
               교회 소개
-              <ArrowRight
-                size={16}
-                className="transition-transform group-hover:translate-x-1"
-              />
             </Link>
           </div>
-        </div>
 
-        <div className="flex items-end justify-between gap-6">
-          <div className="min-w-0 flex-1">
-            {!isFallback && (
-              <Link
-                href={active.href}
-                className="group block max-w-[680px]"
-              >
-                <p className="text-[11px] uppercase tracking-[0.28em] text-white/60">
-                  현재 공지
-                </p>
-                <h2 className="mt-2 line-clamp-2 text-lg font-medium leading-snug text-white sm:text-2xl">
-                  {active.title}
-                </h2>
-              </Link>
-            )}
-          </div>
-          {list.length > 1 && (
-            <div className="flex shrink-0 items-center gap-1.5">
-              {list.map((slide, i) => (
-                <button
-                  key={slide.id}
-                  onClick={() => setIdx(i)}
-                  aria-label={`슬라이드 ${i + 1}`}
-                  className="h-[3px] rounded-full transition-all"
-                  style={{
-                    width: i === idx ? 36 : 14,
-                    background:
-                      i === idx
-                        ? "var(--liturgy-brand-base, rgba(255,255,255,0.95))"
-                        : "rgba(255,255,255,0.35)",
-                  }}
-                />
-              ))}
+          <div className="absolute bottom-12 left-8 flex flex-col gap-3 text-xs tracking-wider text-white/40 sm:left-16 sm:flex-row sm:items-center sm:gap-8 lg:left-24">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-white/60">ADDR.</span>
+              서울시 동작구 사당로 16바길 9
             </div>
-          )}
+            <span className="hidden opacity-30 sm:block">|</span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-white/60">TIME.</span>
+              매주 주일 8시 · 10시 · 12시
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Rotating Notice Card */}
+      <NoticeCard 
+        slides={list} 
+        activeIdx={idx} 
+        onSelect={(n) => setIdx(n)} 
+      />
     </section>
   );
 }
+
