@@ -93,16 +93,16 @@
   --liturgy-brand-strong: #000000;
 }
 
-/* 평주일 — 결정 #4: 핵심 액센트는 church-gold 유지, 절기 표시 토큰은 녹색 */
+/* 평주일 — 절기색(초록)을 브랜드 색상으로도 사용 */
 [data-season="ordinary_after_epiphany"],
 [data-season="ordinary_after_pentecost"] {
   --liturgy-base: #2E7D32;
   --liturgy-soft: #E3F1E4;
   --liturgy-strong: #1B5E20;
   --liturgy-on: #FFFFFF;
-  --liturgy-brand-base: #C9A84C;
-  --liturgy-brand-soft: #F5EDDA;
-  --liturgy-brand-strong: #8E7325;
+  --liturgy-brand-base: #2E7D32;
+  --liturgy-brand-soft: #E3F1E4;
+  --liturgy-brand-strong: #1B5E20;
 }
 
 @keyframes fade-in {
