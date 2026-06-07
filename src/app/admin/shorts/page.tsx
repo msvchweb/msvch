@@ -192,16 +192,17 @@ export default function AdminShortsPage() {
   }
 
   async function handleReject(clipId: string) {
-    const note = prompt("반려 사유를 입력하세요 (최대 500자):");
-    if (note === null) return;
-    if (note.length > 500) {
+    if (!confirm("이 클립을 반려하시겠습니까?")) return;
+
+    const note = prompt("반려 사유를 입력하세요 (선택 사항, 최대 500자):");
+    if (note && note.length > 500) {
       alert("반려 사유는 500자까지입니다.");
       return;
     }
     await fetch(`/api/shorts/${clipId}/reject`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ note: note.trim() || undefined }),
+      body: JSON.stringify({ note: note?.trim() || undefined }),
     });
     await loadJobs();
   }
