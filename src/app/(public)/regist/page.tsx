@@ -325,9 +325,9 @@ export default function QuickRegistPage() {
                 </div>
                 <div className="text-xs text-gray-500 leading-relaxed pt-0.5">
                   <span className="font-bold text-gray-800 underline underline-offset-4 decoration-primary-200">[필수] 개인정보 수집 및 이용 동의</span>
-                  <p className="mt-2 line-clamp-2 text-gray-400">
+                  <div className="mt-3 h-24 overflow-y-auto whitespace-pre-wrap rounded-xl border border-gray-100 bg-white/30 p-3 text-[10px] leading-normal text-gray-400 scrollbar-thin">
                     {PRIVACY_POLICY_TEXT}
-                  </p>
+                  </div>
                 </div>
               </label>
             </div>
