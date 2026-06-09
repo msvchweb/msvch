@@ -16,6 +16,7 @@ import {
   type TextPosition,
   type TextSize,
 } from "@/lib/poster-footer";
+import type { SharedPosterData } from "./PostersTabs";
 
 type InputMode = "file" | "url";
 
@@ -26,7 +27,7 @@ const COLOR_SWATCHES = [
   { value: "#c9a84c", label: "골드" },
 ];
 
-export function Finalizer() {
+export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null }) {
   const [ratio, setRatio] = useState<PosterRatio>("a4");
   const [inputMode, setInputMode] = useState<InputMode>("file");
   const [imageUrlInput, setImageUrlInput] = useState("");
@@ -41,6 +42,38 @@ export function Finalizer() {
 
   const previewRef = useRef<HTMLCanvasElement>(null);
   const footerAssetsRef = useRef<{ logo: HTMLImageElement; qr: HTMLImageElement } | null>(null);
+
+  // 공유 데이터 반영
+  useEffect(() => {
+    if (!sharedData) return;
+
+    setTitle(sharedData.title);
+    setBodyText(sharedData.bodyText);
+    setRatio(sharedData.ratio);
+
+    if (sharedData.imageUrl) {
+      setLoadingImg(true);
+      (async () => {
+        try {
+          // 서버 프록시를 통해 same-origin 으로 로드 (CORS taint 회피)
+          const proxied = `/api/posters/proxy-image?url=${encodeURIComponent(sharedData.imageUrl!)}`;
+          const head = await fetch(proxied, { method: "GET" });
+          if (!head.ok) throw new Error("Image transfer failed");
+
+          const blob = await head.blob();
+          const blobUrl = URL.createObjectURL(blob);
+          const img = await loadImage(blobUrl);
+          URL.revokeObjectURL(blobUrl);
+          setAiImg(img);
+        } catch (err) {
+          console.error("Shared data image load failed", err);
+          alert("이미지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+        } finally {
+          setLoadingImg(false);
+        }
+      })();
+    }
+  }, [sharedData]);
 
   // 폰트 + footer 자산 사전 로드
   useEffect(() => {

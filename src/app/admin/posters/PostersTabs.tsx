@@ -4,16 +4,30 @@ import { useState } from "react";
 import { Sparkles, Wand2 } from "lucide-react";
 import { PromptBuilder } from "./PromptBuilder";
 import { Finalizer } from "./Finalizer";
+import type { PosterRatio } from "@/lib/poster-prompts";
 
 type Tab = "prompt" | "finalize";
 
+export interface SharedPosterData {
+  ratio: PosterRatio;
+  title: string;
+  bodyText: string;
+  imageUrl?: string;
+}
+
 /**
  * 탭 컨테이너. 두 패널 모두 항상 마운트해두고 CSS 로 가시성만 토글한다.
- * - 탭 전환 시 작성 중이던 입력값/생성 요청 in-flight 가 보존됨
- * - 비활성 패널의 `useEffect` 는 그대로 동작 (preload 등) — 비용 미미
  */
 export function PostersTabs() {
   const [tab, setTab] = useState<Tab>("prompt");
+  const [sharedData, setSharedData] = useState<SharedPosterData | null>(null);
+
+  // PromptBuilder 에서 이미지를 생성하거나 확정했을 때 호출
+  const handleTransferToFinalize = (data: SharedPosterData) => {
+    setSharedData(data);
+    setTab("finalize");
+  };
+
   return (
     <div>
       <div className="mb-5 flex gap-1 border-b border-gray-200">
@@ -22,7 +36,7 @@ export function PostersTabs() {
           onClick={() => setTab("prompt")}
           icon={<Sparkles size={14} />}
           label="① 프롬프트 만들기"
-          hint="입력 → 영문 프롬프트 → 복사 → ChatGPT/Gemini/Midjourney"
+          hint="입력 → 영문 프롬프트 → 복사 또는 바로 생성"
           dataTour="poster-prompt-tab"
         />
         <TabButton
@@ -36,10 +50,10 @@ export function PostersTabs() {
       </div>
 
       <div className={tab === "prompt" ? "" : "hidden"} aria-hidden={tab !== "prompt"}>
-        <PromptBuilder />
+        <PromptBuilder onTransfer={handleTransferToFinalize} />
       </div>
       <div className={tab === "finalize" ? "" : "hidden"} aria-hidden={tab !== "finalize"}>
-        <Finalizer />
+        <Finalizer sharedData={sharedData} />
       </div>
     </div>
   );

@@ -14,6 +14,7 @@ import {
   X,
   Image as ImageIcon,
   Download,
+  Wand2,
 } from "lucide-react";
 import {
   POSTER_CATEGORIES,
@@ -42,6 +43,7 @@ import {
   type PeopleHandling,
   type ReferenceAspect,
 } from "@/lib/poster-prompts";
+import type { SharedPosterData } from "./PostersTabs";
 
 interface BuildPromptResponse {
   englishPrompt: string;
@@ -67,7 +69,7 @@ const TARGET_TOOLS: { name: string; href: string; hint: string }[] = [
   },
 ];
 
-export function PromptBuilder() {
+export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterData) => void }) {
   const [category, setCategory] = useState<PosterCategory>("event");
   const [ratio, setRatio] = useState<PosterRatio>("a4");
   const [title, setTitle] = useState("");
@@ -102,6 +104,10 @@ export function PromptBuilder() {
   // 결과 화면용 — submit 시점의 참고 이미지 미리보기 URL 을 보관
   const [resultRefPreview, setResultRefPreview] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  // DALL-E 직접 생성 관련
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [dalleImageUrl, setDalleImageUrl] = useState<string | null>(null);
 
   // 미리보기 URL 생명주기 관리
   useEffect(() => {
@@ -165,6 +171,7 @@ export function PromptBuilder() {
     }
     setLoading(true);
     setCopied(false);
+    setDalleImageUrl(null); // 새 프롬프트 뽑으면 이전 생성 결과 리셋
     try {
       // 구조화 부가 정보 정리
       const cleanedSchedules = schedules.map((s) => s.trim()).filter((s) => s.length > 0);
@@ -213,6 +220,51 @@ export function PromptBuilder() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleGenerateImage() {
+    if (!result?.englishPrompt) return;
+
+    setGeneratingImage(true);
+    try {
+      const r = await fetch("/api/posters/generate-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: result.englishPrompt,
+          ratio: ratio,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) {
+        alert(data.error ?? "이미지 생성 실패");
+        return;
+      }
+      setDalleImageUrl(data.imageUrl);
+    } catch (e) {
+      console.error(e);
+      alert("이미지 생성 중 오류가 발생했습니다.");
+    } finally {
+      setGeneratingImage(false);
+    }
+  }
+
+  function handleFinishAndEdit() {
+    if (!dalleImageUrl) return;
+
+    // 부제목(bodyText) 구성
+    const cleanedSchedules = schedules.map((s) => s.trim()).filter((s) => s.length > 0);
+    const bodyParts: string[] = [];
+    if (cleanedSchedules.length > 0) bodyParts.push(cleanedSchedules.join(" / "));
+    if (location.trim()) bodyParts.push(location.trim());
+    if (audience.trim()) bodyParts.push(audience.trim());
+
+    onTransfer({
+      ratio,
+      title: title.trim(),
+      bodyText: bodyParts.join("\n"),
+      imageUrl: dalleImageUrl,
+    });
   }
 
   async function handleCopy() {
@@ -578,6 +630,71 @@ export function PromptBuilder() {
           <pre className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm leading-relaxed text-gray-800">
             {result.englishPrompt}
           </pre>
+
+          {/* DALL-E 생성 버튼 및 결과 */}
+          <div className="space-y-4 rounded-xl border border-primary-100 bg-primary-50/30 p-4">
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-sm font-bold text-primary-900 flex items-center gap-1.5">
+                <Wand2 size={16} />
+                ChatGPT(DALL-E 3)로 바로 이미지 생성
+              </h3>
+              {!dalleImageUrl && (
+                <button
+                  type="button"
+                  onClick={handleGenerateImage}
+                  disabled={generatingImage}
+                  className="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-primary-700 disabled:bg-gray-300"
+                >
+                  {generatingImage ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={14} />
+                  )}
+                  {generatingImage ? "생성 중..." : "이미지 바로 만들기"}
+                </button>
+              )}
+            </div>
+
+            {dalleImageUrl ? (
+              <div className="space-y-4">
+                <div className="relative aspect-[3/4] max-w-sm mx-auto overflow-hidden rounded-lg border border-primary-200 shadow-md bg-white">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={dalleImageUrl}
+                    alt="DALL-E 생성 결과"
+                    className="h-full w-full object-contain"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
+                </div>
+                <div className="flex flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={handleFinishAndEdit}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 py-3 text-sm font-bold text-white shadow-lg transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                  >
+                    <Wand2 size={18} />
+                    이 이미지로 마무리 작업 시작하기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerateImage}
+                    disabled={generatingImage}
+                    className="text-xs text-gray-500 hover:text-primary-600 underline underline-offset-4"
+                  >
+                    마음에 안 드나요? 다시 생성하기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-600 leading-relaxed">
+                영문 프롬프트를 복사해 직접 생성하는 대신, 버튼 하나로 이미지를 즉시 생성할 수 있습니다. 
+                <br />
+                <span className="text-[10px] text-gray-400 font-normal">
+                  * OpenAI API를 사용하여 약 10~20초 정도 소요됩니다.
+                </span>
+              </p>
+            )}
+          </div>
 
           {resultRefPreview && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
