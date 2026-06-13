@@ -9,6 +9,10 @@ on:
       jobId:
         description: "Supabase shorts_jobs.id"
         required: true
+      count:
+        description: "Number of highlights (5 or 10)"
+        required: false
+        default: "5"
 
 concurrency:
   group: sermon-shorts
@@ -17,7 +21,7 @@ concurrency:
 jobs:
   generate:
     runs-on: [self-hosted, windows, shorts]
-    timeout-minutes: 30
+    timeout-minutes: 60
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
@@ -48,4 +52,5 @@ jobs:
         run: |
           npx tsx scripts/shorts/run.ts `
             --videoId="${{ inputs.videoId }}" `
-            --jobId="${{ inputs.jobId }}"
+            --jobId="${{ inputs.jobId }}" `
+            --count="${{ inputs.count }}"

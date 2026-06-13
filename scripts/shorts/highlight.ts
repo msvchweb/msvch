@@ -289,6 +289,7 @@ export function computeVoicedChunks(
 
 export async function selectHighlights(
   subtitlePath: string,
+  count: number = 5,
 ): Promise<HighlightSegment[]> {
   const segments = parseJson3(subtitlePath);
   if (segments.length === 0) {
@@ -325,12 +326,12 @@ export async function selectHighlights(
   const prompt = `당신은 교회 설교 편집자입니다.
 아래는 한국어 설교 트랜스크립트입니다 (타임스탬프 포함).
 
-다음 조건을 만족하는 30~55초 구간 5개를 골라주세요:
+다음 조건을 만족하는 30~55초 구간 ${count}개를 골라주세요:
 - 한 가지 완결된 메시지를 담고 있을 것
 - 문장이 자연스럽게 시작하고 끝날 것
 - 감정적 호소, 핵심 적용, 인상 깊은 비유, 도전적 권면 중 하나에 해당
 - 비신자에게도 이해 가능할 것 (내부 용어/상황 의존 X)
-- 5개는 서로 주제가 겹치지 않을 것
+- ${count}개는 서로 주제가 겹치지 않을 것
 
 각 클립에 대해 추가로 아래 항목을 함께 산출하세요:
 - quote_start: 구간이 시작하는 문장 전체를 트랜스크립트에 나온 그대로(앞의 타임스탬프 [mm:ss] 제외) 정확히 복사하세요.

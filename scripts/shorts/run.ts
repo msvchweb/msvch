@@ -81,13 +81,15 @@ async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const videoId = parseArg(args, "--videoId=");
   const jobId = parseArg(args, "--jobId=");
+  const countStr = parseArg(args, "--count=");
+  const count = countStr ? parseInt(countStr, 10) : 5;
 
   if (!videoId || !jobId) {
     console.error("Usage: --videoId=XXX --jobId=YYY");
     process.exit(1);
   }
 
-  console.log(`[shorts] 시작: videoId=${videoId}, jobId=${jobId}`);
+  console.log(`[shorts] 시작: videoId=${videoId}, jobId=${jobId}, count=${count}`);
 
   try {
     // 0. 이전 임시 파일 정리 (C 드라이브 용량 확보)
@@ -119,7 +121,7 @@ async function main(): Promise<void> {
     // 3. 자막 파싱 + 하이라이트 선정
     console.log("[shorts] 3/6 하이라이트 선정");
     await updateJob(jobId, "selecting");
-    const highlights = await selectHighlights(subtitlePath);
+    const highlights = await selectHighlights(subtitlePath, count);
     console.log(`[shorts] 하이라이트 ${highlights.length}개 선정 완료`);
 
     // 4. FFmpeg 편집
