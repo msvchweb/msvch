@@ -1,5 +1,5 @@
 import { execSync } from "child_process";
-import { existsSync, readdirSync } from "fs";
+import { existsSync, readdirSync, rmSync } from "fs";
 import path from "path";
 import { supabase } from "./lib/supabase";
 import { download } from "./download";
@@ -90,6 +90,22 @@ async function main(): Promise<void> {
   console.log(`[shorts] 시작: videoId=${videoId}, jobId=${jobId}`);
 
   try {
+    // 0. 이전 임시 파일 정리 (C 드라이브 용량 확보)
+    if (existsSync(WORK_DIR)) {
+      console.log("[shorts] 0/6 임시 디렉토리 정리");
+      try {
+        const files = readdirSync(WORK_DIR);
+        for (const file of files) {
+          if (!file.includes(videoId)) {
+            const p = path.join(WORK_DIR, file);
+            rmSync(p, { recursive: true, force: true });
+          }
+        }
+      } catch (e) {
+        console.warn("[shorts] 임시 파일 정리 중 오류 발생 (무시):", e);
+      }
+    }
+
     // 1. 다운로드 + 오디오 추출
     console.log("[shorts] 1/6 다운로드 시작");
     await updateJob(jobId, "downloading");

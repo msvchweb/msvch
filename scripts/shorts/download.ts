@@ -20,11 +20,12 @@ export function download(videoId: string): DownloadResult {
       "yt-dlp",
       '-f "bv*[height<=1080]+ba/b[height<=1080]"',
       "--merge-output-format mp4",
+      "--fragment-retries infinite", // 네트워크 끊김 시 무한 재시도
       `-o "${videoPath}"`,
       "--no-playlist",
       `"https://www.youtube.com/watch?v=${videoId}"`,
     ].join(" "),
-    { stdio: "inherit", timeout: 300_000 },
+    { stdio: "inherit", timeout: 3600_000 }, // 1시간 (대용량 영상 대응)
   );
 
   if (!existsSync(videoPath)) {
@@ -43,7 +44,7 @@ export function download(videoId: string): DownloadResult {
       "-b:a 32k",
       `"${audioPath}"`,
     ].join(" "),
-    { stdio: "inherit", timeout: 300_000 },
+    { stdio: "inherit", timeout: 1800_000 }, // 30분
   );
 
   if (!existsSync(audioPath)) {
