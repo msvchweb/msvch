@@ -1,6 +1,7 @@
 import QRCode from 'qrcode';
 import { Home, BookOpen } from 'lucide-react';
 import { InstagramIcon } from '@/components/icons/InstagramIcon';
+import { InstallButton } from '@/components/links/InstallButton';
 
 const PAGE_URL = 'https://msvch.vercel.app/links';
 
@@ -67,6 +68,9 @@ export default async function LinksPage() {
         <h1 className="text-white text-2xl font-bold tracking-tight">링크 모음</h1>
         <p className="text-white/50 text-sm mt-1">원하는 채널을 선택하세요</p>
       </div>
+
+      {/* 앱 설치 버튼 */}
+      <InstallButton />
 
       {/* 링크 카드 */}
       <div className="w-full max-w-sm flex flex-col gap-3">

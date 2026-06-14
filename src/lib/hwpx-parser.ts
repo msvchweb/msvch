@@ -127,7 +127,12 @@ function collectOrderedText(nodes: OrderedNode[]): string {
     if (typeof t === "string") parts.push(t);
     else if (typeof t === "number") parts.push(String(t));
     const tc = orderedTagOf(node);
-    if (tc) parts.push(collectOrderedText(tc.children));
+    if (tc) {
+      const ln = localName(tc.tag).toLowerCase();
+      // 그림(pic/img)이나 OLE 객체 등은 텍스트 수집 대상에서 제외 (메타데이터 노출 방지)
+      if (ln === "pic" || ln === "img" || ln === "image" || ln === "ole") continue;
+      parts.push(collectOrderedText(tc.children));
+    }
   }
   return parts.join("");
 }

@@ -4,6 +4,7 @@ import { NavigationShell } from "@/components/layout/NavigationShell";
 import { NoticeBanner } from "@/components/layout/NoticeBanner";
 import { ChatBot } from "@/components/chat/ChatBot";
 import { RootFurniture } from "@/components/layout/RootFurniture";
+import { ServiceWorkerRegister } from "@/components/layout/ServiceWorkerRegister";
 import { getLiturgicalDay } from "@/lib/liturgical/season";
 import "./globals.css";
 
@@ -48,6 +49,7 @@ export default function RootLayout({
       data-liturgy-week={day.week ?? undefined}
     >
       <body className="flex min-h-full flex-col font-sans">
+        <ServiceWorkerRegister />
         <RootFurniture
           navigation={<NavigationShell />}
           footer={<Footer />}
