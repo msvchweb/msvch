@@ -27,7 +27,7 @@ export const tabItems: TabItem[] = [
 ];
 
 /** 탭바를 숨길 경로 접두사 */
-export const hiddenPrefixes = ["/admin", "/login", "/auth"];
+export const hiddenPrefixes = ["/admin", "/login", "/auth", "/links"];
 
 /** 웹 전용: 아이콘 문자열 → Lucide 컴포넌트 매핑 */
 export const iconMap: Record<string, LucideIcon> = {
