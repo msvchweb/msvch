@@ -45,7 +45,8 @@ export default function AdminNoticesPage() {
     const { data } = await supabase
       .from("notices")
       .select("*")
-      .order("date", { ascending: false });
+      .order("date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false });
     const list = (data ?? []) as Notice[];
     setNotices(list);
     const map = await fetchAuthorRecordMap(

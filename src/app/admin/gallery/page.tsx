@@ -80,7 +80,8 @@ export default function AdminGalleryPage() {
     const { data: albumsData } = await supabase
       .from("gallery_albums")
       .select("*")
-      .order("date", { ascending: false })
+      .order("date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .range(0, PAGE_SIZE - 1);
 
     if (!albumsData) {
@@ -133,7 +134,8 @@ export default function AdminGalleryPage() {
       const { data: albumsData } = await supabase
         .from("gallery_albums")
         .select("*")
-        .order("date", { ascending: false })
+        .order("date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
         .range(offset, offset + PAGE_SIZE - 1);
 
       if (!albumsData || albumsData.length === 0) {

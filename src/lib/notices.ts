@@ -7,7 +7,8 @@ export async function getNotices(): Promise<Notice[]> {
     .from("notices")
     .select("*")
     .eq("is_public", true)
-    .order("date", { ascending: false });
+    .order("date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
   return (data ?? []) as Notice[];
 }
@@ -43,7 +44,8 @@ export async function getHeroSlides(limit = 5): Promise<HeroSlide[]> {
     .from("notices")
     .select("*")
     .eq("is_public", true)
-    .order("date", { ascending: false })
+    .order("date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
     .limit(limit * 3);
 
   const notices = (data ?? []) as Notice[];
@@ -85,7 +87,8 @@ export async function getWeeklies(): Promise<Weekly[]> {
     .from("weeklies")
     .select("*")
     .eq("is_published", true)
-    .order("date", { ascending: false })
+    .order("date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
     .limit(20);
 
   return (data ?? []) as Weekly[];

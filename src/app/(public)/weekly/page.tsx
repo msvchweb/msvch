@@ -19,7 +19,8 @@ export default async function WeeklyPage() {
       .from("weeklies")
       .select("*")
       .eq("is_published", true)
-      .order("date", { ascending: false })
+      .order("date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .limit(20),
     loadBulletinMaster(supabase),
   ]);

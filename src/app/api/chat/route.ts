@@ -81,7 +81,8 @@ async function fetchRecentNotices(): Promise<string> {
       .from("notices")
       .select("title, content, date, category")
       .eq("is_public", true)
-      .order("date", { ascending: false })
+      .order("date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .limit(10);
 
     if (!data || data.length === 0) return "";

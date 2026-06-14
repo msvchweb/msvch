@@ -31,7 +31,8 @@ export async function GET() {
       .from("notices")
       .select("date")
       .eq("is_public", true)
-      .order("date", { ascending: false })
+      .order("date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
     supabase
@@ -44,7 +45,8 @@ export async function GET() {
     supabase
       .from("weeklies")
       .select("date")
-      .order("date", { ascending: false })
+      .order("date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
     getLatestSermonDate(),

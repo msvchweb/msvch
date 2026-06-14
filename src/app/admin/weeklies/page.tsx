@@ -24,7 +24,8 @@ export default function AdminWeekliesPage() {
     const { data } = await supabase
       .from("weeklies")
       .select("*")
-      .order("date", { ascending: false });
+      .order("date", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false });
     const list = (data ?? []) as Weekly[];
     setWeeklies(list);
     const map = await fetchAuthorRecordMap(

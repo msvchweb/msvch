@@ -19,7 +19,8 @@ export async function getGalleryAlbums(options: GetAlbumsOptions = {}): Promise<
     .from("gallery_albums")
     .select("*")
     .eq("is_public", true)
-    .order("date", { ascending: false });
+    .order("date", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false });
 
   if (tags && tags.length > 0) {
     query = query.contains("tags", tags);
