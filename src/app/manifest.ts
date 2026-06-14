@@ -1,26 +1,12 @@
 import type { MetadataRoute } from 'next';
 import { getLiturgicalDay } from '@/lib/liturgical/season';
+import { SEASON_TO_TOKENS } from '@/lib/liturgical/colors';
 
 export default function manifest(): MetadataRoute.Manifest {
   const day = getLiturgicalDay();
   
-  // 절기별 테마 색상 매핑
-  const themeColors = {
-    advent: '#5C2E91',
-    lent: '#5C2E91',
-    holy_week: '#5C2E91',
-    christmas: '#C9A84C',
-    epiphany: '#C9A84C',
-    easter: '#C9A84C',
-    trinity: '#C9A84C',
-    pentecost: '#B91C1C',
-    reformation: '#B91C1C',
-    good_friday: '#1A1A1A',
-    ordinary_after_epiphany: '#2E7D32',
-    ordinary_after_pentecost: '#2E7D32',
-  };
-
-  const themeColor = themeColors[day.season] || '#c9a84c';
+  // 중앙화된 SEASON_TO_TOKENS에서 현재 절기의 base 색상을 가져옴
+  const themeColor = SEASON_TO_TOKENS[day.season]?.base || '#c9a84c';
 
   return {
     name: '명성비전교회',
