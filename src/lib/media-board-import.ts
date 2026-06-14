@@ -163,41 +163,59 @@ async function uploadImages(
 /**
  * Layer 3(a) — 블록 시퀀스를 마크다운으로 직렬화.
  * 이미지 블록은 binItemId 로 업로드 URL 을 찾고, 못 찾으면 등장 순서 fallback.
+ * AI 정리를 위해 보호할 블록(표, 이미지)을 플레이스홀더로 치환한 버전도 함께 생성한다.
  */
 function serializeBlocks(
   blocks: HwpxBlock[],
   upload: UploadResult,
-): { markdown: string; imageUrls: string[]; warnings: string[] } {
+): {
+  markdown: string;
+  imageUrls: string[];
+  warnings: string[];
+  protectedMarkdown: string;
+  protectedMap: Map<string, string>;
+} {
   const lines: string[] = [];
   const imageUrls: string[] = [];
   const warnings: string[] = [];
+  const protectedMap = new Map<string, string>();
+  const aiLines: string[] = [];
   let fallbackCursor = 0;
 
   for (const block of blocks) {
     if (block.kind === "paragraph") {
       lines.push(block.text);
+      aiLines.push(block.text);
       continue;
     }
+
+    let blockMd = "";
     if (block.kind === "table") {
-      const md = tableToMarkdown(block.rows, block.colCount);
-      if (md) lines.push(md);
-      continue;
-    }
-    // image — binItemId 직접 매칭 시도 → 실패 시 등장 순서 fallback
-    let url = upload.urlByBinItem.get(block.binItemId);
-    if (!url) {
-      // 키 후보: 끝 토큰(파일명/stem) 으로도 시도
-      const tail = block.binItemId.slice(block.binItemId.lastIndexOf("/") + 1);
-      url = upload.urlByBinItem.get(tail);
-    }
-    if (!url) {
-      url = upload.orderedUrls[fallbackCursor];
-      fallbackCursor += 1;
-    }
-    if (url) {
-      lines.push(`[IMG:${url}]`);
-      imageUrls.push(url);
+      blockMd = tableToMarkdown(block.rows, block.colCount);
     } else {
+      // image
+      let url = upload.urlByBinItem.get(block.binItemId);
+      if (!url) {
+        const tail = block.binItemId.slice(block.binItemId.lastIndexOf("/") + 1);
+        url = upload.urlByBinItem.get(tail);
+      }
+      if (!url) {
+        url = upload.orderedUrls[fallbackCursor];
+        fallbackCursor += 1;
+      }
+      if (url) {
+        blockMd = `[IMG:${url}]`;
+        imageUrls.push(url);
+      }
+    }
+
+    if (blockMd) {
+      lines.push(blockMd);
+      // AI 용 보호 마커 생성
+      const id = `[HWPX_PROTECTED_BLOCK_${protectedMap.size}]`;
+      protectedMap.set(id, blockMd);
+      aiLines.push(id);
+    } else if (block.kind === "image") {
       warnings.push("일부 그림을 본문에 삽입하지 못했습니다.");
     }
   }
@@ -206,6 +224,8 @@ function serializeBlocks(
     markdown: lines.join("\n\n").trim(),
     imageUrls,
     warnings,
+    protectedMarkdown: aiLines.join("\n\n").trim(),
+    protectedMap,
   };
 }
 
@@ -227,15 +247,15 @@ function stripCodeFence(text: string): string {
 
 export function buildMeetingNotePrompt(markdown: string): string {
   return `당신은 한국 교회 미디어선교부의 회의록을 정리하는 전문가입니다.
-아래는 한컴오피스 회의록(.hwpx)에서 추출한 본문입니다. 표는 GFM 마크다운 표(|...|), 그림은 [IMG:...] 마커로 위치가 표시되어 있습니다.
+아래는 한컴오피스 회의록(.hwpx)에서 추출한 본문입니다. [HWPX_PROTECTED_BLOCK_N] 은 표나 그림이 들어갈 자리입니다.
 
 [추출 본문]
 ${markdown.slice(0, 20000)}
 
 [정리 규칙]
 1. 문단 다듬기·맞춤법 교정·항목 정형화만 하세요. 본문에 없는 내용을 만들지 마세요(환각 금지).
-2. [중요] 표(| --- |) 구조와 이미지 마커 [IMG:...] 는 "절대로" 그대로 유지해야 합니다. 표를 목록(-)이나 일반 텍스트로 변환하지 마세요.
-3. 이미지 마커 [IMG:...] 는 반드시 한 줄에 하나씩 단독으로 배치하세요(앞뒤에 빈 줄 추가 권장). 마커 내부의 URL은 절대 수정하지 마세요.
+2. [필독] [HWPX_PROTECTED_BLOCK_N] 마커는 표와 그림의 위치를 나타냅니다. 이 마커를 "절대로" 삭제하거나 수정하거나 내용을 추측해서 채우지 마세요. 마커를 그대로 유지해야 합니다.
+3. 마커는 앞뒤에 빈 줄을 두어 단독 행으로 배치하는 것이 좋습니다.
 4. 회의록답게 제목(##), 목록(-), 강조(**굵게**) 정도의 가벼운 마크다운만 사용하세요.
 5. title 은 회의록 제목으로 어울리는 짧은 한 줄(날짜·주제 포함 가능).
 
@@ -287,7 +307,9 @@ export async function importMeetingNote(
   let suggestedTitle = autoTitle(fileName, doc.blocks);
 
   try {
-    const raw = await callGeminiWithFallback(buildMeetingNotePrompt(baseMarkdown));
+    const raw = await callGeminiWithFallback(
+      buildMeetingNotePrompt(serialized.protectedMarkdown),
+    );
     const stripped = stripCodeFence(raw);
     let parsed: unknown;
     try {
@@ -297,15 +319,35 @@ export async function importMeetingNote(
     }
     const result = MediaImportAiSchema.safeParse(parsed);
     if (result.success) {
-      // 이미지 마커가 AI 응답에서 사라졌는지 검사 — 사라졌으면 보존 위해 원문 유지
-      const aiUrlCount = (result.data.markdown.match(/\[IMG:/g) ?? []).length;
-      if (aiUrlCount >= serialized.imageUrls.length) {
-        finalMarkdown = result.data.markdown;
+      // 마커 복구 (대괄호 누락이나 공백 추가 등 AI 의 미세한 변형에 대비)
+      let restoredMd = result.data.markdown;
+      const markerRegex = /\[?HWPX_PROTECTED_BLOCK_(\d+)\]?/g;
+      const foundIds = new Set<string>();
+
+      restoredMd = restoredMd.replace(markerRegex, (match, p1) => {
+        const index = parseInt(p1, 10);
+        const id = `[HWPX_PROTECTED_BLOCK_${index}]`;
+        const rawBlock = serialized.protectedMap.get(id);
+        if (rawBlock) {
+          foundIds.add(id);
+          // 단독 행 렌더링을 위해 앞뒤 줄바꿈 강제
+          return `\n\n${rawBlock}\n\n`;
+        }
+        return match;
+      });
+
+      // 모든 마커가 복구되었는지 확인
+      const allRestored = serialized.protectedMap.size === foundIds.size;
+
+      if (allRestored) {
+        finalMarkdown = restoredMd.replace(/\n{3,}/g, "\n\n").trim();
         suggestedTitle = result.data.title;
         aiApplied = true;
       } else {
+        const missing = Array.from(serialized.protectedMap.keys()).filter(k => !foundIds.has(k));
+        console.warn(`[media-import] AI lost placeholders: ${missing.join(", ")}`);
         warnings.push(
-          "AI 정리 중 일부 그림 마커가 사라져 원문을 유지했습니다.",
+          "AI 정리 과정에서 일부 표나 그림 마커가 유실되어 원문을 유지했습니다.",
         );
       }
     } else {

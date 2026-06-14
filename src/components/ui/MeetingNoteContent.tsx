@@ -40,12 +40,14 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
 
 /** GFM 표 구분선인지 (| --- | --- |) */
 function isTableSeparator(line: string): boolean {
-  return /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
+  // 1개 이상의 컬럼 지원 (| --- | 또는 | --- | --- |)
+  return /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/.test(line);
 }
 
 /** 표 행 한 줄을 셀 배열로 (앞뒤 파이프 제거, \| 언이스케이프) */
 function splitTableRow(line: string): string[] {
   const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  if (!trimmed.includes("|")) return [trimmed.replace(/\\\|/g, "|").trim()];
   return trimmed
     .split(/(?<!\\)\|/)
     .map((c) => c.replace(/\\\|/g, "|").trim());
@@ -107,9 +109,9 @@ function parseBlocks(content: string): Block[] {
       continue;
     }
 
-    // GFM 표 — 현재 줄이 | 로 시작하고 다음 줄이 구분선
+    // GFM 표 — 현재 줄에 | 가 있고 다음 줄이 구분선
     if (
-      trimmed.startsWith("|") &&
+      trimmed.includes("|") &&
       i + 1 < lines.length &&
       isTableSeparator(lines[i + 1])
     ) {
@@ -117,8 +119,10 @@ function parseBlocks(content: string): Block[] {
       flushList();
       const rows: string[][] = [splitTableRow(trimmed)];
       i += 2; // header + separator 소비
-      while (i < lines.length && lines[i].trim().startsWith("|")) {
-        rows.push(splitTableRow(lines[i].trim()));
+      while (i < lines.length && (lines[i].trim().startsWith("|") || lines[i].trim().includes("|"))) {
+        const rowTrimmed = lines[i].trim();
+        if (rowTrimmed.length === 0) break;
+        rows.push(splitTableRow(rowTrimmed));
         i += 1;
       }
       blocks.push({
