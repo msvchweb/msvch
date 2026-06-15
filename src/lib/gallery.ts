@@ -35,7 +35,7 @@ export async function getGalleryAlbums(options: GetAlbumsOptions = {}): Promise<
   const { data: albums } = await query;
   if (!albums || albums.length === 0) return [];
 
-  let imagesByAlbum: Record<string, GalleryImage[]> = {};
+  const imagesByAlbum: Record<string, GalleryImage[]> = {};
 
   if (withImages) {
     const albumIds = albums.map((a) => a.id as string);

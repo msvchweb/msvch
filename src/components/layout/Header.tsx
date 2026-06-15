@@ -67,11 +67,19 @@ export function Header() {
   const [openSubmenu, setOpenSubmenu] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [prevPathname, setPrevPathname] = useState(pathname);
   const { dots } = useNewContent();
   const { isStaff } = useMe();
 
+  // 라우트 변경 시 오버레이 자동 닫기 (Link onClick 누락 대비)
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setMobileOpen(false);
+    setOpenSubmenu(null);
+  }
+
   useEffect(() => {
-    setMounted(true);
+    requestAnimationFrame(() => setMounted(true));
   }, []);
 
   useEffect(() => {
@@ -94,12 +102,6 @@ export function Header() {
       window.removeEventListener("keydown", onKey);
     };
   }, [mobileOpen]);
-
-  // 라우트 변경 시 오버레이 자동 닫기 (Link onClick 누락 대비)
-  useEffect(() => {
-    setMobileOpen(false);
-    setOpenSubmenu(null);
-  }, [pathname]);
 
   const closeMenu = () => setMobileOpen(false);
 

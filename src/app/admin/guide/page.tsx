@@ -129,7 +129,7 @@ export default function GuidePage() {
           </ul>
         </Step>
         <Tip>
-          AI에 따라 한국어 텍스트를 잘 못 그리는 경우가 많아, 보통 <strong>"AI가 텍스트 안 그림 → 마무리 단계에서 한글 합성"</strong> 흐름이 가장 깔끔합니다.
+          AI에 따라 한국어 텍스트를 잘 못 그리는 경우가 많아, 보통 <strong>&quot;AI가 텍스트 안 그림 → 마무리 단계에서 한글 합성&quot;</strong> 흐름이 가장 깔끔합니다.
         </Tip>
       </Section>
 

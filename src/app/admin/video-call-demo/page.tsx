@@ -141,7 +141,7 @@ export default function VideoCallDemoPage() {
 
       <div className="mt-8 max-w-lg text-center text-xs text-gray-400">
         <p>
-          <strong>UX 포인트:</strong> 사용자가 '입장' 버튼을 누른 후, 브라우저의 기본 팝업이 뜨기 전에 
+          <strong>UX 포인트:</strong> 사용자가 &apos;입장&apos; 버튼을 누른 후, 브라우저의 기본 팝업이 뜨기 전에 
           충분한 안내를 제공합니다. 또한 권한이 거부되었을 때 막막해하지 않도록 
           기기별/브라우저별 상세 설정을 안내하는 가이드가 포함되어 있습니다.
         </p>

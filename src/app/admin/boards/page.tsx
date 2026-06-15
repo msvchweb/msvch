@@ -15,10 +15,6 @@ export default function AdminBoardsPage() {
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    void load();
-  }, []);
-
   async function load() {
     setLoading(true);
     const r = await fetch("/api/admin/boards", { credentials: "same-origin" });
@@ -28,6 +24,12 @@ export default function AdminBoardsPage() {
     }
     setLoading(false);
   }
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      void load();
+    });
+  }, []);
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();

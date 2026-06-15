@@ -23,8 +23,10 @@ function NoticeBannerInner() {
     const text = NOTICE_MESSAGES[noticeKey];
     if (!text) return;
 
-    setMessage(text);
-    setVisible(true);
+    requestAnimationFrame(() => {
+      setMessage(text);
+      setVisible(true);
+    });
 
     // 5초 후 자동 닫기 + URL 에서 ?notice 제거 (뒤로가기 시 재표시 방지)
     const hideTimer = setTimeout(() => setVisible(false), 5000);

@@ -16,10 +16,6 @@ export default function AdminWeekliesPage() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  useEffect(() => {
-    loadWeeklies();
-  }, []);
-
   async function loadWeeklies() {
     const { data } = await supabase
       .from("weeklies")
@@ -36,6 +32,12 @@ export default function AdminWeekliesPage() {
     setAuthorMap(map);
     setLoading(false);
   }
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      void loadWeeklies();
+    });
+  }, []);
 
   async function deleteWeekly(w: Weekly) {
     if (!confirm("이 주보를 삭제하시겠습니까?")) return;

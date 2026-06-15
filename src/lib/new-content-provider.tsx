@@ -94,8 +94,10 @@ export function NewContentProvider({ children }: { children: React.ReactNode }) 
     for (const k of ALL_KEYS) {
       initial[k] = getLastSeen(k);
     }
-    setSeen(initial);
-    setHydrated(true);
+    requestAnimationFrame(() => {
+      setSeen(initial);
+      setHydrated(true);
+    });
   }, []);
 
   // 2) API fetch — 한 번만, AbortController로 정리
@@ -104,7 +106,9 @@ export function NewContentProvider({ children }: { children: React.ReactNode }) 
 
     fetch("/api/new-content", { signal: controller.signal })
       .then((res) => res.json())
-      .then((data: NewContentDates) => setDates(data))
+      .then((data: NewContentDates) => {
+        requestAnimationFrame(() => setDates(data));
+      })
       .catch(() => {});
 
     return () => controller.abort();
@@ -118,7 +122,9 @@ export function NewContentProvider({ children }: { children: React.ReactNode }) 
         const latestDate = dates[key];
         if (latestDate) {
           persistLastSeen(key, latestDate);
-          setSeen((prev) => ({ ...prev, [key]: latestDate }));
+          requestAnimationFrame(() => {
+            setSeen((prev) => ({ ...prev, [key]: latestDate }));
+          });
         }
       }
     }

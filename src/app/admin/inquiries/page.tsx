@@ -17,8 +17,6 @@ export default function AdminInquiriesPage() {
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  useEffect(() => { loadInquiries(); }, []);
-
   async function loadInquiries() {
     const { data } = await supabase
       .from("chat_inquiries")
@@ -27,6 +25,12 @@ export default function AdminInquiriesPage() {
     setInquiries((data ?? []) as Inquiry[]);
     setLoading(false);
   }
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      void loadInquiries();
+    });
+  }, []);
 
   async function deleteInquiry(id: string) {
     if (!confirm("이 문의를 삭제하시겠습니까?")) return;

@@ -144,16 +144,18 @@ export default function AdminShortsPage() {
   const [sermons, setSermons] = useState<SermonVideo[]>([]);
   const [triggering, setTriggering] = useState(false);
 
-  useEffect(() => {
-    loadJobs();
-  }, []);
-
   async function loadJobs() {
     const res = await fetch("/api/shorts");
     const data = (await res.json()) as ShortsJobWithClips[];
     setJobs(data);
     setLoading(false);
   }
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      void loadJobs();
+    });
+  }, []);
 
   async function openSermonPicker() {
     if (sermons.length === 0) {

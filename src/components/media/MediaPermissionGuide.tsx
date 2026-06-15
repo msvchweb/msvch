@@ -26,13 +26,14 @@ export function MediaPermissionGuide({ onGranted, onClose }: MediaPermissionGuid
       });
       setStatus("granted");
       onGranted(stream);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Permission request failed:", err);
       setStatus("denied");
       
-      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+      const errorName = err instanceof Error ? err.name : "";
+      if (errorName === "NotAllowedError" || errorName === "PermissionDeniedError") {
         setError("카메라 및 마이크 권한이 거부되었습니다.");
-      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+      } else if (errorName === "NotFoundError" || errorName === "DevicesNotFoundError") {
         setError("카메라나 마이크 장치를 찾을 수 없습니다.");
       } else {
         setError("미디어 장치에 접근하는 중 오류가 발생했습니다.");
@@ -44,7 +45,7 @@ export function MediaPermissionGuide({ onGranted, onClose }: MediaPermissionGuid
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.mediaDevices) return;
 
-    navigator.permissions.query({ name: "camera" as any }).then((result) => {
+    navigator.permissions.query({ name: "camera" as PermissionName }).then((result) => {
       if (result.state === "granted") {
         // 이미 허용된 경우 바로 요청해서 스트림 확보
         requestPermission();
@@ -111,7 +112,7 @@ export function MediaPermissionGuide({ onGranted, onClose }: MediaPermissionGuid
               <div className="absolute -top-12 left-2 animate-bounce text-primary-600 lg:left-[-20px]">
                 <div className="flex flex-col items-center">
                   <ArrowUpLeft size={48} />
-                  <span className="text-sm font-bold bg-primary-600 text-white px-2 py-1 rounded-md">여기 '허용'을 눌러주세요!</span>
+                  <span className="text-sm font-bold bg-primary-600 text-white px-2 py-1 rounded-md">여기 &apos;허용&apos;을 눌러주세요!</span>
                 </div>
               </div>
               <LoaderSpinner />

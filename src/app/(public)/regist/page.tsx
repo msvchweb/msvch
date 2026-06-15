@@ -60,8 +60,8 @@ export default function QuickRegistPage() {
       }
 
       setStep("done");
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
     }
@@ -125,7 +125,7 @@ export default function QuickRegistPage() {
           <p>정보를 소중히 잘 받았습니다.</p>
           <p>곧 연락드리고 환영하겠습니다.</p>
         </div>
-        <p className="mt-8 font-medium text-primary-600 italic text-center">"행복한 주일 되세요!"</p>
+        <p className="mt-8 font-medium text-primary-600 italic text-center">&quot;행복한 주일 되세요!&quot;</p>
 
         <div className="mt-12 w-full max-w-md space-y-4">
           <div className="rounded-3xl bg-white p-8 shadow-xl shadow-gray-200/50 ring-1 ring-gray-100">

@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { X, Loader2, Check, AlertCircle, ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { renderPoster, preloadFooterAssets } from "@/lib/poster-footer";
+import { renderPoster, preloadFooterAssets, type TextSettings } from "@/lib/poster-footer";
 import type { SharedPosterData } from "../PostersTabs";
 import type { PosterRatio } from "@/lib/poster-prompts";
-import { useRouter } from "next/navigation";
 
 interface NoticeDraft {
   title: string;
@@ -17,7 +17,7 @@ interface NoticeDraft {
 interface NoticeDraftModalProps {
   sharedData: SharedPosterData;
   bgImg: HTMLImageElement;
-  textSettings: any;
+  textSettings: TextSettings;
   showFooter: boolean;
   onClose: () => void;
 }
@@ -37,7 +37,7 @@ export function NoticeDraftModal({
   
   const mainPreviewRef = useRef<HTMLCanvasElement>(null);
   const thumbPreviewRef = useRef<HTMLCanvasElement>(null);
-  const footerAssetsRef = useRef<any>(null);
+  const footerAssetsRef = useRef<{ logo: HTMLImageElement; qr: HTMLImageElement } | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -256,3 +256,4 @@ function generateSlug(text: string) {
     .replace(/\s+/g, "-")
     .slice(0, 50) + "-" + Date.now().toString(36);
 }
+

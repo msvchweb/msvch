@@ -50,11 +50,8 @@ export default function AdminBoardMembersPage({
 
   // 회원 검색 (250ms 디바운스)
   useEffect(() => {
-    if (!query.trim()) {
-      setResults([]);
-      return;
-    }
-    setSearching(true);
+    if (!query.trim()) return;
+    
     const t = setTimeout(async () => {
       const term = query.replace(/[%_]/g, "\\$&");
       const { data } = await supabase
@@ -143,7 +140,16 @@ export default function AdminBoardMembersPage({
           <Search size={14} className="absolute left-3 top-3 text-gray-400" />
           <input
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value;
+              setQuery(v);
+              if (!v.trim()) {
+                setResults([]);
+                setSearching(false);
+              } else {
+                setSearching(true);
+              }
+            }}
             placeholder="홍길동 또는 hong@..."
             className="w-full rounded-lg border border-gray-300 py-2 pl-9 pr-3 text-sm focus:border-primary-500 focus:outline-none"
           />

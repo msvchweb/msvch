@@ -4,8 +4,23 @@ import { useState, useEffect } from 'react';
 import { Download, Smartphone, X, Share } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+interface BeforeInstallPromptEvent extends Event {
+  readonly platforms: string[];
+  readonly userChoice: Promise<{
+    outcome: 'accepted' | 'dismissed';
+    platform: string;
+  }>;
+  prompt(): Promise<void>;
+}
+
+declare global {
+  interface Navigator {
+    standalone?: boolean;
+  }
+}
+
 export function InstallButton() {
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
@@ -14,29 +29,31 @@ export function InstallButton() {
   useEffect(() => {
     // 1. 이미 설치되어 있는지 확인
     const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches 
-      || (window.navigator as any).standalone 
+      || window.navigator.standalone 
       || document.referrer.includes('android-app://');
     
-    setIsStandalone(isStandaloneMode);
+    requestAnimationFrame(() => {
+      setIsStandalone(!!isStandaloneMode);
 
-    // 2. iOS 여부 확인
-    const userAgent = window.navigator.userAgent.toLowerCase();
-    const ios = /iphone|ipad|ipod/.test(userAgent);
-    setIsIOS(ios);
+      // 2. iOS 여부 확인
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      const ios = /iphone|ipad|ipod/.test(userAgent);
+      setIsIOS(ios);
+
+      // iOS이거나 이미 설치 가능 환경인 경우 가시성 확보 (테스트 등을 위해 항상 노출할 수도 있음)
+      if (ios && !isStandaloneMode) {
+        setIsVisible(true);
+      }
+    });
 
     // 3. Android/Chrome 설치 프로프트 이벤트 리스너
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
       setIsVisible(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // iOS이거나 이미 설치 가능 환경인 경우 가시성 확보 (테스트 등을 위해 항상 노출할 수도 있음)
-    if (ios && !isStandaloneMode) {
-      setIsVisible(true);
-    }
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
