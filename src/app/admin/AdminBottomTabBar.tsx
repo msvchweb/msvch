@@ -8,21 +8,30 @@ import {
   ImageIcon,
   Layers,
   Ellipsis,
+  LayoutDashboard,
+  Palette,
+  Clapperboard,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type AdminBottomTabIcon =
+  | "dashboard"
   | "weeklies"
   | "calendar"
   | "gallery"
-  | "boards";
+  | "boards"
+  | "posters"
+  | "mediaBoard";
 
 const ICONS: Record<AdminBottomTabIcon, LucideIcon> = {
+  dashboard: LayoutDashboard,
   weeklies: FileText,
   calendar: Calendar,
   gallery: ImageIcon,
   boards: Layers,
+  posters: Palette,
+  mediaBoard: Clapperboard,
 };
 
 export interface AdminBottomTab {

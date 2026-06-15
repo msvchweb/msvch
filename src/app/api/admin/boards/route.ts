@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
   try {
     await requireAdmin(request);
     const supabase = await createApiClient(request);
-    const boards = await listVisibleBoards(supabase);
+    const boards = await listVisibleBoards(supabase, { includeMediaDept: true });
     return NextResponse.json<Board[]>(boards);
   } catch (err) {
     if (err instanceof AuthError) {

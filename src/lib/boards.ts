@@ -166,12 +166,18 @@ async function fetchCounts(
  */
 export async function listVisibleBoards(
   supabase: SupabaseClient,
+  options: { includeMediaDept?: boolean } = {},
 ): Promise<Board[]> {
-  const { data: rows } = await supabase
+  let query = supabase
     .from("boards")
-    .select(BOARD_COLUMNS)
+    .select(BOARD_COLUMNS);
+
+  if (!options.includeMediaDept) {
     // 미디어선교부 전용 게시판은 별도 라우트(/media-board)로 분리 — 일반 목록에서 제외 (마이그 039)
-    .eq("is_media_dept", false)
+    query = query.eq("is_media_dept", false);
+  }
+
+  const { data: rows } = await query
     .order("created_at", { ascending: false })
     .returns<BoardRow[]>();
 

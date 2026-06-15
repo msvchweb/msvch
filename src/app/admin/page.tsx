@@ -292,7 +292,7 @@ export default async function AdminDashboard() {
             <RecentList
               title="최근 게시판 글"
               emptyText="새 글 없음"
-              href="/admin/boards"
+              href={mediaBoardId ? "/media-board" : "/admin/boards"}
               items={recentBoardPosts.map((p) => ({
                 id: p.id,
                 primary: p.title,

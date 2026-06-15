@@ -64,10 +64,10 @@ const baseNav: AdminNavItem[] = [
 ];
 
 const bottomTabsAll: AdminBottomTab[] = [
-  { key: "weeklies", label: "주보", href: "/admin/weeklies", icon: "weeklies" },
-  { key: "calendar", label: "교회일정", href: "/admin/calendar", icon: "calendar" },
+  { key: "dashboard", label: "대시보드", href: "/admin", icon: "dashboard" },
   { key: "gallery", label: "갤러리", href: "/admin/gallery", icon: "gallery" },
   { key: "boards", label: "게시판", href: "/admin/boards", icon: "boards" },
+  { key: "posters", label: "포스터", href: "/admin/posters", icon: "posters" },
 ];
 
 export default async function AdminLayout({
@@ -103,9 +103,16 @@ export default async function AdminLayout({
     });
   }
 
-  const bottomTabs = bottomTabsAll.filter((tab) =>
-    canAccessAdminPath(role, tab.href),
-  );
+  const bottomTabs = bottomTabsAll
+    .filter((tab) => canAccessAdminPath(role, tab.href))
+    .map((tab) => {
+      // "게시판" 탭을 미디어선교부 게시판으로 바로 연결 (요청사항)
+      // staff 이상의 권한이 있으면 미디어선교부 게시판으로 유도
+      if (tab.key === "boards" && (role === "staff" || role === "admin" || role === "master")) {
+        return { ...tab, href: "/media-board", icon: "mediaBoard" as const };
+      }
+      return tab;
+    });
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-slate-100">

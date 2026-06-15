@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Plus, Eye, EyeOff, Trash2, Users, Loader2 } from "lucide-react";
+import { Plus, Eye, EyeOff, Trash2, Users, Loader2, Clapperboard } from "lucide-react";
 import type { Board } from "@/types/board";
 import { BoardCreateSchema } from "@/lib/validation";
+import { cn } from "@/lib/utils";
 
 export default function AdminBoardsPage() {
   const [boards, setBoards] = useState<Board[]>([]);
@@ -174,14 +175,19 @@ export default function AdminBoardsPage() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {boards.map((b) => (
-                  <tr key={b.id} className="hover:bg-gray-50">
+                  <tr key={b.id} className={cn("hover:bg-gray-50", b.isMediaDept && "bg-amber-50/50")}>
                     <td className="px-4 py-3">
                       <Link
-                        href={`/boards/${b.id}`}
+                        href={b.isMediaDept ? "/media-board" : `/boards/${b.id}`}
                         className="block hover:text-primary-700"
                       >
-                        <div className="font-medium text-gray-900 hover:text-primary-700">
+                        <div className="flex items-center gap-2 font-medium text-gray-900 hover:text-primary-700">
                           {b.title}
+                          {b.isMediaDept && (
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                              미디어선교부
+                            </span>
+                          )}
                         </div>
                         {b.description && (
                           <div className="text-xs text-gray-500">
@@ -246,15 +252,21 @@ export default function AdminBoardsPage() {
             {boards.map((b) => (
               <div
                 key={b.id}
-                className="rounded-xl border border-gray-200 bg-white p-4"
+                className={cn(
+                  "rounded-xl border border-gray-200 bg-white p-4",
+                  b.isMediaDept && "border-amber-200 bg-amber-50/30"
+                )}
               >
                 <div className="flex items-start justify-between gap-2">
                   <Link
-                    href={`/boards/${b.id}`}
+                    href={b.isMediaDept ? "/media-board" : `/boards/${b.id}`}
                     className="min-w-0 flex-1 hover:text-primary-700"
                   >
-                    <div className="font-medium text-gray-900 hover:text-primary-700">
+                    <div className="flex items-center gap-2 font-medium text-gray-900 hover:text-primary-700">
                       {b.title}
+                      {b.isMediaDept && (
+                        <Clapperboard size={14} className="text-amber-600" />
+                      )}
                     </div>
                     {b.description && (
                       <div className="text-xs text-gray-500">
