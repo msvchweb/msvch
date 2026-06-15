@@ -9,6 +9,12 @@ import { AdminTour } from "@/components/admin/AdminTour";
 import { Wrench } from "lucide-react";
 import { canAccessAdminPath } from "@/lib/admin-permissions";
 import { isMediaDeptMember } from "@/lib/boards";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "관리자",
+  manifest: "/admin/manifest.webmanifest",
+};
 
 function roleLabel(role: string | null): string {
   if (role === "master") return "최고 관리자";
