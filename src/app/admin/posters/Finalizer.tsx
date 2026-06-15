@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Upload, Link2, Download, Loader2, Image as ImageIcon } from "lucide-react";
+import { Upload, Link2, Download, Loader2, Image as ImageIcon, BellPlus } from "lucide-react";
+import { NoticeDraftModal } from "./NoticeDraftModal";
 import {
   POSTER_RATIOS,
   POSTER_RATIO_LABEL,
@@ -39,6 +40,7 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
   const [text, setText] = useState<TextSettings>(DEFAULT_TEXT_SETTINGS);
   const [showFooter, setShowFooter] = useState(true);
   const [downloading, setDownloading] = useState(false);
+  const [showNoticeDraft, setShowNoticeDraft] = useState(false);
 
   const previewRef = useRef<HTMLCanvasElement>(null);
   const footerAssetsRef = useRef<{ logo: HTMLImageElement; qr: HTMLImageElement } | null>(null);
@@ -276,7 +278,27 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
             PNG 다운로드
           </button>
         )}
+        {aiImg && sharedData?.fullInput && (
+          <button
+            type="button"
+            onClick={() => setShowNoticeDraft(true)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border-2 border-primary-600 bg-white px-4 py-3 text-sm font-semibold text-primary-700 hover:bg-primary-50"
+          >
+            <BellPlus size={16} />
+            공지사항으로 바로 등록
+          </button>
+        )}
       </div>
+
+      {showNoticeDraft && aiImg && sharedData && (
+        <NoticeDraftModal
+          sharedData={sharedData}
+          bgImg={aiImg}
+          textSettings={text}
+          showFooter={showFooter}
+          onClose={() => setShowNoticeDraft(false)}
+        />
+      )}
 
       {/* ── 우: 컨트롤 ───────────────────────────────────── */}
       <div className="space-y-4">

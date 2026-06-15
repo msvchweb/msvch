@@ -254,6 +254,11 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
 
     // 부제목(bodyText) 구성
     const cleanedSchedules = schedules.map((s) => s.trim()).filter((s) => s.length > 0);
+    const cleanedExtraLines = extraInfoText
+      .split(/\r?\n/)
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
     const bodyParts: string[] = [];
     if (cleanedSchedules.length > 0) bodyParts.push(cleanedSchedules.join(" / "));
     if (location.trim()) bodyParts.push(location.trim());
@@ -264,6 +269,22 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
       title: title.trim(),
       bodyText: bodyParts.join("\n"),
       imageUrl: dalleImageUrl,
+      fullInput: {
+        category,
+        title,
+        schedules: cleanedSchedules,
+        location,
+        audience,
+        extraLines: cleanedExtraLines.length > 0 ? cleanedExtraLines : undefined,
+        colorPalette,
+        artStyle,
+        mood,
+        motifs,
+        peopleHandling,
+        moodKeywords,
+        ratio,
+        includeText,
+      },
     });
   }
 

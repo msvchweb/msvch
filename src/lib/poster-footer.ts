@@ -23,10 +23,11 @@ export const CHURCH_FOOTER = {
 } as const;
 
 /** 비율별 최종 출력 캔버스 픽셀 크기 */
-export const FINAL_DIMENSIONS: Record<PosterRatio, { w: number; h: number }> = {
+export const FINAL_DIMENSIONS: Record<PosterRatio | "16:9", { w: number; h: number }> = {
   "1:1": { w: 1080, h: 1080 },
   "9:16": { w: 1080, h: 1920 },
   a4: { w: 1240, h: 1754 }, // ≈ 150 DPI of 210 × 297 mm
+  "16:9": { w: 1920, h: 1080 },
 };
 
 // ─── 텍스트 오버레이 옵션 타입 ──────────────────────────────
@@ -99,12 +100,15 @@ export function drawCover(
 }
 
 // ─── 텍스트 그리기 ──────────────────────────────────────────
-function yPercentForPos(p: TextPosition, hasFooter: boolean): number {
-  // footer 가 켜져 있으면 bottom 이 footer 와 안 겹치도록 살짝 위로
-  const bottomY = hasFooter ? 0.78 : 0.86;
+function yPercentForPos(p: TextPosition, hasFooter: boolean, ratio?: PosterRatio | "16:9"): number {
+  // 가로형(16:9)일 때는 상하 여백을 좀 더 넓게 잡아야 텍스트가 꽉 차지 않음
+  const isHorizontal = ratio === "16:9";
+  const bottomY = hasFooter ? (isHorizontal ? 0.72 : 0.78) : (isHorizontal ? 0.82 : 0.86);
+  const topY = isHorizontal ? 0.22 : 0.16;
+
   switch (p) {
     case "top":
-      return 0.16;
+      return topY;
     case "middle":
       return 0.5;
     case "bottom":
@@ -189,7 +193,7 @@ function wrapText(
 
 export interface RenderInput {
   bg: HTMLImageElement;
-  ratio: PosterRatio;
+  ratio: PosterRatio | "16:9";
   title: string;
   bodyText: string;
   text: TextSettings;
@@ -225,7 +229,7 @@ export function renderPoster(canvas: HTMLCanvasElement, input: RenderInput): voi
   if (titleLines.length > 0) {
     drawTextBlock(ctx, titleLines, {
       x: canvas.width / 2,
-      yPercent: yPercentForPos(input.text.titlePos, input.showFooter),
+      yPercent: yPercentForPos(input.text.titlePos, input.showFooter, input.ratio),
       fontPx: titlePx,
       weight: "700",
       color: input.text.color,
@@ -236,7 +240,7 @@ export function renderPoster(canvas: HTMLCanvasElement, input: RenderInput): voi
   if (bodyLines.length > 0) {
     drawTextBlock(ctx, bodyLines, {
       x: canvas.width / 2,
-      yPercent: yPercentForPos(input.text.bodyPos, input.showFooter),
+      yPercent: yPercentForPos(input.text.bodyPos, input.showFooter, input.ratio),
       fontPx: bodyPx,
       weight: "400",
       color: input.text.color,

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Sparkles, Wand2 } from "lucide-react";
 import { PromptBuilder } from "./PromptBuilder";
 import { Finalizer } from "./Finalizer";
-import type { PosterRatio } from "@/lib/poster-prompts";
+import type { PosterRatio, PromptBuilderInput } from "@/lib/poster-prompts";
 
 type Tab = "prompt" | "finalize";
 
@@ -13,6 +13,8 @@ export interface SharedPosterData {
   title: string;
   bodyText: string;
   imageUrl?: string;
+  /** AI 공지사항 초안 생성을 위한 원본 입력값 */
+  fullInput?: PromptBuilderInput;
 }
 
 /**

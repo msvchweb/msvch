@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/server";
 import { canAccessAdminPath } from "@/lib/admin-permissions";
 import { AdminTourStartButton } from "@/components/admin/AdminTourStartButton";
 import { UpdatesCard } from "./_components/UpdatesCard";
+import { InstallPWAButton, InstallPWACard } from "@/components/ui/InstallPWAButton";
 
 export const metadata: Metadata = { title: "관리자 대시보드" };
 
@@ -159,6 +160,7 @@ export default async function AdminDashboard() {
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">대시보드</h1>
         <div className="flex items-center gap-2">
+          <InstallPWAButton variant="outline" size="sm" className="h-9 px-3 text-xs sm:text-sm" />
           <Link
             href="/admin/guide"
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 sm:text-sm"
@@ -306,8 +308,9 @@ export default async function AdminDashboard() {
       )}
 
       {/* D — 업데이트 노트 (대시보드 최하단) */}
-      <section>
+      <section className="grid gap-6 lg:grid-cols-2">
         <UpdatesCard />
+        <InstallPWACard className="lg:h-full" />
       </section>
     </div>
   );
