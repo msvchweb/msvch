@@ -111,7 +111,7 @@ export default async function AdminLayout({
       if (tab.key === "boards" && mediaDeptMember) {
         return {
           ...tab,
-          label: "미디어",
+          label: "게시판",
           href: "/admin/media-board",
           icon: "mediaBoard" as const,
         };

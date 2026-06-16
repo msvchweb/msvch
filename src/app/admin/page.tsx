@@ -196,7 +196,7 @@ export default async function AdminDashboard() {
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
             오늘 처리할 일
           </h2>
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(220px,1fr))]">
             {canNewFamilies && (
               <ActionCard
                 href="/admin/new-families"
@@ -231,7 +231,7 @@ export default async function AdminDashboard() {
               <ActionCard
                 href="/admin/media-board"
                 icon={Clapperboard}
-                label="미디어 회의록"
+                label="미디어선교부 게시판"
                 value={recentMediaPosts.length}
                 hint={
                   recentMediaPosts.length > 0
@@ -245,14 +245,14 @@ export default async function AdminDashboard() {
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_18rem] xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-6">
           {(canCalendar || canNewFamilies || canInquiries || canBoards) && (
             <section>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
                 최근 활동
               </h2>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-[repeat(auto-fit,minmax(280px,1fr))]">
                 {canCalendar && (
                   <RecentList
                     title="다가오는 일정"
@@ -417,7 +417,7 @@ function ActionCard({
   return (
     <Link
       href={href}
-      className={`group flex min-h-28 items-center gap-4 rounded-lg border p-4 transition-colors ${TONE_CARD[tone]} hover:border-gray-300`}
+      className={`group flex min-h-28 items-center gap-4 rounded-lg border p-4 transition-colors lg:min-h-24 ${TONE_CARD[tone]} hover:border-gray-300`}
     >
       <div
         className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${TONE_ICON[tone]}`}
