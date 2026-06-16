@@ -156,10 +156,10 @@ export default async function AdminDashboard() {
   const mediaBoardId = mediaBoardRes.data?.id ?? null;
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between gap-3">
+    <div className="mx-auto w-full max-w-4xl space-y-8">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">대시보드</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <InstallPWAButton variant="outline" size="sm" className="h-9 px-3 text-xs sm:text-sm" />
           <Link
             href="/admin/guide"
@@ -411,12 +411,12 @@ function RecentList({
   items: RecentListItem[];
 }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-gray-900">{title}</h3>
+        <h3 className="truncate text-sm font-semibold text-gray-900">{title}</h3>
         <Link
           href={href}
-          className="flex items-center gap-0.5 text-xs font-medium text-gray-500 hover:text-primary-600"
+          className="ml-2 flex shrink-0 items-center gap-0.5 text-xs font-medium text-gray-500 hover:text-primary-600"
         >
           전체
           <ChevronRight size={14} />
