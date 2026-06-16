@@ -98,7 +98,7 @@ export default async function AdminLayout({
   if (mediaDeptMember) {
     adminNav.push({
       label: "미디어선교부",
-      href: "/media-board",
+      href: "/admin/media-board",
       icon: "mediaBoard",
     });
   }
@@ -107,9 +107,14 @@ export default async function AdminLayout({
     .filter((tab) => canAccessAdminPath(role, tab.href))
     .map((tab) => {
       // "게시판" 탭을 미디어선교부 게시판으로 바로 연결 (요청사항)
-      // staff 이상의 권한이 있으면 미디어선교부 게시판으로 유도
-      if (tab.key === "boards" && (role === "staff" || role === "admin" || role === "master")) {
-        return { ...tab, href: "/media-board", icon: "mediaBoard" as const };
+      // 미디어선교부 멤버십이 있을 때만 관리자 모드 안의 미디어 게시판으로 유도
+      if (tab.key === "boards" && mediaDeptMember) {
+        return {
+          ...tab,
+          label: "미디어",
+          href: "/admin/media-board",
+          icon: "mediaBoard" as const,
+        };
       }
       return tab;
     });

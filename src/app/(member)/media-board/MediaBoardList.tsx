@@ -11,10 +11,12 @@ export function MediaBoardList({
   boardId,
   initialItems,
   initialCursor,
+  basePath = "/media-board",
 }: {
   boardId: string;
   initialItems: BoardPost[];
   initialCursor: string | null;
+  basePath?: string;
 }) {
   const [items, setItems] = useState<BoardPost[]>(initialItems);
   const [cursor, setCursor] = useState<string | null>(initialCursor);
@@ -67,7 +69,7 @@ export function MediaBoardList({
           {items.map((p) => (
             <li key={p.id}>
               <Link
-                href={`/media-board/${p.id}`}
+                href={`${basePath}/${p.id}`}
                 className="block px-5 py-4 hover:bg-gray-50"
               >
                 <div className="flex items-center justify-between gap-3">

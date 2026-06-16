@@ -187,7 +187,7 @@ export default async function AdminMenuPage() {
       items: [
         {
           label: "미디어선교부",
-          href: "/media-board",
+          href: "/admin/media-board",
           description: "미디어선교부 전용 게시판",
           icon: Clapperboard,
         },

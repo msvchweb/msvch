@@ -9,6 +9,7 @@ import {
   ImageIcon,
   ChevronRight,
   BookOpen,
+  Clapperboard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
@@ -137,7 +138,7 @@ export default async function AdminDashboard() {
       .select("id, title, author_name, board_id, created_at")
       .order("created_at", { ascending: false })
       .limit(5),
-    // 미디어선교부 게시판 id — 최근 글 링크를 /media-board 로 분기하기 위함
+    // 미디어선교부 게시판 id — 최근 글 링크를 관리자 경로로 분기하기 위함
     // (RLS 상 비멤버에겐 null → 일반 게시판 경로로 폴백)
     supabase
       .from("boards")
@@ -154,11 +155,25 @@ export default async function AdminDashboard() {
   const recentInquiry = (recentInquiryRes.data ?? []) as RecentInquiry[];
   const recentBoardPosts = (recentBoardPostsRes.data ?? []) as RecentBoardPost[];
   const mediaBoardId = mediaBoardRes.data?.id ?? null;
+  const canMediaBoard = mediaBoardId !== null;
+  const recentMediaPosts = mediaBoardId
+    ? recentBoardPosts.filter((p) => p.board_id === mediaBoardId)
+    : [];
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">대시보드</h1>
+    <div className="mx-auto w-full max-w-7xl space-y-6 lg:space-y-8">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">
+            Staff workspace
+          </p>
+          <h1 className="mt-1 text-xl font-bold text-gray-900 sm:text-2xl">
+            관리자 대시보드
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            오늘 확인할 운영 업무와 자주 쓰는 작업을 모았습니다.
+          </p>
+        </div>
         <div className="flex flex-wrap items-center gap-2">
           <InstallPWAButton
             variant="outline"
@@ -176,13 +191,12 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* A — 처리 대기 (최상단 가로형) */}
-      {(canNewFamilies || canInquiries || canCalendar) && (
+      {(canNewFamilies || canInquiries || canCalendar || canMediaBoard) && (
         <section>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-            처리 대기
+            오늘 처리할 일
           </h2>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {canNewFamilies && (
               <ActionCard
                 href="/admin/new-families"
@@ -213,19 +227,32 @@ export default async function AdminDashboard() {
                 tone={upcomingEventCount > 0 ? "info" : "neutral"}
               />
             )}
+            {canMediaBoard && (
+              <ActionCard
+                href="/admin/media-board"
+                icon={Clapperboard}
+                label="미디어 회의록"
+                value={recentMediaPosts.length}
+                hint={
+                  recentMediaPosts.length > 0
+                    ? "최근 게시글"
+                    : "게시판 확인"
+                }
+                tone={recentMediaPosts.length > 0 ? "info" : "neutral"}
+              />
+            )}
           </div>
         </section>
       )}
 
-      <div className="grid gap-8 lg:grid-cols-3">
-        {/* 왼쪽 영역 (2/3): 최근 활동 */}
-        <div className="lg:col-span-2 space-y-8">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="space-y-6">
           {(canCalendar || canNewFamilies || canInquiries || canBoards) && (
             <section>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
                 최근 활동
               </h2>
-              <div className="grid gap-6 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-2">
                 {canCalendar && (
                   <RecentList
                     title="다가오는 일정"
@@ -275,7 +302,7 @@ export default async function AdminDashboard() {
                   <RecentList
                     title="최근 게시판 글"
                     emptyText="새 글 없음"
-                    href={mediaBoardId ? "/media-board" : "/admin/boards"}
+                    href={canMediaBoard ? "/admin/media-board" : "/admin/boards"}
                     items={recentBoardPosts.map((p) => ({
                       id: p.id,
                       primary: p.title,
@@ -284,8 +311,8 @@ export default async function AdminDashboard() {
                       )}`,
                       href:
                         mediaBoardId && p.board_id === mediaBoardId
-                          ? `/media-board/${p.id}`
-                          : `/boards/${p.board_id}/${p.id}`,
+                          ? `/admin/media-board/${p.id}`
+                          : "/admin/boards",
                     }))}
                   />
                 )}
@@ -294,14 +321,17 @@ export default async function AdminDashboard() {
           )}
         </div>
 
-        {/* 오른쪽 영역 (1/3): 빠른 작성 및 기타 */}
-        <div className="space-y-8">
-          {(canNotices || canWeeklies || canCalendar || canGallery) && (
+        <aside className="space-y-6">
+          {(canNotices ||
+            canWeeklies ||
+            canCalendar ||
+            canGallery ||
+            canMediaBoard) && (
             <section>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-                빠른 작성
+                빠른 작업
               </h2>
-              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1">
+              <div className="grid grid-cols-2 gap-2 lg:grid-cols-1">
                 {canNotices && (
                   <QuickAction
                     href="/admin/notices"
@@ -330,6 +360,13 @@ export default async function AdminDashboard() {
                     label="앨범 만들기"
                   />
                 )}
+                {canMediaBoard && (
+                  <QuickAction
+                    href="/admin/media-board"
+                    icon={Clapperboard}
+                    label="회의록 업로드"
+                  />
+                )}
               </div>
             </section>
           )}
@@ -338,7 +375,7 @@ export default async function AdminDashboard() {
             <UpdatesCard />
             <InstallPWACard />
           </section>
-        </div>
+        </aside>
       </div>
     </div>
   );
@@ -380,10 +417,10 @@ function ActionCard({
   return (
     <Link
       href={href}
-      className={`group flex items-center gap-4 rounded-xl border p-4 transition-colors ${TONE_CARD[tone]} hover:border-gray-300`}
+      className={`group flex min-h-28 items-center gap-4 rounded-lg border p-4 transition-colors ${TONE_CARD[tone]} hover:border-gray-300`}
     >
       <div
-        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${TONE_ICON[tone]}`}
+        className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${TONE_ICON[tone]}`}
       >
         <Icon size={22} />
       </div>
@@ -412,7 +449,7 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-gray-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700"
+      className="flex min-h-12 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 sm:px-4"
     >
       <Icon size={18} className="text-gray-500" />
       {label}
@@ -439,7 +476,7 @@ function RecentList({
   items: RecentListItem[];
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
       <div className="flex items-center justify-between border-b border-gray-100 px-4 py-3">
         <h3 className="truncate text-sm font-semibold text-gray-900">{title}</h3>
         <Link
@@ -506,4 +543,3 @@ function formatRelative(iso: string): string {
   if (d < 7) return `${d}일 전`;
   return iso.slice(0, 10);
 }
-

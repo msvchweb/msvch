@@ -19,11 +19,13 @@ export function MediaPostDetail({
   boardTitle,
   post,
   comments: initialComments,
+  basePath = "/media-board",
 }: {
   boardId: string;
   boardTitle: string;
   post: BoardPost;
   comments: BoardComment[];
+  basePath?: string;
 }) {
   const router = useRouter();
   const [comments, setComments] = useState<BoardComment[]>(initialComments);
@@ -39,7 +41,7 @@ export function MediaPostDetail({
       alert("삭제 실패");
       return;
     }
-    router.push("/media-board");
+    router.push(basePath);
     router.refresh();
   }
 
@@ -85,7 +87,7 @@ export function MediaPostDetail({
   return (
     <div className="mx-auto max-w-3xl">
       <Link
-        href="/media-board"
+        href={basePath}
         className="mb-3 inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900"
       >
         <ArrowLeft size={14} />

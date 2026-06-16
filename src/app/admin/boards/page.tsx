@@ -180,7 +180,11 @@ export default function AdminBoardsPage() {
                   <tr key={b.id} className={cn("hover:bg-gray-50", b.isMediaDept && "bg-amber-50/50")}>
                     <td className="px-4 py-3">
                       <Link
-                        href={b.isMediaDept ? "/media-board" : `/boards/${b.id}`}
+                        href={
+                          b.isMediaDept
+                            ? "/admin/media-board"
+                            : `/boards/${b.id}`
+                        }
                         className="block hover:text-primary-700"
                       >
                         <div className="flex items-center gap-2 font-medium text-gray-900 hover:text-primary-700">
@@ -261,7 +265,9 @@ export default function AdminBoardsPage() {
               >
                 <div className="flex items-start justify-between gap-2">
                   <Link
-                    href={b.isMediaDept ? "/media-board" : `/boards/${b.id}`}
+                    href={
+                      b.isMediaDept ? "/admin/media-board" : `/boards/${b.id}`
+                    }
                     className="min-w-0 flex-1 hover:text-primary-700"
                   >
                     <div className="flex items-center gap-2 font-medium text-gray-900 hover:text-primary-700">
