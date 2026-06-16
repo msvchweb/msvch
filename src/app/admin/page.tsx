@@ -156,11 +156,15 @@ export default async function AdminDashboard() {
   const mediaBoardId = mediaBoardRes.data?.id ?? null;
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8">
+    <div className="mx-auto w-full max-w-7xl space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-bold text-gray-900 sm:text-2xl">대시보드</h1>
         <div className="flex flex-wrap items-center gap-2">
-          <InstallPWAButton variant="outline" size="sm" className="h-9 px-3 text-xs sm:text-sm" />
+          <InstallPWAButton
+            variant="outline"
+            size="sm"
+            className="h-9 px-3 text-xs sm:text-sm"
+          />
           <Link
             href="/admin/guide"
             className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 sm:text-sm"
@@ -172,7 +176,7 @@ export default async function AdminDashboard() {
         </div>
       </div>
 
-      {/* A — 처리 대기 */}
+      {/* A — 처리 대기 (최상단 가로형) */}
       {(canNewFamilies || canInquiries || canCalendar) && (
         <section>
           <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
@@ -213,105 +217,129 @@ export default async function AdminDashboard() {
         </section>
       )}
 
-      {/* C — 빠른 진입 */}
-      {(canNotices || canWeeklies || canCalendar || canGallery) && (
-        <section>
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
-            빠른 작성
-          </h2>
-          <div className="grid gap-2 sm:grid-cols-4">
-            {canNotices && (
-              <QuickAction href="/admin/notices" icon={Newspaper} label="공지 작성" />
-            )}
-            {canWeeklies && (
-              <QuickAction
-                href="/admin/weeklies/new"
-                icon={FileText}
-                label="주보 작성"
-              />
-            )}
-            {canCalendar && (
-              <QuickAction href="/admin/calendar" icon={Calendar} label="일정 등록" />
-            )}
-            {canGallery && (
-              <QuickAction
-                href="/admin/gallery"
-                icon={ImageIcon}
-                label="앨범 만들기"
-              />
-            )}
-          </div>
-        </section>
-      )}
+      <div className="grid gap-8 lg:grid-cols-3">
+        {/* 왼쪽 영역 (2/3): 최근 활동 */}
+        <div className="lg:col-span-2 space-y-8">
+          {(canCalendar || canNewFamilies || canInquiries || canBoards) && (
+            <section>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                최근 활동
+              </h2>
+              <div className="grid gap-6 md:grid-cols-2">
+                {canCalendar && (
+                  <RecentList
+                    title="다가오는 일정"
+                    emptyText="7일 내 일정 없음"
+                    href="/admin/calendar"
+                    items={upcomingEvents.map((e) => ({
+                      id: e.id,
+                      primary: e.title,
+                      secondary: `${e.date}${
+                        e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""
+                      }`,
+                      href: "/admin/calendar",
+                    }))}
+                  />
+                )}
+                {canNewFamilies && (
+                  <RecentList
+                    title="최근 새가족 신청"
+                    emptyText="신청 없음"
+                    href="/admin/new-families"
+                    items={recentNewFamily.map((n) => ({
+                      id: n.id,
+                      primary: n.name,
+                      secondary: `${formatRelative(n.created_at)} · ${statusLabel(
+                        n.status
+                      )}`,
+                      href: "/admin/new-families",
+                    }))}
+                  />
+                )}
+                {canInquiries && (
+                  <RecentList
+                    title="최근 문의"
+                    emptyText="문의 없음"
+                    href="/admin/inquiries"
+                    items={recentInquiry.map((q) => ({
+                      id: q.id,
+                      primary: q.name,
+                      secondary: q.message
+                        ? truncate(q.message, 40)
+                        : formatRelative(q.created_at),
+                      href: "/admin/inquiries",
+                    }))}
+                  />
+                )}
+                {canBoards && (
+                  <RecentList
+                    title="최근 게시판 글"
+                    emptyText="새 글 없음"
+                    href={mediaBoardId ? "/media-board" : "/admin/boards"}
+                    items={recentBoardPosts.map((p) => ({
+                      id: p.id,
+                      primary: p.title,
+                      secondary: `${p.author_name} · ${formatRelative(
+                        p.created_at
+                      )}`,
+                      href:
+                        mediaBoardId && p.board_id === mediaBoardId
+                          ? `/media-board/${p.id}`
+                          : `/boards/${p.board_id}/${p.id}`,
+                    }))}
+                  />
+                )}
+              </div>
+            </section>
+          )}
+        </div>
 
-      {/* B — 최근 활동 */}
-      {(canCalendar || canNewFamilies || canInquiries || canBoards) && (
-        <section className="grid gap-6 lg:grid-cols-2">
-          {canCalendar && (
-            <RecentList
-              title="다가오는 일정"
-              emptyText="7일 내 일정 없음"
-              href="/admin/calendar"
-              items={upcomingEvents.map((e) => ({
-                id: e.id,
-                primary: e.title,
-                secondary: `${e.date}${e.start_time ? ` · ${e.start_time.slice(0, 5)}` : ""}`,
-                href: "/admin/calendar",
-              }))}
-            />
+        {/* 오른쪽 영역 (1/3): 빠른 작성 및 기타 */}
+        <div className="space-y-8">
+          {(canNotices || canWeeklies || canCalendar || canGallery) && (
+            <section>
+              <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-400">
+                빠른 작성
+              </h2>
+              <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-1">
+                {canNotices && (
+                  <QuickAction
+                    href="/admin/notices"
+                    icon={Newspaper}
+                    label="공지 작성"
+                  />
+                )}
+                {canWeeklies && (
+                  <QuickAction
+                    href="/admin/weeklies/new"
+                    icon={FileText}
+                    label="주보 작성"
+                  />
+                )}
+                {canCalendar && (
+                  <QuickAction
+                    href="/admin/calendar"
+                    icon={Calendar}
+                    label="일정 등록"
+                  />
+                )}
+                {canGallery && (
+                  <QuickAction
+                    href="/admin/gallery"
+                    icon={ImageIcon}
+                    label="앨범 만들기"
+                  />
+                )}
+              </div>
+            </section>
           )}
-          {canNewFamilies && (
-            <RecentList
-              title="최근 새가족 신청"
-              emptyText="신청 없음"
-              href="/admin/new-families"
-              items={recentNewFamily.map((n) => ({
-                id: n.id,
-                primary: n.name,
-                secondary: `${formatRelative(n.created_at)} · ${statusLabel(n.status)}`,
-                href: "/admin/new-families",
-              }))}
-            />
-          )}
-          {canInquiries && (
-            <RecentList
-              title="최근 문의"
-              emptyText="문의 없음"
-              href="/admin/inquiries"
-              items={recentInquiry.map((q) => ({
-                id: q.id,
-                primary: q.name,
-                secondary: q.message
-                  ? truncate(q.message, 40)
-                  : formatRelative(q.created_at),
-                href: "/admin/inquiries",
-              }))}
-            />
-          )}
-          {canBoards && (
-            <RecentList
-              title="최근 게시판 글"
-              emptyText="새 글 없음"
-              href={mediaBoardId ? "/media-board" : "/admin/boards"}
-              items={recentBoardPosts.map((p) => ({
-                id: p.id,
-                primary: p.title,
-                secondary: `${p.author_name} · ${formatRelative(p.created_at)}`,
-                href:
-                  mediaBoardId && p.board_id === mediaBoardId
-                    ? `/media-board/${p.id}`
-                    : `/boards/${p.board_id}/${p.id}`,
-              }))}
-            />
-          )}
-        </section>
-      )}
 
-      {/* D — 업데이트 노트 (대시보드 최하단) */}
-      <section className="grid gap-6 lg:grid-cols-2">
-        <UpdatesCard />
-        <InstallPWACard className="lg:h-full" />
-      </section>
+          <section className="space-y-6">
+            <UpdatesCard />
+            <InstallPWACard />
+          </section>
+        </div>
+      </div>
     </div>
   );
 }
