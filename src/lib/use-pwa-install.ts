@@ -22,6 +22,7 @@ export function usePWAInstall() {
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const canPrompt = deferredPrompt !== null;
 
   useEffect(() => {
     // 1. 이미 설치되어 있는지 확인 (Standalone 모드)
@@ -36,9 +37,9 @@ export function usePWAInstall() {
       const ios = /iphone|ipad|ipod/.test(userAgent);
       setIsIOS(ios);
 
-      // iOS는 beforeinstallprompt 이벤트를 지원하지 않으므로, 
-      // 이미 설치된 상태가 아니라면 항상 "설치 가능" 상태로 간주하여 가이드를 보여줄 수 있게 함
-      if (ios && !isStandaloneMode) {
+      // beforeinstallprompt 는 플랫폼/브라우저 상태에 따라 오지 않을 수 있다.
+      // 관리자 PWA는 수동 설치 안내라도 보여야 하므로 standalone 이 아니면 버튼을 노출한다.
+      if (!isStandaloneMode) {
         setIsInstallable(true);
       }
     });
@@ -66,8 +67,8 @@ export function usePWAInstall() {
     };
   }, []);
 
-  const install = async () => {
-    if (!deferredPrompt) return;
+  const install = async (): Promise<boolean> => {
+    if (!deferredPrompt) return false;
 
     // 저장해둔 설치 프롬프트 표시
     await deferredPrompt.prompt();
@@ -84,7 +85,8 @@ export function usePWAInstall() {
     // 프롬프트는 1회용이므로 초기화
     setDeferredPrompt(null);
     setIsInstallable(false);
+    return outcome === 'accepted';
   };
 
-  return { isInstallable, isInstalled, isIOS, install };
+  return { isInstallable, isInstalled, isIOS, canPrompt, install };
 }

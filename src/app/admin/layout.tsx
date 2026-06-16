@@ -13,7 +13,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "관리자",
-  manifest: "/admin/manifest.webmanifest",
+  manifest: "/admin-manifest.webmanifest",
 };
 
 function roleLabel(role: string | null): string {

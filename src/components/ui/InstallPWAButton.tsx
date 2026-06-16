@@ -18,17 +18,17 @@ export function InstallPWAButton({
   size = 'md',
   showIconOnly = false 
 }: InstallPWAButtonProps) {
-  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall();
+  const [showGuide, setShowGuide] = useState(false);
 
   if (!isInstallable || isInstalled) return null;
 
-  const handleClick = () => {
-    if (isIOS) {
-      setShowIOSGuide(true);
-    } else {
-      install();
+  const handleClick = async () => {
+    if (isIOS || !canPrompt) {
+      setShowGuide(true);
+      return;
     }
+    await install();
   };
 
   const variants = {
@@ -57,23 +57,23 @@ export function InstallPWAButton({
         {!showIconOnly && <span>앱으로 설치</span>}
       </button>
 
-      {showIOSGuide && <IOSInstallGuide onClose={() => setShowIOSGuide(false)} />}
+      {showGuide && <InstallGuide isIOS={isIOS} onClose={() => setShowGuide(false)} />}
     </>
   );
 }
 
 export function InstallPWACard({ className }: { className?: string }) {
-  const { isInstallable, isInstalled, isIOS, install } = usePWAInstall();
-  const [showIOSGuide, setShowIOSGuide] = useState(false);
+  const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall();
+  const [showGuide, setShowGuide] = useState(false);
 
   if (!isInstallable || isInstalled) return null;
 
-  const handleClick = () => {
-    if (isIOS) {
-      setShowIOSGuide(true);
-    } else {
-      install();
+  const handleClick = async () => {
+    if (isIOS || !canPrompt) {
+      setShowGuide(true);
+      return;
     }
+    await install();
   };
 
   return (
@@ -100,12 +100,18 @@ export function InstallPWACard({ className }: { className?: string }) {
         </button>
       </div>
 
-      {showIOSGuide && <IOSInstallGuide onClose={() => setShowIOSGuide(false)} />}
+      {showGuide && <InstallGuide isIOS={isIOS} onClose={() => setShowGuide(false)} />}
     </>
   );
 }
 
-function IOSInstallGuide({ onClose }: { onClose: () => void }) {
+function InstallGuide({
+  isIOS,
+  onClose,
+}: {
+  isIOS: boolean;
+  onClose: () => void;
+}) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
       <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 max-w-xs w-full shadow-2xl relative">
@@ -123,18 +129,28 @@ function IOSInstallGuide({ onClose }: { onClose: () => void }) {
           <div>
             <h3 className="text-white font-bold text-lg">홈 화면에 추가</h3>
             <p className="text-white/60 text-sm mt-2">
-              iPhone/iPad에서 앱처럼 사용하려면 아래 순서대로 진행해주세요.
+              관리자 페이지를 앱처럼 사용하려면 아래 순서대로 진행해주세요.
             </p>
           </div>
           
           <div className="w-full space-y-3 mt-2">
             <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
               <span className="bg-white/10 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shrink-0">1</span>
-              <p className="text-white/80 text-xs text-left">하단 메뉴의 <Share size={14} className="inline mx-1 text-blue-400" /> <b>공유 버튼</b>을 누릅니다.</p>
+              <p className="text-white/80 text-xs text-left">
+                {isIOS ? (
+                  <>
+                    하단 메뉴의 <Share size={14} className="inline mx-1 text-blue-400" /> <b>공유 버튼</b>을 누릅니다.
+                  </>
+                ) : (
+                  <>브라우저 메뉴를 엽니다.</>
+                )}
+              </p>
             </div>
             <div className="flex items-center gap-3 bg-white/5 p-3 rounded-lg border border-white/5">
               <span className="bg-white/10 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full shrink-0">2</span>
-              <p className="text-white/80 text-xs text-left">스크롤을 내려 <b>홈 화면에 추가</b>를 선택합니다.</p>
+              <p className="text-white/80 text-xs text-left">
+                <b>{isIOS ? "홈 화면에 추가" : "앱 설치 또는 홈 화면에 추가"}</b>를 선택합니다.
+              </p>
             </div>
           </div>
 
