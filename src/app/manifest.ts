@@ -14,6 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     short_name: '명성비전교회',
     description: '꿈이 있는 건강한 교회 명성비전교회입니다',
     start_url: '/links',
+    scope: '/',
     display: 'standalone',
     background_color: '#111827',
     theme_color: themeColor,
@@ -29,12 +30,12 @@ export default function manifest(): MetadataRoute.Manifest {
         type: 'image/png',
       },
       {
-        src: '/icon.png',
+        src: '/icons/app-icon-192.png',
         sizes: '192x192',
         type: 'image/png',
       },
       {
-        src: '/icon.png',
+        src: '/icons/app-icon-512.png',
         sizes: '512x512',
         type: 'image/png',
       },

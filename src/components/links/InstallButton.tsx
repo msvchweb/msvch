@@ -1,87 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Download, Smartphone, X, Share } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed';
-    platform: string;
-  }>;
-  prompt(): Promise<void>;
-}
-
-declare global {
-  interface Navigator {
-    standalone?: boolean;
-  }
-}
+import { usePWAInstall } from '@/lib/use-pwa-install';
 
 export function InstallButton() {
-  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isIOS, setIsIOS] = useState(false);
-  const [isStandalone, setIsStandalone] = useState(false);
+  const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall();
   const [showIOSGuide, setShowIOSGuide] = useState(false);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    // 1. 이미 설치되어 있는지 확인
-    const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches 
-      || window.navigator.standalone 
-      || document.referrer.includes('android-app://');
-    
-    requestAnimationFrame(() => {
-      setIsStandalone(!!isStandaloneMode);
-
-      // 2. iOS 여부 확인
-      const userAgent = window.navigator.userAgent.toLowerCase();
-      const ios = /iphone|ipad|ipod/.test(userAgent);
-      setIsIOS(ios);
-
-      // iOS이거나 이미 설치 가능 환경인 경우 가시성 확보 (테스트 등을 위해 항상 노출할 수도 있음)
-      if (ios && !isStandaloneMode) {
-        setIsVisible(true);
-      }
-    });
-
-    // 3. Android/Chrome 설치 프로프트 이벤트 리스너
-    const handleBeforeInstallPrompt = (e: Event) => {
-      e.preventDefault();
-      setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setIsVisible(true);
-    };
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-    };
-  }, []);
 
   const handleInstallClick = async () => {
-    if (isIOS) {
+    if (isIOS || !canPrompt) {
       setShowIOSGuide(true);
       return;
     }
 
-    if (!deferredPrompt) {
-      // 프로프트가 없는데 클릭된 경우 (안내 메시지 등)
-      alert('이 브라우저에서는 직접 설치를 지원하지 않습니다. 브라우저 메뉴에서 "홈 화면에 추가"를 선택해주세요.');
-      return;
-    }
-
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-      setIsVisible(false);
-    }
+    await install();
   };
 
-  if (!isVisible || isStandalone) return null;
+  if (!isInstallable || isInstalled) return null;
 
   return (
     <>

@@ -17,44 +17,46 @@ declare global {
   }
 }
 
-export function usePWAInstall() {
+interface UsePWAInstallOptions {
+  showFallback?: boolean;
+}
+
+export function usePWAInstall({ showFallback = false }: UsePWAInstallOptions = {}) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
-  const [isInstallable, setIsInstallable] = useState(false);
+  const [hasCheckedInstallState, setHasCheckedInstallState] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const canPrompt = deferredPrompt !== null;
+  const isInstallable =
+    hasCheckedInstallState && !isInstalled && (canPrompt || isIOS || showFallback);
 
   useEffect(() => {
     // 1. 이미 설치되어 있는지 확인 (Standalone 모드)
     const isStandaloneMode = window.matchMedia('(display-mode: standalone)').matches 
-      || window.navigator.standalone;
+      || window.navigator.standalone
+      || document.referrer.includes('android-app://');
     
     requestAnimationFrame(() => {
       setIsInstalled(!!isStandaloneMode);
 
       // 2. iOS 여부 확인
       const userAgent = window.navigator.userAgent.toLowerCase();
-      const ios = /iphone|ipad|ipod/.test(userAgent);
+      const ios = /iphone|ipad|ipod/.test(userAgent)
+        || (window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1);
       setIsIOS(ios);
-
-      // beforeinstallprompt 는 플랫폼/브라우저 상태에 따라 오지 않을 수 있다.
-      // 관리자 PWA는 수동 설치 안내라도 보여야 하므로 standalone 이 아니면 버튼을 노출한다.
-      if (!isStandaloneMode) {
-        setIsInstallable(true);
-      }
+      setHasCheckedInstallState(true);
     });
 
     const handler = (e: Event) => {
       // 브라우저 기본 설치 팝업 방지 (Android/Chrome)
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      setIsInstallable(true);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
 
     const installedHandler = () => {
-      setIsInstallable(false);
+      setHasCheckedInstallState(true);
       setIsInstalled(true);
       setDeferredPrompt(null);
     };
@@ -84,7 +86,6 @@ export function usePWAInstall() {
     
     // 프롬프트는 1회용이므로 초기화
     setDeferredPrompt(null);
-    setIsInstallable(false);
     return outcome === 'accepted';
   };
 

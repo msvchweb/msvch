@@ -18,8 +18,11 @@ export function InstallPWAButton({
   size = 'md',
   showIconOnly = false 
 }: InstallPWAButtonProps) {
-  const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall();
+  const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall({
+    showFallback: true,
+  });
   const [showGuide, setShowGuide] = useState(false);
+  const label = canPrompt ? '앱으로 설치' : '설치 방법 보기';
 
   if (!isInstallable || isInstalled) return null;
 
@@ -54,7 +57,7 @@ export function InstallPWAButton({
         )}
       >
         <Download size={size === 'sm' ? 14 : 16} />
-        {!showIconOnly && <span>앱으로 설치</span>}
+        {!showIconOnly && <span>{label}</span>}
       </button>
 
       {showGuide && <InstallGuide isIOS={isIOS} onClose={() => setShowGuide(false)} />}
@@ -63,7 +66,9 @@ export function InstallPWAButton({
 }
 
 export function InstallPWACard({ className }: { className?: string }) {
-  const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall();
+  const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall({
+    showFallback: true,
+  });
   const [showGuide, setShowGuide] = useState(false);
 
   if (!isInstallable || isInstalled) return null;
@@ -88,7 +93,9 @@ export function InstallPWACard({ className }: { className?: string }) {
         <div className="space-y-1 text-center">
           <h3 className="text-lg font-semibold leading-none tracking-tight">앱으로 설치하기</h3>
           <p className="text-sm text-gray-500">
-            홈 화면에 추가하여 더 편리하게 이용하세요.
+            {canPrompt
+              ? '홈 화면에 추가하여 더 편리하게 이용하세요.'
+              : '브라우저에서 관리자 앱을 추가하는 방법을 확인하세요.'}
           </p>
         </div>
         <button 
@@ -96,7 +103,7 @@ export function InstallPWACard({ className }: { className?: string }) {
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-amber-400 px-4 py-2.5 text-sm font-bold text-slate-900 transition-colors hover:bg-amber-500"
         >
           <Download className="h-4 w-4" />
-          설치하기
+          {canPrompt ? '설치하기' : '방법 보기'}
         </button>
       </div>
 
