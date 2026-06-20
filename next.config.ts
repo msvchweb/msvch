@@ -71,6 +71,12 @@ const nextConfig: NextConfig = {
   },
   async redirects() {
     return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "msvch.vercel.app" }],
+        destination: "https://www.msvch.org/:path*",
+        permanent: true,
+      },
       // 기존 유지
       { source: "/post/:slug", destination: "/notice/:slug", permanent: true },
       { source: "/home-1", destination: "/", permanent: true },

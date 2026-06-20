@@ -1,6 +1,6 @@
 # 명성비전교회 (msvch) 홈페이지
 
-명성비전교회의 공식 홈페이지와 관리자 시스템. 공개 사이트는 [msvch.vercel.app](https://msvch.vercel.app) 에서 운영된다.
+명성비전교회의 공식 홈페이지와 관리자 시스템. 공개 사이트는 [www.msvch.org](https://www.msvch.org) 에서 운영된다.
 
 > ℹ️ 더나브론비전(thenavron) 교회 SaaS 프로젝트는 **별도 레포에서 진행** — 본 레포는 명성비전교회 홈페이지 개발만 다룬다.
 
@@ -90,4 +90,4 @@ npm run lint       # eslint
 ## 라이선스 / 운영
 
 - 본 레포는 명성비전교회 내부 운영용. 외부 공개·재사용 전 별도 합의 필요.
-- 운영 도메인: `msvch.vercel.app` (msvch.org 는 사용하지 않음).
+- 운영 도메인: `www.msvch.org`.

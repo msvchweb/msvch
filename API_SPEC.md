@@ -152,7 +152,7 @@ interface UpdatesResponse {
 **예시 호출**
 
 ```bash
-curl https://msvch.vercel.app/api/updates?limit=10&since=2026-05-01
+curl https://www.msvch.org/api/updates?limit=10&since=2026-05-01
 ```
 
 ---
@@ -334,7 +334,7 @@ Vercel Cron 엔드포인트 — YouTube 업로드 플레이리스트에서 최�
 
 - **수동 트리거** (배포 직후 첫 백필 등):
   ```bash
-  curl -H "x-cron-secret: $CRON_SECRET" https://msvch.vercel.app/api/admin/cron/sync-sermons
+  curl -H "x-cron-secret: $CRON_SECRET" https://www.msvch.org/api/admin/cron/sync-sermons
   ```
 
 ---

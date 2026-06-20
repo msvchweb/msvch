@@ -473,7 +473,7 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
             하단에 로고·연락처·QR 코드 자동 합성
           </label>
           <p className="mt-1.5 text-xs text-gray-500">
-            QR 은 {`https://msvch.vercel.app/links`} 로 연결됩니다 (교회 링크 모음).
+            QR 은 {`https://www.msvch.org/links`} 로 연결됩니다 (교회 링크 모음).
           </p>
         </Card>
       </div>

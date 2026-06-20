@@ -3,12 +3,12 @@ import { Home, BookOpen } from 'lucide-react';
 import { InstagramIcon } from '@/components/icons/InstagramIcon';
 import { InstallButton } from '@/components/links/InstallButton';
 
-const PAGE_URL = 'https://msvch.vercel.app/links';
+const PAGE_URL = 'https://www.msvch.org/links';
 
 const links = [
   {
     label: '홈페이지',
-    href: 'https://msvch.vercel.app/',
+    href: 'https://www.msvch.org/',
     icon: 'home',
     description: '명성교회 공식 홈페이지',
   },

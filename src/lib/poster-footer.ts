@@ -18,7 +18,7 @@ export const CHURCH_FOOTER = {
   name: "명성비전교회",
   phone: "02-534-0691",
   address: "서울 동작구 사당로 16바길 9",
-  qrUrl: "https://msvch.vercel.app/links",
+  qrUrl: "https://www.msvch.org/links",
   logoUrl: "/images/banner.avif",
 } as const;
 

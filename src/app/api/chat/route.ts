@@ -45,7 +45,7 @@ const STATIC_KNOWLEDGE = `
 주소: 서울시 동작구 사당로 16바길 9 (사당4동 주민센터 옆)
 전화: 02-534-0691
 이메일: info@msvch.org
-웹사이트: https://msvch.vercel.app
+웹사이트: https://www.msvch.org
 인스타그램: @msvch_main
 
 [오시는 길]

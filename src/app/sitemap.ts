@@ -2,7 +2,7 @@ import type { MetadataRoute } from "next";
 import { getNotices } from "@/lib/notices";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = "https://msvch.vercel.app";
+  const baseUrl = "https://www.msvch.org";
 
   const staticPages = [
     "",

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
     template: "%s | 명성비전교회",
   },
   description: "꿈이 있는 건강한 교회 명성비전교회입니다",
-  metadataBase: new URL("https://msvch.vercel.app"),
+  metadataBase: new URL("https://www.msvch.org"),
   icons: {
     icon: [
       { url: "/favicon.png", sizes: "32x32", type: "image/png" },

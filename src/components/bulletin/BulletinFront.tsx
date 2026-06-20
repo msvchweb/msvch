@@ -153,7 +153,7 @@ const DEFAULT: FrontData = {
   sundayTimes: "1부 오전 8시 / 2부 오전 10시 / 3부 낮 12시",
   address: "서울특별시 동작구 사당로 16바길 9",
   phone: "02) 534-0691",
-  website: "msvch.vercel.app",
+  website: "www.msvch.org",
   news: [
     {
       title: "1. 2026 새생명 마을축제",
