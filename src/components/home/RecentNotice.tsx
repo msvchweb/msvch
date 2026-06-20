@@ -3,17 +3,12 @@ import { Bell } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import type { Notice } from "@/types/notice";
 
-function getNoticeHref(slug: string) {
-  const safeSlug = slug.trim();
-  return safeSlug ? `/notice/${encodeURIComponent(safeSlug)}` : "/notice";
-}
-
 export function RecentNotice({ notices }: { notices: Notice[] }) {
   return (
-    <section className="bg-white px-4 py-12 sm:px-12 sm:py-[88px]">
+    <section className="bg-white px-4 py-16 sm:px-12 sm:py-[88px]">
       <div className="mx-auto max-w-[1200px]">
-        <div className="mb-5 flex items-baseline justify-between sm:mb-8">
-          <h2 className="text-2xl font-bold tracking-[-0.03em] text-church-dark sm:text-4xl">
+        <div className="mb-8 flex items-baseline justify-between">
+          <h2 className="text-3xl font-bold tracking-[-0.03em] text-church-dark sm:text-4xl">
             공지사항
           </h2>
           <Link href="/notice" className="text-[13px] text-gray-500 hover:text-gray-700">
@@ -22,12 +17,12 @@ export function RecentNotice({ notices }: { notices: Notice[] }) {
         </div>
 
         {notices.length > 0 ? (
-          <ul className="space-y-3 sm:space-y-0 sm:border-t sm:border-gray-200">
+          <ul className="border-t border-gray-200">
             {notices.map((n) => (
               <li key={n.id}>
                 <Link
-                  href={getNoticeHref(n.slug)}
-                  className="block rounded-xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:bg-gray-50 active:bg-gray-50 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:rounded-none sm:border-0 sm:border-b sm:p-0 sm:py-[22px] sm:shadow-none"
+                  href={`/notice/${n.slug}`}
+                  className="flex items-center justify-between gap-4 border-b border-gray-200 py-[22px] transition-colors hover:bg-gray-50"
                 >
                   <span className="flex min-w-0 items-center gap-3">
                     {n.category === "긴급" && (
@@ -45,7 +40,7 @@ export function RecentNotice({ notices }: { notices: Notice[] }) {
                     </span>
                   </span>
                   {n.date && (
-                    <span className="mt-2 block text-[13px] tabular-nums text-gray-500 sm:mt-0 sm:shrink-0">
+                    <span className="shrink-0 text-[13px] tabular-nums text-gray-500">
                       {formatDate(n.date)}
                     </span>
                   )}

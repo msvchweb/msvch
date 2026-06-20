@@ -34,6 +34,11 @@ function extractHeroImage(notice: Notice): string | null {
   return m ? m[1] : null;
 }
 
+function getNoticeHref(slug: string): string {
+  const safeSlug = slug.trim();
+  return safeSlug ? `/notice/${encodeURIComponent(safeSlug)}` : "/notice";
+}
+
 /**
  * 홈 히어로 슬라이드. 이미지가 있는 공개 공지만 최신순으로 채택.
  * 이미지 0건 공지는 제외 (레이아웃 깨짐 방지).
@@ -60,7 +65,7 @@ export async function getHeroSlides(limit = 5): Promise<HeroSlide[]> {
       title: n.title,
       subtitle: extractSubtitle(n.content),
       image,
-      href: `/notice/${n.slug}`,
+      href: getNoticeHref(n.slug),
       date: n.date,
     });
     if (slides.length >= limit) break;
