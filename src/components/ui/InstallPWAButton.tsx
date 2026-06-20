@@ -20,6 +20,7 @@ export function InstallPWAButton({
 }: InstallPWAButtonProps) {
   const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall({
     showFallback: true,
+    hideWhenStandalone: false,
   });
   const [showGuide, setShowGuide] = useState(false);
   const label = canPrompt ? '앱으로 설치' : '설치 방법 보기';
@@ -68,6 +69,7 @@ export function InstallPWAButton({
 export function InstallPWACard({ className }: { className?: string }) {
   const { isInstallable, isInstalled, isIOS, canPrompt, install } = usePWAInstall({
     showFallback: true,
+    hideWhenStandalone: false,
   });
   const [showGuide, setShowGuide] = useState(false);
 

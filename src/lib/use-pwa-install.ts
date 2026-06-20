@@ -19,9 +19,13 @@ declare global {
 
 interface UsePWAInstallOptions {
   showFallback?: boolean;
+  hideWhenStandalone?: boolean;
 }
 
-export function usePWAInstall({ showFallback = false }: UsePWAInstallOptions = {}) {
+export function usePWAInstall({
+  showFallback = false,
+  hideWhenStandalone = true,
+}: UsePWAInstallOptions = {}) {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [hasCheckedInstallState, setHasCheckedInstallState] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
@@ -37,7 +41,7 @@ export function usePWAInstall({ showFallback = false }: UsePWAInstallOptions = {
       || document.referrer.includes('android-app://');
     
     requestAnimationFrame(() => {
-      setIsInstalled(!!isStandaloneMode);
+      setIsInstalled(hideWhenStandalone && !!isStandaloneMode);
 
       // 2. iOS 여부 확인
       const userAgent = window.navigator.userAgent.toLowerCase();
@@ -67,7 +71,7 @@ export function usePWAInstall({ showFallback = false }: UsePWAInstallOptions = {
       window.removeEventListener('beforeinstallprompt', handler);
       window.removeEventListener('appinstalled', installedHandler);
     };
-  }, []);
+  }, [hideWhenStandalone]);
 
   const install = async (): Promise<boolean> => {
     if (!deferredPrompt) return false;
