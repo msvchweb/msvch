@@ -78,21 +78,41 @@ export default async function LinksPage() {
   });
 
   return (
-    <main className="relative min-h-screen bg-church-dark flex flex-col items-center justify-start px-4 py-12">
-      <Link
-        href="/links/silent-mode"
-        className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 transition-colors hover:border-church-gold/50 hover:text-church-gold"
-      >
-        <BellOff size={14} />
-        예배시간 무음모드 방법
-      </Link>
-
+    <main className="min-h-screen bg-church-dark flex flex-col items-center justify-start px-4 py-12">
       {/* 헤더 */}
-      <div className="mb-8 text-center">
+      <div className="mb-6 text-center">
         <p className="text-church-gold text-sm tracking-widest uppercase mb-1">명성비전교회</p>
         <h1 className="text-white text-2xl font-bold tracking-tight">링크 모음</h1>
         <p className="text-white/50 text-sm mt-1">원하는 채널을 선택하세요</p>
       </div>
+
+      <Link
+        href="/links/silent-mode"
+        className="mb-4 flex w-full max-w-sm items-center gap-3 rounded-xl border border-church-gold/45 bg-church-gold/15 px-4 py-3 text-white shadow-lg shadow-black/15 transition-all duration-200 hover:bg-church-gold/25 hover:border-church-gold/70 group"
+      >
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-church-gold text-church-dark transition-transform duration-200 group-hover:scale-105">
+          <BellOff size={20} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="text-sm font-semibold leading-tight">
+            예배시간 무음모드 방법
+          </span>
+          <span className="mt-0.5 text-xs text-white/55">
+            예배 중 알림이 울리지 않도록 설정하기
+          </span>
+        </span>
+        <svg
+          className="shrink-0 text-church-gold/80 transition-transform duration-200 group-hover:translate-x-0.5"
+          width={16}
+          height={16}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+        >
+          <path d="M5 12h14M12 5l7 7-7 7" />
+        </svg>
+      </Link>
 
       {/* 앱 설치 버튼 */}
       <InstallButton />
