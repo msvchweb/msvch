@@ -1,6 +1,5 @@
 import QRCode from 'qrcode';
-import Link from 'next/link';
-import { Home, BookOpen, CirclePlay, BellOff } from 'lucide-react';
+import { Home, BookOpen, CirclePlay } from 'lucide-react';
 import { InstagramIcon } from '@/components/icons/InstagramIcon';
 import { InstallButton } from '@/components/links/InstallButton';
 
@@ -11,7 +10,6 @@ type LinkItem = {
   href: string;
   icon: string;
   description: string;
-  external?: boolean;
 };
 
 const links: LinkItem[] = [
@@ -65,7 +63,6 @@ function LinkIcon({ type }: { type: string }) {
     return (
       <BookOpen size={22} className="shrink-0" />
     );
-  if (type === 'silent') return <BellOff size={22} className="shrink-0" />;
   if (type === 'youtube') return <CirclePlay size={22} className="shrink-0" />;
   return <InstagramIcon size={22} className="shrink-0" />;
 }
@@ -85,34 +82,6 @@ export default async function LinksPage() {
         <h1 className="text-white text-2xl font-bold tracking-tight">링크 모음</h1>
         <p className="text-white/50 text-sm mt-1">원하는 채널을 선택하세요</p>
       </div>
-
-      <Link
-        href="/links/silent-mode"
-        className="mb-4 flex w-full max-w-sm items-center gap-3 rounded-xl border border-church-gold/45 bg-church-gold/15 px-4 py-3 text-white shadow-lg shadow-black/15 transition-all duration-200 hover:bg-church-gold/25 hover:border-church-gold/70 group"
-      >
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-church-gold text-church-dark transition-transform duration-200 group-hover:scale-105">
-          <BellOff size={20} />
-        </span>
-        <span className="flex min-w-0 flex-1 flex-col">
-          <span className="text-sm font-semibold leading-tight">
-            예배시간 무음모드 방법
-          </span>
-          <span className="mt-0.5 text-xs text-white/55">
-            예배 중 알림이 울리지 않도록 설정하기
-          </span>
-        </span>
-        <svg
-          className="shrink-0 text-church-gold/80 transition-transform duration-200 group-hover:translate-x-0.5"
-          width={16}
-          height={16}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path d="M5 12h14M12 5l7 7-7 7" />
-        </svg>
-      </Link>
 
       {/* 앱 설치 버튼 */}
       <InstallButton />
@@ -144,14 +113,6 @@ export default async function LinksPage() {
           );
           const className =
             "flex items-center gap-4 bg-white/5 hover:bg-church-gold/20 border border-white/10 hover:border-church-gold/50 rounded-xl px-5 py-4 text-white transition-all duration-200 group";
-
-          if (link.external === false) {
-            return (
-              <Link key={link.href} href={link.href} className={className}>
-                {content}
-              </Link>
-            );
-          }
 
           return (
             <a
