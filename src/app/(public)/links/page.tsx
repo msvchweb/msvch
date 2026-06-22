@@ -28,13 +28,6 @@ const links: LinkItem[] = [
     description: '네이버 블로그',
   },
   {
-    label: '예배시간 무음모드 방법',
-    href: '/links/silent-mode',
-    icon: 'silent',
-    description: '방해금지 모드 설정 안내',
-    external: false,
-  },
-  {
     label: '유튜브',
     href: 'https://www.youtube.com/@msvchphoto',
     icon: 'youtube',
@@ -85,10 +78,18 @@ export default async function LinksPage() {
   });
 
   return (
-    <main className="min-h-screen bg-church-dark flex flex-col items-center justify-start px-4 py-12">
+    <main className="relative min-h-screen bg-church-dark flex flex-col items-center justify-start px-4 py-12">
+      <Link
+        href="/links/silent-mode"
+        className="absolute right-4 top-4 flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-xs font-medium text-white/70 transition-colors hover:border-church-gold/50 hover:text-church-gold"
+      >
+        <BellOff size={14} />
+        예배시간 무음모드 방법
+      </Link>
+
       {/* 헤더 */}
       <div className="mb-8 text-center">
-        <p className="text-church-gold text-sm tracking-widest uppercase mb-1">명성교회</p>
+        <p className="text-church-gold text-sm tracking-widest uppercase mb-1">명성비전교회</p>
         <h1 className="text-white text-2xl font-bold tracking-tight">링크 모음</h1>
         <p className="text-white/50 text-sm mt-1">원하는 채널을 선택하세요</p>
       </div>
