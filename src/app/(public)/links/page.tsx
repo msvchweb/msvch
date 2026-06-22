@@ -1,5 +1,5 @@
 import QRCode from 'qrcode';
-import { Home, BookOpen } from 'lucide-react';
+import { Home, BookOpen, CirclePlay } from 'lucide-react';
 import { InstagramIcon } from '@/components/icons/InstagramIcon';
 import { InstallButton } from '@/components/links/InstallButton';
 
@@ -10,13 +10,19 @@ const links = [
     label: '홈페이지',
     href: 'https://www.msvch.org/',
     icon: 'home',
-    description: '명성교회 공식 홈페이지',
+    description: '명성비전교회 홈페이지',
   },
   {
     label: '블로그',
     href: 'https://blog.naver.com/msvch01/',
     icon: 'blog',
     description: '네이버 블로그',
+  },
+  {
+    label: '유튜브',
+    href: 'https://www.youtube.com/@msvchphoto',
+    icon: 'youtube',
+    description: '@msvchphoto',
   },
   {
     label: '인스타그램 (메인)',
@@ -50,6 +56,7 @@ function LinkIcon({ type }: { type: string }) {
     return (
       <BookOpen size={22} className="shrink-0" />
     );
+  if (type === 'youtube') return <CirclePlay size={22} className="shrink-0" />;
   return <InstagramIcon size={22} className="shrink-0" />;
 }
 

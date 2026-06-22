@@ -20,7 +20,7 @@ const mainWorship: WorshipInfo[] = [
   { name: "주일예배 3부", time: "낮 12:00", day: "매주 일요일", location: "본당", accent: "from-primary-500 to-primary-700" },
   { name: "수요예배", time: "오후 7:30", day: "매주 수요일", location: "본당", accent: "from-emerald-500 to-emerald-700" },
   { name: "금요기도회", time: "오후 8:30", day: "매주 금요일", location: "본당", accent: "from-violet-500 to-violet-700" },
-  { name: "새벽예배", time: "오전 6:00 (토 6:30)", day: "매일 (월~토)", location: "본당", accent: "from-amber-500 to-amber-700" },
+  { name: "새벽예배", time: "오전 6:00 (토,주일 없음)", day: "월~금", location: "본당", accent: "from-amber-500 to-amber-700" },
 ];
 
 const schoolWorship: WorshipInfo[] = [
