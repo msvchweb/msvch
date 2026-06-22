@@ -69,7 +69,7 @@ export function Header() {
   const [mounted, setMounted] = useState(false);
   const [prevPathname, setPrevPathname] = useState(pathname);
   const { dots } = useNewContent();
-  const { isStaff } = useMe();
+  const me = useMe();
 
   // 라우트 변경 시 오버레이 자동 닫기 (Link onClick 누락 대비)
   if (pathname !== prevPathname) {
@@ -167,7 +167,7 @@ export function Header() {
 
         {/* Desktop right: admin + auth + Instagram */}
         <div className="hidden items-center gap-1 lg:flex">
-          {isStaff && (
+          {me.isStaff && (
             <Link
               href="/admin"
               className="flex items-center gap-1.5 rounded-lg bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700 transition-colors hover:bg-primary-100"
@@ -176,7 +176,7 @@ export function Header() {
               관리자
             </Link>
           )}
-          <AuthButton variant="desktop" />
+          <AuthButton variant="desktop" me={me} />
           <a
             href="https://www.instagram.com/msvch_main?igsh=MWhuYmg5dDQxMzhuZg=="
             target="_blank"
@@ -256,7 +256,7 @@ export function Header() {
           >
             {/* 인증/관리자 카드 */}
             <div className="mb-6 rounded-2xl bg-gray-50 p-2">
-              {isStaff && (
+              {me.isStaff && (
                 <Link
                   href="/admin"
                   onClick={closeMenu}
@@ -269,7 +269,7 @@ export function Header() {
                 </Link>
               )}
               <div className="px-3">
-                <AuthButton variant="menu" onAction={closeMenu} />
+                <AuthButton variant="menu" me={me} onAction={closeMenu} />
               </div>
             </div>
 

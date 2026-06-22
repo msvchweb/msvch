@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createApiClient } from "@/lib/supabase/api";
 import { hasStaffAccess } from "@/lib/admin-auth";
-import { isMediaDeptMember } from "@/lib/boards";
+import { hasMediaDeptBoardAccess } from "@/lib/boards";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     .single<{ role: string }>();
 
   const role = profile?.role ?? null;
-  const mediaDeptMember = await isMediaDeptMember(supabase);
+  const mediaDeptMember = await hasMediaDeptBoardAccess(supabase);
 
   return NextResponse.json<MeResponse>(
     {

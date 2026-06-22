@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogIn, LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { useMe } from "@/lib/use-me";
+import type { UseMeState } from "@/lib/use-me";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -14,12 +14,12 @@ interface Props {
    * menu    = 햄버거 메뉴 안 행 스타일 (full width, 좌측 아이콘)
    */
   variant: "desktop" | "menu";
+  me: UseMeState;
   /** menu 변형에서 액션 후 부모 메뉴를 닫기 위한 콜백 */
   onAction?: () => void;
 }
 
-export function AuthButton({ variant, onAction }: Props) {
-  const me = useMe();
+export function AuthButton({ variant, me, onAction }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const [busy, setBusy] = useState<boolean>(false);
@@ -45,6 +45,13 @@ export function AuthButton({ variant, onAction }: Props) {
   if (variant === "desktop") {
     const cls =
       "flex items-center gap-1.5 rounded-lg bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200";
+    if (me.loading) {
+      return (
+        <span className={cn(cls, "pointer-events-none w-[82px] justify-center")}>
+          <span className="h-4 w-14 animate-pulse rounded bg-gray-200" />
+        </span>
+      );
+    }
     if (!me.authenticated) {
       return (
         <Link
@@ -74,6 +81,13 @@ export function AuthButton({ variant, onAction }: Props) {
   // variant === "menu" — 햄버거 메뉴 행
   const menuCls =
     "flex w-full items-center gap-2 py-3 text-[0.95rem] font-medium text-gray-800";
+  if (me.loading) {
+    return (
+      <span className={cn(menuCls, "pointer-events-none")}>
+        <span className="h-4 w-20 animate-pulse rounded bg-gray-200" />
+      </span>
+    );
+  }
   if (!me.authenticated) {
     return (
       <Link

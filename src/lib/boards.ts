@@ -267,6 +267,12 @@ export async function isMediaDeptMember(
   } = await supabase.auth.getUser();
   if (!user) return false;
 
+  return hasMediaDeptBoardAccess(supabase);
+}
+
+export async function hasMediaDeptBoardAccess(
+  supabase: SupabaseClient,
+): Promise<boolean> {
   const { data } = await supabase
     .from("boards")
     .select("id")

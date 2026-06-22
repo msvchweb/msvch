@@ -13,23 +13,30 @@ const EMPTY: MeResponse = {
   isMediaDeptMember: false,
 };
 
+export interface UseMeState extends MeResponse {
+  loading: boolean;
+}
+
 /**
  * 클라이언트 컴포넌트에서 현재 로그인 사용자 권한을 가져온다.
  * - 마운트 시 1회 fetch
  * - Supabase auth 이벤트(SIGNED_IN/SIGNED_OUT/TOKEN_REFRESHED) 시 자동 재조회
  *   → 같은 페이지에서 로그인/로그아웃해도 헤더가 즉시 갱신됨
  */
-export function useMe(): MeResponse {
-  const [me, setMe] = useState<MeResponse>(EMPTY);
+export function useMe(): UseMeState {
+  const [me, setMe] = useState<UseMeState>({ ...EMPTY, loading: true });
 
   const refresh = useCallback(async (): Promise<void> => {
     try {
       const r = await fetch("/api/me", { credentials: "same-origin" });
-      if (!r.ok) return;
+      if (!r.ok) {
+        setMe((prev) => ({ ...prev, loading: false }));
+        return;
+      }
       const data = (await r.json()) as MeResponse;
-      setMe(data);
+      setMe({ ...data, loading: false });
     } catch {
-      /* 네트워크 실패 — 기존 값 유지 */
+      setMe((prev) => ({ ...prev, loading: false }));
     }
   }, []);
 
