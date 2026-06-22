@@ -1,11 +1,20 @@
 import QRCode from 'qrcode';
-import { Home, BookOpen, CirclePlay } from 'lucide-react';
+import Link from 'next/link';
+import { Home, BookOpen, CirclePlay, BellOff } from 'lucide-react';
 import { InstagramIcon } from '@/components/icons/InstagramIcon';
 import { InstallButton } from '@/components/links/InstallButton';
 
 const PAGE_URL = 'https://www.msvch.org/links';
 
-const links = [
+type LinkItem = {
+  label: string;
+  href: string;
+  icon: string;
+  description: string;
+  external?: boolean;
+};
+
+const links: LinkItem[] = [
   {
     label: '홈페이지',
     href: 'https://www.msvch.org/',
@@ -17,6 +26,13 @@ const links = [
     href: 'https://blog.naver.com/msvch01/',
     icon: 'blog',
     description: '네이버 블로그',
+  },
+  {
+    label: '예배시간 무음모드 방법',
+    href: '/links/silent-mode',
+    icon: 'silent',
+    description: '방해금지 모드 설정 안내',
+    external: false,
   },
   {
     label: '유튜브',
@@ -56,6 +72,7 @@ function LinkIcon({ type }: { type: string }) {
     return (
       <BookOpen size={22} className="shrink-0" />
     );
+  if (type === 'silent') return <BellOff size={22} className="shrink-0" />;
   if (type === 'youtube') return <CirclePlay size={22} className="shrink-0" />;
   return <InstagramIcon size={22} className="shrink-0" />;
 }
@@ -81,34 +98,52 @@ export default async function LinksPage() {
 
       {/* 링크 카드 */}
       <div className="w-full max-w-sm flex flex-col gap-3">
-        {links.map((link) => (
-          <a
-            key={link.href}
-            href={link.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-4 bg-white/5 hover:bg-church-gold/20 border border-white/10 hover:border-church-gold/50 rounded-xl px-5 py-4 text-white transition-all duration-200 group"
-          >
-            <span className="text-church-gold group-hover:scale-110 transition-transform duration-200">
-              <LinkIcon type={link.icon} />
-            </span>
-            <div className="flex flex-col min-w-0">
-              <span className="font-semibold text-sm leading-tight">{link.label}</span>
-              <span className="text-white/40 text-xs mt-0.5 truncate">{link.description}</span>
-            </div>
-            <svg
-              className="ml-auto shrink-0 text-white/20 group-hover:text-church-gold/60 transition-colors"
-              width={16}
-              height={16}
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
+        {links.map((link) => {
+          const content = (
+            <>
+              <span className="text-church-gold group-hover:scale-110 transition-transform duration-200">
+                <LinkIcon type={link.icon} />
+              </span>
+              <div className="flex flex-col min-w-0">
+                <span className="font-semibold text-sm leading-tight">{link.label}</span>
+                <span className="text-white/40 text-xs mt-0.5 truncate">{link.description}</span>
+              </div>
+              <svg
+                className="ml-auto shrink-0 text-white/20 group-hover:text-church-gold/60 transition-colors"
+                width={16}
+                height={16}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+              >
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
+            </>
+          );
+          const className =
+            "flex items-center gap-4 bg-white/5 hover:bg-church-gold/20 border border-white/10 hover:border-church-gold/50 rounded-xl px-5 py-4 text-white transition-all duration-200 group";
+
+          if (link.external === false) {
+            return (
+              <Link key={link.href} href={link.href} className={className}>
+                {content}
+              </Link>
+            );
+          }
+
+          return (
+            <a
+              key={link.href}
+              href={link.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={className}
             >
-              <path d="M5 12h14M12 5l7 7-7 7" />
-            </svg>
-          </a>
-        ))}
+              {content}
+            </a>
+          );
+        })}
       </div>
 
       {/* QR 코드 */}
