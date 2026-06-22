@@ -111,23 +111,14 @@ export function HeroSection({ slides }: { slides: HeroSlide[] }) {
 
       <Link
         href="/links/silent-mode"
-        className="group absolute right-4 top-4 z-20 flex max-w-[calc(100%-2rem)] items-center gap-2 rounded-xl border border-white/70 bg-white/90 px-3 py-2 text-church-dark shadow-xl shadow-black/20 backdrop-blur transition-all duration-200 hover:bg-white md:right-8 md:top-8 md:gap-3 md:px-4 md:py-3"
+        className="group absolute right-3 top-3 z-20 flex max-w-[calc(100%-1.5rem)] items-center gap-1.5 rounded-full border border-white/70 bg-white/90 px-2.5 py-1.5 text-church-dark shadow-lg shadow-black/20 backdrop-blur transition-colors duration-200 hover:bg-white md:hidden"
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-church-gold text-church-dark transition-transform duration-200 group-hover:scale-105 md:h-10 md:w-10">
-          <BellOff size={18} />
+        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-church-gold text-church-dark">
+          <BellOff size={14} />
         </span>
-        <span className="flex min-w-0 flex-col">
-          <span className="text-sm font-bold leading-tight">
-            예배시간 무음모드 방법
-          </span>
-          <span className="mt-0.5 hidden text-xs font-medium text-church-dark/60 sm:block">
-            알림이 울리지 않도록 설정하기
-          </span>
+        <span className="min-w-0 text-xs font-bold leading-tight">
+          예배시간 무음모드
         </span>
-        <ArrowRight
-          size={16}
-          className="shrink-0 text-church-dark/50 transition-transform duration-200 group-hover:translate-x-0.5"
-        />
       </Link>
 
       <div className="relative z-10 flex h-full max-w-7xl flex-col justify-start px-6 pb-60 pt-16 sm:px-16 md:justify-center md:px-8 md:py-0 lg:px-24">
