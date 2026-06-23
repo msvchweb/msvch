@@ -43,6 +43,7 @@ const PayloadSchema = z.object({
   mood: z.enum(MOODS),
   motifs: z.array(z.enum(MOTIFS)).max(8),
   peopleHandling: z.enum(PEOPLE_HANDLINGS),
+  peopleCount: z.number().int().min(1).max(30).optional(),
   moodKeywords: z.string().trim().max(200).optional(),
   includeText: z.boolean(),
 

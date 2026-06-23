@@ -249,7 +249,7 @@ export const MOTIF_DEFS: Record<Motif, { ko: string; en: string }> = {
   abstractGeometric: { ko: "추상 기하", en: "abstract geometric shapes and gentle lines" },
 };
 
-export const PEOPLE_HANDLINGS = ["none", "silhouette", "abstract"] as const;
+export const PEOPLE_HANDLINGS = ["none", "silhouette", "abstract", "visible"] as const;
 export type PeopleHandling = (typeof PEOPLE_HANDLINGS)[number];
 
 export const PEOPLE_HANDLING_DEFS: Record<PeopleHandling, { ko: string; en: string }> = {
@@ -261,6 +261,10 @@ export const PEOPLE_HANDLING_DEFS: Record<PeopleHandling, { ko: string; en: stri
   abstract: {
     ko: "추상화된 사람들",
     en: "highly stylized abstract human figures with no realistic facial features",
+  },
+  visible: {
+    ko: "사람 등장",
+    en: "visible people appearing naturally in the scene, warm and respectful, without depicting any specific real person or religious figure",
   },
 };
 
@@ -307,6 +311,8 @@ export interface PromptBuilderInput {
   mood: Mood;
   motifs: Motif[];
   peopleHandling: PeopleHandling;
+  /** 사람 표현이 none 이 아닐 때 원하는 인원 수 */
+  peopleCount?: number;
 
   /** (고급) 자유 키워드. 비워두는 게 기본 */
   moodKeywords?: string;
@@ -321,13 +327,14 @@ export interface PromptBuilderInput {
 
 export const DEFAULT_PROMPT_INPUT: Pick<
   PromptBuilderInput,
-  "colorPalette" | "artStyle" | "mood" | "motifs" | "peopleHandling"
+  "colorPalette" | "artStyle" | "mood" | "motifs" | "peopleHandling" | "peopleCount"
 > = {
   colorPalette: "springPastel",
   artStyle: "watercolor",
   mood: "warmWelcoming",
   motifs: ["raysOfLight"],
   peopleHandling: "none",
+  peopleCount: 3,
 };
 
 // ─── 메타 프롬프트 빌더 ─────────────────────────────────────
@@ -396,6 +403,11 @@ export function buildMetaPromptForGemini(
   inputBlocks.push(`- Mood: ${MOOD_DEFS[input.mood].en}`);
   inputBlocks.push(`- Visual motifs to include: ${motifsEn}`);
   inputBlocks.push(`- Human figures: ${PEOPLE_HANDLING_DEFS[input.peopleHandling].en}`);
+  if (input.peopleHandling !== "none" && input.peopleCount) {
+    inputBlocks.push(
+      `- Desired number of human figures: approximately ${input.peopleCount}. Keep all people above the reserved footer band.`,
+    );
+  }
   if (input.moodKeywords?.trim()) {
     inputBlocks.push(`- Additional user keywords: ${input.moodKeywords.trim()}`);
   }
@@ -518,6 +530,9 @@ export function buildKoreanSummary(input: PromptBuilderInput): string {
     parts.push(input.motifs.map((m) => MOTIF_DEFS[m].ko).join("·"));
   }
   parts.push(PEOPLE_HANDLING_DEFS[input.peopleHandling].ko);
+  if (input.peopleHandling !== "none" && input.peopleCount) {
+    parts.push(`사람 수: ${input.peopleCount}명`);
+  }
   if (input.moodKeywords) parts.push(`키워드: ${input.moodKeywords}`);
   parts.push(POSTER_RATIO_LABEL[input.ratio]);
   parts.push(input.includeText ? "AI 가 한국어 텍스트 디자인 통합" : "텍스트는 따로 합성");

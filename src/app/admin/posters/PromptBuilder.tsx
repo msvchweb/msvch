@@ -145,6 +145,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
   const [peopleHandling, setPeopleHandling] = useState<PeopleHandling>(
     DEFAULT_PROMPT_INPUT.peopleHandling,
   );
+  const [peopleCount, setPeopleCount] = useState(DEFAULT_PROMPT_INPUT.peopleCount ?? 3);
 
   // 참고 이미지
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
@@ -224,6 +225,9 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
       return next.length === 0 ? [""] : next;
     });
   }
+  function updatePeopleCount(value: number) {
+    setPeopleCount(Math.max(1, Math.min(30, Math.round(value || 1))));
+  }
 
   async function handleGenerate() {
     if (!title.trim()) {
@@ -256,6 +260,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
         mood,
         motifs,
         peopleHandling,
+        peopleCount: peopleHandling === "none" ? undefined : peopleCount,
         moodKeywords: moodKeywords.trim() || undefined,
         includeText,
         referenceAspect: referenceFile ? referenceAspect : undefined,
@@ -380,6 +385,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
         mood,
         motifs,
         peopleHandling,
+        peopleCount: peopleHandling === "none" ? undefined : peopleCount,
         moodKeywords,
         ratio,
         includeText,
@@ -603,7 +609,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
           </Field>
 
           <Field label="👥 사람 표현">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
               {PEOPLE_HANDLINGS.map((p) => (
                 <ChipButton
                   key={p}
@@ -615,6 +621,32 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
               ))}
             </div>
           </Field>
+
+          {peopleHandling !== "none" && (
+            <Field label="사람 수" hint="포스터에 등장시키고 싶은 대략적인 인원 수입니다.">
+              <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50/50 p-4 sm:flex-row sm:items-center">
+                <input
+                  type="range"
+                  min={1}
+                  max={30}
+                  value={peopleCount}
+                  onChange={(e) => updatePeopleCount(Number(e.target.value))}
+                  className="w-full accent-primary-600"
+                />
+                <div className="flex items-center gap-2 sm:w-32">
+                  <input
+                    type="number"
+                    min={1}
+                    max={30}
+                    value={peopleCount}
+                    onChange={(e) => updatePeopleCount(Number(e.target.value))}
+                    className="w-20 rounded-lg border border-gray-300 bg-white px-3 py-2 text-right text-sm focus:border-primary-500 focus:outline-none"
+                  />
+                  <span className="text-sm font-medium text-gray-600">명</span>
+                </div>
+              </div>
+            </Field>
+          )}
 
           {/* 고급 옵션 */}
           <div className="overflow-hidden rounded-xl border border-gray-100 bg-gray-50/50">
