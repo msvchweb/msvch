@@ -226,7 +226,7 @@ function sizeForRatio(ratio: PosterRatio, model: string): string {
     case "9:16":
       return "1024x1792";
     case "a4":
-      return "1024x1448";
+      return "1024x1456";
   }
 }
 
