@@ -6,6 +6,9 @@ import {
   Loader2,
   Copy,
   Check,
+  Save,
+  FolderOpen,
+  Trash2,
   ExternalLink,
   ChevronDown,
   ChevronUp,
@@ -70,6 +73,35 @@ interface GeneratedPosterImage {
   instruction?: string;
   createdAt: number;
 }
+
+interface SavedPosterPrompt {
+  id: string;
+  savedAt: number;
+  title: string;
+  englishPrompt: string;
+  koreanSummary: string;
+  form: {
+    category: PosterCategory;
+    ratio: PosterRatio;
+    title: string;
+    schedules: string[];
+    location: string;
+    audience: string;
+    extraInfoText: string;
+    colorPalette: ColorPalette;
+    artStyle: ArtStyle;
+    mood: Mood;
+    motifs: Motif[];
+    peopleHandling: PeopleHandling;
+    peopleCount: number;
+    moodKeywords: string;
+    includeText: boolean;
+    referenceAspect: ReferenceAspect;
+  };
+}
+
+const SAVED_PROMPTS_KEY = "msvch.poster.savedPrompts.v1";
+const MAX_SAVED_PROMPTS = 30;
 
 const QUICK_REVISION_CHIPS: { label: string; instruction: string }[] = [
   {
@@ -170,6 +202,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
   const [dalleImageUrl, setDalleImageUrl] = useState<string | null>(null);
   const [revisionInstruction, setRevisionInstruction] = useState("");
   const [imageHistory, setImageHistory] = useState<GeneratedPosterImage[]>([]);
+  const [savedPrompts, setSavedPrompts] = useState<SavedPosterPrompt[]>([]);
 
   // 미리보기 URL 생명주기 관리
   useEffect(() => {
@@ -188,6 +221,17 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
       if (resultRefPreview) URL.revokeObjectURL(resultRefPreview);
     };
   }, [resultRefPreview]);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SAVED_PROMPTS_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as SavedPosterPrompt[];
+      if (Array.isArray(parsed)) setSavedPrompts(parsed);
+    } catch {
+      setSavedPrompts([]);
+    }
+  }, []);
 
   function handleReferenceFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -227,6 +271,87 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
   }
   function updatePeopleCount(value: number) {
     setPeopleCount(Math.max(1, Math.min(30, Math.round(value || 1))));
+  }
+
+  function persistSavedPrompts(next: SavedPosterPrompt[]) {
+    const trimmed = next.slice(0, MAX_SAVED_PROMPTS);
+    setSavedPrompts(trimmed);
+    try {
+      localStorage.setItem(SAVED_PROMPTS_KEY, JSON.stringify(trimmed));
+    } catch {
+      alert("브라우저 저장 공간이 부족해 프롬프트를 저장하지 못했습니다.");
+    }
+  }
+
+  function currentFormState(): SavedPosterPrompt["form"] {
+    return {
+      category,
+      ratio,
+      title,
+      schedules,
+      location,
+      audience,
+      extraInfoText,
+      colorPalette,
+      artStyle,
+      mood,
+      motifs,
+      peopleHandling,
+      peopleCount,
+      moodKeywords,
+      includeText,
+      referenceAspect,
+    };
+  }
+
+  function handleSavePrompt() {
+    if (!result?.englishPrompt) return;
+    const item: SavedPosterPrompt = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      savedAt: Date.now(),
+      title: title.trim() || "제목 없음",
+      englishPrompt: result.englishPrompt,
+      koreanSummary: result.koreanSummary,
+      form: currentFormState(),
+    };
+    persistSavedPrompts([item, ...savedPrompts]);
+  }
+
+  function handleLoadSavedPrompt(item: SavedPosterPrompt) {
+    setCategory(item.form.category);
+    setRatio(item.form.ratio);
+    setTitle(item.form.title);
+    setSchedules(item.form.schedules.length > 0 ? item.form.schedules : [""]);
+    setLocation(item.form.location);
+    setAudience(item.form.audience);
+    setExtraInfoText(item.form.extraInfoText);
+    setColorPalette(item.form.colorPalette);
+    setArtStyle(item.form.artStyle);
+    setMood(item.form.mood);
+    setMotifs(item.form.motifs);
+    setPeopleHandling(item.form.peopleHandling);
+    setPeopleCount(item.form.peopleCount);
+    setMoodKeywords(item.form.moodKeywords);
+    setIncludeText(item.form.includeText);
+    setReferenceAspect(item.form.referenceAspect);
+    setReferenceFile(null);
+    setResultRefPreview(null);
+    setResult({
+      englishPrompt: item.englishPrompt,
+      koreanSummary: item.koreanSummary,
+    });
+    setCopied(false);
+    setDalleImageUrl(null);
+    setRevisionInstruction("");
+    setImageHistory([]);
+    requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function handleDeleteSavedPrompt(id: string) {
+    if (!window.confirm("저장된 프롬프트를 삭제할까요?")) return;
+    persistSavedPrompts(savedPrompts.filter((item) => item.id !== id));
   }
 
   async function handleGenerate() {
@@ -407,6 +532,51 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
   return (
     <div className="relative pb-24 lg:pb-0">
       <div className="mx-auto max-w-4xl space-y-6">
+        <Section title="저장된 프롬프트" icon={FolderOpen}>
+          {savedPrompts.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-gray-200 bg-gray-50 px-4 py-5 text-center text-sm text-gray-500">
+              저장된 프롬프트가 없습니다. 영문 프롬프트를 만든 뒤 결과 영역에서 저장할 수 있습니다.
+            </p>
+          ) : (
+            <div className="divide-y divide-gray-100 rounded-xl border border-gray-200">
+              {savedPrompts.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-bold text-gray-900">{item.title}</p>
+                    <p className="mt-1 line-clamp-2 text-xs leading-relaxed text-gray-500">
+                      {item.koreanSummary}
+                    </p>
+                    <p className="mt-1 text-[11px] font-medium text-gray-400">
+                      {formatSavedAt(item.savedAt)}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleLoadSavedPrompt(item)}
+                      className="flex items-center justify-center gap-1.5 rounded-lg bg-primary-600 px-3 py-2 text-xs font-bold text-white hover:bg-primary-700"
+                    >
+                      <FolderOpen size={14} />
+                      불러오기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteSavedPrompt(item.id)}
+                      aria-label={`${item.title} 삭제`}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Section>
+
         {/* ── 섹션 1: 기본 정보 ──────────────────────────────── */}
         <Section title="기본 설정" icon={Layout}>
           <div className="grid gap-6 sm:grid-cols-2">
@@ -768,6 +938,13 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                 <h2 className="text-lg font-bold text-gray-900">영문 프롬프트 결과</h2>
                 <div className="flex gap-2">
                   <button
+                    onClick={handleSavePrompt}
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-bold text-gray-700 transition-all hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700 sm:flex-none"
+                  >
+                    <Save size={16} />
+                    프롬프트 저장
+                  </button>
+                  <button
                     onClick={handleCopy}
                     className={cn(
                       "flex flex-1 items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold transition-all sm:flex-none",
@@ -959,6 +1136,15 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
       </div>
     </div>
   );
+}
+
+function formatSavedAt(value: number): string {
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 // ── 컴포넌트 ───────────────────────────────────────────
