@@ -1,14 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import sharp from "sharp";
-import { readFile } from "node:fs/promises";
-import path from "node:path";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
 import {
   ART_STYLES,
-  ART_STYLE_DEFS,
   POSTER_RATIOS,
-  type ArtStyle,
   type PosterRatio,
 } from "@/lib/poster-prompts";
 
@@ -29,6 +25,8 @@ interface OpenAIImageResponse {
   error?: { message?: string };
 }
 
+const DEFAULT_IMAGE_MODEL = "gpt-image-2";
+
 export async function POST(request: NextRequest) {
   try {
     await requireAdmin(request);
@@ -42,8 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { prompt, ratio, artStyle, mode, revisionInstruction, sourceImageDataUrl } =
-      parsed.data;
+    const { prompt, ratio, mode, revisionInstruction, sourceImageDataUrl } = parsed.data;
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -60,39 +57,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const imageInputs: { buffer: Buffer; mimeType: string; filename: string }[] = [];
-    if (mode === "revise" && sourceImageDataUrl) {
-      imageInputs.push({
-        ...decodeDataUrlImage(sourceImageDataUrl),
-        filename: "current-poster.png",
-      });
-    }
-    imageInputs.push(await loadStyleSampleImage(artStyle));
+    const model = process.env.OPENAI_IMAGE_MODEL ?? DEFAULT_IMAGE_MODEL;
+    const endpoint =
+      mode === "revise"
+        ? "https://api.openai.com/v1/images/edits"
+        : "https://api.openai.com/v1/images/generations";
 
-    const form = new FormData();
-    form.append("model", process.env.OPENAI_IMAGE_MODEL ?? "gpt-image-1");
-    form.append("prompt", buildImagePrompt({ prompt, mode, revisionInstruction, ratio }));
-    form.append("size", sizeForRatio(ratio));
-    form.append("quality", process.env.OPENAI_IMAGE_QUALITY ?? "high");
-    form.append("output_format", "png");
-
-    for (const image of imageInputs) {
-      const normalized = await normalizeImage(image.buffer);
-      const bytes = Uint8Array.from(normalized);
-      form.append(
-        "image[]",
-        new Blob([bytes], { type: "image/png" }),
-        image.filename.replace(/\.[^.]+$/, ".png"),
-      );
-    }
-
-    const response = await fetch("https://api.openai.com/v1/images/edits", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: form,
-    });
+    const response =
+      mode === "revise"
+        ? await callImageEdit({
+            apiKey,
+            endpoint,
+            model,
+            prompt: buildImagePrompt({ prompt, mode, revisionInstruction, ratio }),
+            ratio,
+            sourceImageDataUrl: sourceImageDataUrl!,
+          })
+        : await callImageGeneration({
+            apiKey,
+            endpoint,
+            model,
+            prompt: buildImagePrompt({ prompt, mode, revisionInstruction, ratio }),
+            ratio,
+          });
 
     const data = (await response.json()) as OpenAIImageResponse;
 
@@ -143,8 +130,6 @@ function buildImagePrompt({
 }): string {
   const base = `${prompt}
 
-Use the attached style sample image only as a visual style reference. Do not copy its text, logos, people, characters, or exact objects.
-
 Hard requirements:
 - Generate a Korean church poster image suitable for ${ratio}.
 - Reserve the bottom 14% of the canvas as clean empty space for a footer overlay.
@@ -155,7 +140,7 @@ Hard requirements:
 
   return `${base}
 
-The first attached image is the current poster draft. Keep its overall composition unless the user explicitly asks otherwise. The second attached image is the style sample.
+The attached image is the current poster draft. Keep its overall composition unless the user explicitly asks otherwise.
 
 User revision request:
 ${revisionInstruction || "Create a cleaner, more polished version while preserving the original intent."}
@@ -163,21 +148,86 @@ ${revisionInstruction || "Create a cleaner, more polished version while preservi
 Apply only the requested revision, keep the footer band clear, and return one complete final image.`;
 }
 
-function sizeForRatio(ratio: PosterRatio): "1024x1024" | "1024x1536" {
-  return ratio === "1:1" ? "1024x1024" : "1024x1536";
+async function callImageGeneration({
+  apiKey,
+  endpoint,
+  model,
+  prompt,
+  ratio,
+}: {
+  apiKey: string;
+  endpoint: string;
+  model: string;
+  prompt: string;
+  ratio: PosterRatio;
+}): Promise<Response> {
+  return fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model,
+      prompt,
+      size: sizeForRatio(ratio, model),
+      quality: process.env.OPENAI_IMAGE_QUALITY ?? "high",
+      output_format: "png",
+    }),
+  });
 }
 
-async function loadStyleSampleImage(
-  artStyle: ArtStyle,
-): Promise<{ buffer: Buffer; mimeType: string; filename: string }> {
-  const sampleSrc = ART_STYLE_DEFS[artStyle].sampleSrc;
-  const filePath = path.join(process.cwd(), "public", sampleSrc.replace(/^\//, ""));
-  const buffer = await readFile(filePath);
-  return {
-    buffer,
-    mimeType: mimeTypeFromPath(sampleSrc),
-    filename: path.basename(sampleSrc),
-  };
+async function callImageEdit({
+  apiKey,
+  endpoint,
+  model,
+  prompt,
+  ratio,
+  sourceImageDataUrl,
+}: {
+  apiKey: string;
+  endpoint: string;
+  model: string;
+  prompt: string;
+  ratio: PosterRatio;
+  sourceImageDataUrl: string;
+}): Promise<Response> {
+  const source = decodeDataUrlImage(sourceImageDataUrl);
+  const normalized = await normalizeImage(source.buffer);
+  const form = new FormData();
+  form.append("model", model);
+  form.append("prompt", prompt);
+  form.append("size", sizeForRatio(ratio, model));
+  form.append("quality", process.env.OPENAI_IMAGE_QUALITY ?? "high");
+  form.append("output_format", "png");
+  form.append(
+    "image[]",
+    new Blob([Uint8Array.from(normalized)], { type: "image/png" }),
+    "current-poster.png",
+  );
+
+  return fetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: form,
+  });
+}
+
+function sizeForRatio(ratio: PosterRatio, model: string): string {
+  if (model !== "gpt-image-2") {
+    return ratio === "1:1" ? "1024x1024" : "1024x1536";
+  }
+
+  switch (ratio) {
+    case "1:1":
+      return "1024x1024";
+    case "9:16":
+      return "1024x1792";
+    case "a4":
+      return "1024x1448";
+  }
 }
 
 function decodeDataUrlImage(dataUrl: string): { buffer: Buffer; mimeType: string } {
@@ -197,11 +247,4 @@ async function normalizeImage(buffer: Buffer): Promise<Buffer> {
     .resize({ width: 1536, height: 1536, fit: "inside", withoutEnlargement: true })
     .png()
     .toBuffer();
-}
-
-function mimeTypeFromPath(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  if (ext === ".png") return "image/png";
-  if (ext === ".webp") return "image/webp";
-  return "image/jpeg";
 }
