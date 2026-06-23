@@ -159,39 +159,53 @@ export const ART_STYLES = [
   "flatIllustration",
   "lineArt",
   "paperCut",
-  "oilPainting",
-  "digitalPainting",
   "photoRealistic",
   "miniature3d",
+  "pixelArt",
+  "publicCampaign",
 ] as const;
 export type ArtStyle = (typeof ART_STYLES)[number];
 
-export const ART_STYLE_DEFS: Record<ArtStyle, { ko: string; en: string }> = {
-  watercolor: { ko: "수채화", en: "soft watercolor painting with gentle brush strokes and natural paper texture" },
+export const ART_STYLE_DEFS: Record<ArtStyle, { ko: string; en: string; sampleSrc: string }> = {
+  watercolor: {
+    ko: "수채화",
+    en: "soft watercolor painting with gentle brush strokes, pigment bleed, and natural paper texture",
+    sampleSrc: "/images/1Watercolor.jpg",
+  },
   flatIllustration: {
     ko: "플랫 일러스트",
-    en: "modern flat vector illustration with clean shapes and bold simple forms",
+    en: "modern flat illustration with clean vector-like shapes, bold simple forms, and crisp editorial composition",
+    sampleSrc: "/images/2flat.jpg",
   },
   lineArt: {
     ko: "손그림 라인아트",
-    en: "delicate hand-drawn line art with single accent color and lots of breathing space",
+    en: "delicate hand-drawn line art with sparse detail, warm handmade feeling, and lots of breathing space",
+    sampleSrc: "/images/3line.jpg",
   },
   paperCut: {
     ko: "종이공예",
-    en: "layered paper cut illustration with crisp edges and depth from soft shadows",
-  },
-  oilPainting: { ko: "유화", en: "classical oil painting with rich texture and warm impressionist brushwork" },
-  digitalPainting: {
-    ko: "디지털 페인팅",
-    en: "modern digital painting with smooth gradients and refined detail",
+    en: "layered paper craft illustration with cut paper shapes, tactile depth, crisp edges, and soft shadows",
+    sampleSrc: "/images/4paper.jpg",
   },
   photoRealistic: {
     ko: "사실적 사진",
-    en: "high-quality photorealistic photography with natural lighting and shallow depth of field",
+    en: "realistic photography with natural lighting, documentary church event atmosphere, and subtle depth of field",
+    sampleSrc: "/images/5photo.jpg",
   },
   miniature3d: {
     ko: "3D 미니어처",
-    en: "cute 3D rendered miniature scene with soft global illumination, isometric feel",
+    en: "cute 3D miniature diorama with toy-like scale, soft global illumination, and gentle isometric depth",
+    sampleSrc: "/images/6miniature.jpg",
+  },
+  pixelArt: {
+    ko: "픽셀아트",
+    en: "clean pixel art poster style with crisp grid pixels, retro charm, readable simple silhouettes, and balanced spacing",
+    sampleSrc: "/images/7pixel.jpg",
+  },
+  publicCampaign: {
+    ko: "공익광고풍",
+    en: "Korean public campaign poster style with clear symbolic visual, civic message tone, strong hierarchy, and polished print design",
+    sampleSrc: "/images/8public.jpg",
   },
 };
 
@@ -333,8 +347,16 @@ function cleanList(arr: string[] | undefined): string[] {
  */
 export function buildMetaPromptForGemini(
   input: PromptBuilderInput,
-  hasReferenceImage = false,
+  imageContext: boolean | { hasStyleSampleImage?: boolean; hasUserReferenceImage?: boolean } = false,
 ): string {
+  const hasUserReferenceImage =
+    typeof imageContext === "boolean"
+      ? imageContext
+      : Boolean(imageContext.hasUserReferenceImage);
+  const hasStyleSampleImage =
+    typeof imageContext === "boolean"
+      ? false
+      : Boolean(imageContext.hasStyleSampleImage);
   const categoryLabel = POSTER_CATEGORY_LABEL[input.category];
   const aiRatio = ratioForAI(input.ratio);
 
@@ -416,11 +438,23 @@ ${
 
   // 참고 이미지가 함께 첨부됐을 때 추가 지시
   const aspect = input.referenceAspect ?? "style";
-  const referenceSection = hasReferenceImage
+  const styleSampleSection = hasStyleSampleImage
     ? `
 
-[참고 이미지]
-사용자가 참고 이미지 1장을 함께 첨부했습니다 (이 메시지에 inlineData 로 동봉됨). 이 이미지의 ${REFERENCE_ASPECT_DEFS[aspect].en} 를 분석한 뒤, 결과 영문 프롬프트에 자연스럽게 녹여 주세요.
+[내장 그림체 샘플 이미지]
+선택한 그림체 "${ART_STYLE_DEFS[input.artStyle].ko}" 의 샘플 이미지가 이 메시지의 첫 번째 inlineData 로 동봉되어 있습니다. 이 이미지는 최종 포스터의 **그림체 참고용**입니다.
+
+차용 규칙:
+- 브러시 느낌, 질감, 색 처리, 조명, 깊이감, 형태 단순화 방식 같은 **추상적 스타일 특성만** 참고하세요.
+- 샘플 이미지의 텍스트, 로고, 인물, 고유 캐릭터, 고유 사물 배치는 복제하지 마세요.
+- 결과 프롬프트에는 선택한 교회 행사 정보가 우선이며, 샘플은 "style reference" 로만 자연스럽게 녹입니다.
+`
+    : "";
+  const userReferenceSection = hasUserReferenceImage
+    ? `
+
+[사용자 참고 이미지]
+사용자가 참고 이미지 1장을 함께 첨부했습니다${hasStyleSampleImage ? " (이 메시지의 두 번째 inlineData)" : " (이 메시지의 inlineData)"}. 이 이미지의 ${REFERENCE_ASPECT_DEFS[aspect].en} 를 분석한 뒤, 결과 영문 프롬프트에 자연스럽게 녹여 주세요.
 
 차용 규칙:
 - 색조·라이팅·질감·분위기·구도 같은 **추상적 미적 요소만** 가져옴.
@@ -429,6 +463,7 @@ ${
 - 참고 이미지 자체가 부적절(폭력·성인 등) 하면 그 부분은 무시하고 위 [입력] 만으로 작성.
 `
     : "";
+  const referenceSection = `${styleSampleSection}${userReferenceSection}`;
 
   return `당신은 이미지 생성 AI(ChatGPT image generation, Gemini, Midjourney, DALL·E 등) 에 입력할 영문 프롬프트를 작성하는 전문가입니다.
 

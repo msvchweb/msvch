@@ -13,20 +13,10 @@ import {
   DEFAULT_TEXT_SETTINGS,
   preloadFooterAssets,
   renderPoster,
-  type TextSettings,
-  type TextPosition,
-  type TextSize,
 } from "@/lib/poster-footer";
 import type { SharedPosterData } from "./PostersTabs";
 
 type InputMode = "file" | "url";
-
-const COLOR_SWATCHES = [
-  { value: "#ffffff", label: "흰색" },
-  { value: "#111827", label: "검정" },
-  { value: "#1e3a8a", label: "네이비" },
-  { value: "#c9a84c", label: "골드" },
-];
 
 export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null }) {
   const [ratio, setRatio] = useState<PosterRatio>("a4");
@@ -36,8 +26,6 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
   const [loadingImg, setLoadingImg] = useState(false);
 
   const [title, setTitle] = useState("");
-  const [bodyText, setBodyText] = useState("");
-  const [text, setText] = useState<TextSettings>(DEFAULT_TEXT_SETTINGS);
   const [showFooter, setShowFooter] = useState(true);
   const [downloading, setDownloading] = useState(false);
   const [showNoticeDraft, setShowNoticeDraft] = useState(false);
@@ -50,13 +38,17 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
     if (!sharedData) return;
 
     setTitle(sharedData.title);
-    setBodyText(sharedData.bodyText);
     setRatio(sharedData.ratio);
 
     if (sharedData.imageUrl) {
       setLoadingImg(true);
       (async () => {
         try {
+          if (sharedData.imageUrl!.startsWith("data:image/")) {
+            const img = await loadImage(sharedData.imageUrl!);
+            setAiImg(img);
+            return;
+          }
           // 서버 프록시를 통해 same-origin 으로 로드 (CORS taint 회피)
           const proxied = `/api/posters/proxy-image?url=${encodeURIComponent(sharedData.imageUrl!)}`;
           const head = await fetch(proxied, { method: "GET" });
@@ -104,7 +96,7 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
   useEffect(() => {
     drawPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aiImg, ratio, title, bodyText, text, showFooter]);
+  }, [aiImg, ratio, showFooter]);
 
   function drawPreview() {
     const canvas = previewRef.current;
@@ -112,9 +104,9 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
     renderPoster(canvas, {
       bg: aiImg,
       ratio,
-      title,
-      bodyText,
-      text,
+      title: "",
+      bodyText: "",
+      text: DEFAULT_TEXT_SETTINGS,
       showFooter,
       footerAssets: footerAssetsRef.current ?? undefined,
     });
@@ -206,9 +198,9 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
       renderPoster(canvas, {
         bg: aiImg,
         ratio,
-        title,
-        bodyText,
-        text,
+        title: "",
+        bodyText: "",
+        text: DEFAULT_TEXT_SETTINGS,
         showFooter,
         footerAssets: footerAssetsRef.current ?? undefined,
       });
@@ -294,7 +286,6 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
         <NoticeDraftModal
           sharedData={sharedData}
           bgImg={aiImg}
-          textSettings={text}
           showFooter={showFooter}
           onClose={() => setShowNoticeDraft(false)}
         />
@@ -385,83 +376,6 @@ export function Finalizer({ sharedData }: { sharedData: SharedPosterData | null 
           )}
         </Card>
 
-        {/* 텍스트 */}
-        <Card title="텍스트">
-          <div className="space-y-3">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">
-                제목
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={100}
-                placeholder="예: 2026 봄 부흥회"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-medium text-gray-700">
-                부제목
-              </label>
-              <textarea
-                value={bodyText}
-                onChange={(e) => setBodyText(e.target.value)}
-                maxLength={500}
-                rows={2}
-                placeholder="예: 5월 10일 오전 11시 본당"
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-              />
-            </div>
-            <PositionRow
-              label="제목 위치"
-              value={text.titlePos}
-              onChange={(v) => setText({ ...text, titlePos: v })}
-            />
-            <SizeRow
-              label="제목 크기"
-              value={text.titleSize}
-              onChange={(v) => setText({ ...text, titleSize: v })}
-            />
-            <PositionRow
-              label="부제목 위치"
-              value={text.bodyPos}
-              onChange={(v) => setText({ ...text, bodyPos: v })}
-            />
-            <SizeRow
-              label="부제목 크기"
-              value={text.bodySize}
-              onChange={(v) => setText({ ...text, bodySize: v })}
-            />
-            <div>
-              <p className="mb-1.5 text-xs font-medium text-gray-700">색상</p>
-              <div className="flex gap-2">
-                {COLOR_SWATCHES.map((s) => (
-                  <button
-                    key={s.value}
-                    type="button"
-                    onClick={() => setText({ ...text, color: s.value })}
-                    title={s.label}
-                    style={{ backgroundColor: s.value }}
-                    className={`h-8 w-8 rounded-full border-2 ${
-                      text.color === s.value ? "border-primary-600" : "border-gray-200"
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
-            <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input
-                type="checkbox"
-                checked={text.shadow}
-                onChange={(e) => setText({ ...text, shadow: e.target.checked })}
-              />
-              텍스트 그림자
-            </label>
-          </div>
-        </Card>
-
         {/* Footer */}
         <Card title="교회 정보 footer">
           <label className="flex items-center gap-2 text-sm text-gray-700">
@@ -498,72 +412,6 @@ function chip(active: boolean): string {
   return active
     ? "rounded-lg border border-primary-600 bg-primary-50 px-3 py-1.5 text-sm font-medium text-primary-700"
     : "rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-600 hover:border-gray-300";
-}
-
-function PositionRow({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: TextPosition;
-  onChange: (v: TextPosition) => void;
-}) {
-  const opts: { v: TextPosition; l: string }[] = [
-    { v: "top", l: "위" },
-    { v: "middle", l: "가운데" },
-    { v: "bottom", l: "아래" },
-  ];
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-medium text-gray-700">{label}</p>
-      <div className="grid grid-cols-3 gap-2">
-        {opts.map((o) => (
-          <button
-            key={o.v}
-            type="button"
-            onClick={() => onChange(o.v)}
-            className={chip(value === o.v)}
-          >
-            {o.l}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function SizeRow({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: TextSize;
-  onChange: (v: TextSize) => void;
-}) {
-  const opts: { v: TextSize; l: string }[] = [
-    { v: "sm", l: "작게" },
-    { v: "md", l: "보통" },
-    { v: "lg", l: "크게" },
-  ];
-  return (
-    <div>
-      <p className="mb-1.5 text-xs font-medium text-gray-700">{label}</p>
-      <div className="grid grid-cols-3 gap-2">
-        {opts.map((o) => (
-          <button
-            key={o.v}
-            type="button"
-            onClick={() => onChange(o.v)}
-            className={chip(value === o.v)}
-          >
-            {o.l}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
 }
 
 // ─── 이미지 로드 헬퍼 ──────────────────────────────────────

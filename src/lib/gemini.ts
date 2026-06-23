@@ -110,14 +110,15 @@ export async function callGeminiWithFallback(prompt: string): Promise<string> {
  */
 export async function callGeminiWithFallbackMultimodal(
   prompt: string,
-  image?: { base64: string; mimeType: string },
+  image?: { base64: string; mimeType: string } | { base64: string; mimeType: string }[],
 ): Promise<string> {
-  const parts: GeminiPart[] = image
-    ? [
-        { text: prompt },
-        { inlineData: { mimeType: image.mimeType, data: image.base64 } },
-      ]
-    : [{ text: prompt }];
+  const images = image ? (Array.isArray(image) ? image : [image]) : [];
+  const parts: GeminiPart[] = [
+    { text: prompt },
+    ...images.map((img) => ({
+      inlineData: { mimeType: img.mimeType, data: img.base64 },
+    })),
+  ];
   return callWithRetryAndFallback(parts);
 }
 

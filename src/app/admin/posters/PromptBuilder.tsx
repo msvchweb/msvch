@@ -55,6 +55,59 @@ interface BuildPromptResponse {
   error?: string;
 }
 
+interface GenerateImageResponse {
+  imageUrl?: string;
+  imageBase64?: string;
+  mimeType?: string;
+  revisedPrompt?: string;
+  error?: string;
+}
+
+interface GeneratedPosterImage {
+  id: string;
+  imageUrl: string;
+  source: "generate" | "revise";
+  instruction?: string;
+  createdAt: number;
+}
+
+const QUICK_REVISION_CHIPS: { label: string; instruction: string }[] = [
+  {
+    label: "더 밝게",
+    instruction: "Make the overall image brighter, cleaner, and more uplifting.",
+  },
+  {
+    label: "더 따뜻하게",
+    instruction: "Make the mood warmer, more welcoming, and more pastoral.",
+  },
+  {
+    label: "더 단순하게",
+    instruction: "Simplify the composition and reduce visual clutter while keeping the main idea.",
+  },
+  {
+    label: "인물 제거",
+    instruction: "Remove all people and faces. Use symbolic or environmental elements instead.",
+  },
+  {
+    label: "텍스트 제거",
+    instruction: "Remove all visible text, letters, numbers, logos, and watermark-like marks.",
+  },
+  {
+    label: "footer 공간 확보",
+    instruction:
+      "Reserve more clear empty space at the bottom for the church footer. Do not place any subject, text, face, or important detail in the bottom band.",
+  },
+  {
+    label: "교회 행사 느낌",
+    instruction:
+      "Make it feel more like a polished Korean church event poster, warm and appropriate for a congregation.",
+  },
+  {
+    label: "배경 덜 복잡하게",
+    instruction: "Make the background less busy and keep more calm open space.",
+  },
+];
+
 const TARGET_TOOLS: { name: string; href: string; hint: string }[] = [
   {
     name: "ChatGPT",
@@ -111,9 +164,11 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
 
   const resultRef = useRef<HTMLDivElement>(null);
 
-  // DALL-E 직접 생성 관련
+  // GPT 이미지 직접 생성/수정 관련
   const [generatingImage, setGeneratingImage] = useState(false);
   const [dalleImageUrl, setDalleImageUrl] = useState<string | null>(null);
+  const [revisionInstruction, setRevisionInstruction] = useState("");
+  const [imageHistory, setImageHistory] = useState<GeneratedPosterImage[]>([]);
 
   // 미리보기 URL 생명주기 관리
   useEffect(() => {
@@ -178,6 +233,8 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
     setLoading(true);
     setCopied(false);
     setDalleImageUrl(null); // 새 프롬프트 뽑으면 이전 생성 결과 리셋
+    setRevisionInstruction("");
+    setImageHistory([]);
     try {
       // 구조화 부가 정보 정리
       const cleanedSchedules = schedules.map((s) => s.trim()).filter((s) => s.length > 0);
@@ -233,8 +290,20 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
     }
   }
 
-  async function handleGenerateImage() {
+  async function handleGenerateImage(
+    mode: "generate" | "revise" = "generate",
+    instructionOverride?: string,
+  ) {
     if (!result?.englishPrompt) return;
+    const instruction = (instructionOverride ?? revisionInstruction).trim();
+    if (mode === "revise" && !dalleImageUrl) {
+      alert("먼저 수정할 이미지를 생성해 주세요.");
+      return;
+    }
+    if (mode === "revise" && !instruction) {
+      alert("수정 요청을 입력해 주세요.");
+      return;
+    }
 
     setGeneratingImage(true);
     try {
@@ -244,14 +313,33 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
         body: JSON.stringify({
           prompt: result.englishPrompt,
           ratio: ratio,
+          artStyle,
+          mode,
+          revisionInstruction: mode === "revise" ? instruction : undefined,
+          sourceImageDataUrl: mode === "revise" ? dalleImageUrl : undefined,
         }),
       });
-      const data = await r.json();
+      const data = (await r.json()) as GenerateImageResponse;
       if (!r.ok) {
         alert(data.error ?? "이미지 생성 실패");
         return;
       }
+      if (!data.imageUrl) {
+        alert("이미지 데이터를 받지 못했습니다.");
+        return;
+      }
       setDalleImageUrl(data.imageUrl);
+      setImageHistory((prev) => [
+        {
+          id: `${Date.now()}-${prev.length}`,
+          imageUrl: data.imageUrl!,
+          source: mode,
+          instruction: mode === "revise" ? instruction : undefined,
+          createdAt: Date.now(),
+        },
+        ...prev,
+      ]);
+      if (mode === "revise") setRevisionInstruction("");
     } catch (e) {
       console.error(e);
       alert("이미지 생성 중 오류가 발생했습니다.");
@@ -459,12 +547,37 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
 
           <div className="grid gap-6 sm:grid-cols-2">
             <Field label="🖌 그림체">
-              <div className="grid grid-cols-2 gap-2">
-                {ART_STYLES.map((s) => (
-                  <ChipButton key={s} active={artStyle === s} onClick={() => setArtStyle(s)}>
-                    {ART_STYLE_DEFS[s].ko}
-                  </ChipButton>
-                ))}
+              <div className="grid grid-cols-2 gap-3">
+                {ART_STYLES.map((s) => {
+                  const def = ART_STYLE_DEFS[s];
+                  const active = artStyle === s;
+                  return (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => setArtStyle(s)}
+                      className={cn(
+                        "overflow-hidden rounded-xl border bg-white text-left transition-all active:scale-[0.99]",
+                        active
+                          ? "border-primary-600 shadow-sm ring-2 ring-primary-500"
+                          : "border-gray-200 hover:border-gray-300 hover:shadow-sm",
+                      )}
+                    >
+                      <div className="aspect-[4/3] w-full overflow-hidden bg-gray-100">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={def.sampleSrc}
+                          alt={`${def.ko} 샘플`}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                      <div className="flex min-h-[44px] items-center justify-between gap-2 px-3 py-2">
+                        <span className="text-sm font-semibold text-gray-900">{def.ko}</span>
+                        {active && <Check size={16} className="shrink-0 text-primary-600" />}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             </Field>
 
@@ -653,12 +766,12 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                 </pre>
               </div>
 
-              {/* DALL-E 생성 카드 */}
+              {/* GPT 이미지 생성/수정 카드 */}
               <div className="overflow-hidden rounded-2xl border-2 border-primary-100 bg-primary-50/20">
                 <div className="bg-primary-600 p-4 text-white">
                   <h3 className="flex items-center gap-2 text-sm font-bold">
                     <Wand2 size={18} />
-                    ChatGPT(DALL-E) 이미지 바로 생성
+                    GPT 이미지 바로 생성
                   </h3>
                 </div>
                 <div className="p-5 sm:p-8">
@@ -666,9 +779,76 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                     <div className="flex flex-col items-center gap-6">
                       <div className="relative aspect-[3/4] w-full max-w-sm overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={dalleImageUrl} alt="DALL-E Result" className="h-full w-full object-contain" />
+                        <img src={dalleImageUrl} alt="GPT 이미지 결과" className="h-full w-full object-contain" />
                       </div>
                       <div className="w-full space-y-3">
+                        <div className="rounded-xl border border-gray-200 bg-white p-4">
+                          <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
+                            수정 요청
+                          </label>
+                          <textarea
+                            value={revisionInstruction}
+                            onChange={(e) => setRevisionInstruction(e.target.value)}
+                            rows={3}
+                            placeholder="예: 하단 footer 공간을 더 비우고 전체 톤을 더 밝고 따뜻하게 해줘"
+                            className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
+                          />
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {QUICK_REVISION_CHIPS.map((chip) => (
+                              <button
+                                key={chip.label}
+                                type="button"
+                                onClick={() => setRevisionInstruction(chip.instruction)}
+                                className="rounded-full border border-gray-200 bg-gray-50 px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-700"
+                              >
+                                {chip.label}
+                              </button>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleGenerateImage("revise")}
+                            disabled={generatingImage || !revisionInstruction.trim()}
+                            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 py-3 text-sm font-bold text-white hover:bg-primary-700 disabled:bg-gray-300"
+                          >
+                            {generatingImage ? (
+                              <Loader2 className="animate-spin" size={18} />
+                            ) : (
+                              <Wand2 size={18} />
+                            )}
+                            수정해서 다시 만들기
+                          </button>
+                        </div>
+                        {imageHistory.length > 1 && (
+                          <div className="rounded-xl border border-gray-200 bg-white p-4">
+                            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
+                              이전 결과
+                            </p>
+                            <div className="grid grid-cols-4 gap-2">
+                              {imageHistory.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => setDalleImageUrl(item.imageUrl)}
+                                  title={item.instruction || "초안 생성"}
+                                  className={cn(
+                                    "aspect-square overflow-hidden rounded-lg border bg-gray-100",
+                                    item.imageUrl === dalleImageUrl
+                                      ? "border-primary-600 ring-2 ring-primary-500"
+                                      : "border-gray-200 hover:border-gray-300",
+                                  )}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.source === "revise" ? "수정 결과" : "생성 결과"}
+                                    className="h-full w-full object-cover"
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <button
                           onClick={handleFinishAndEdit}
                           className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-4 text-base font-bold text-white shadow-md hover:bg-emerald-700"
@@ -677,11 +857,11 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                           이 이미지로 마무리 작업하기
                         </button>
                         <button
-                          onClick={handleGenerateImage}
+                          onClick={() => handleGenerateImage("generate")}
                           disabled={generatingImage}
                           className="w-full text-sm font-bold text-gray-500 hover:text-primary-600"
                         >
-                          다시 생성하기
+                          같은 조건으로 다시 생성하기
                         </button>
                       </div>
                     </div>
@@ -692,7 +872,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                         버튼 클릭 한 번으로 즉시 고화질 포스터를 생성할 수 있습니다.
                       </p>
                       <button
-                        onClick={handleGenerateImage}
+                        onClick={() => handleGenerateImage("generate")}
                         disabled={generatingImage}
                         className="flex w-full items-center justify-center gap-2 rounded-xl bg-primary-600 py-4 text-base font-bold text-white shadow-md hover:bg-primary-700 sm:w-auto sm:px-10"
                       >
@@ -700,7 +880,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                         {generatingImage ? "이미지 생성 중..." : "이미지 바로 만들기"}
                       </button>
                       <p className="text-[10px] text-gray-400">
-                        * OpenAI DALL-E 3 API를 사용하며 약 15~30초가 소요됩니다.
+                        * 선택한 그림체 샘플을 참고해 GPT 이미지 API로 생성합니다.
                       </p>
                     </div>
                   )}

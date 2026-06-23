@@ -10,8 +10,8 @@ export default function AdminPostersPage() {
         포스터 도구
       </h1>
       <p className="mb-6 text-sm text-gray-600">
-        ① 프롬프트를 만들어 ChatGPT·Gemini·Midjourney 등에서 이미지를 생성하고,
-        ② 받은 이미지에 한글 제목·교회 footer 를 합성해 최종 PNG 로 저장합니다.
+        행사 정보를 입력해 그림체 샘플 기반 이미지를 만들고 수정한 뒤, 교회 footer 를 합성해
+        PNG 저장 또는 공지사항 등록까지 진행합니다.
       </p>
       <PostersTabs />
     </div>

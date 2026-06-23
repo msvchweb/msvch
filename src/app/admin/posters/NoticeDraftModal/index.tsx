@@ -2,11 +2,10 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { X, Loader2, Check, AlertCircle, ImageIcon } from "lucide-react";
+import { X, Loader2, Check, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { renderPoster, preloadFooterAssets, type TextSettings } from "@/lib/poster-footer";
+import { DEFAULT_TEXT_SETTINGS, renderPoster, preloadFooterAssets } from "@/lib/poster-footer";
 import type { SharedPosterData } from "../PostersTabs";
-import type { PosterRatio } from "@/lib/poster-prompts";
 
 interface NoticeDraft {
   title: string;
@@ -17,7 +16,6 @@ interface NoticeDraft {
 interface NoticeDraftModalProps {
   sharedData: SharedPosterData;
   bgImg: HTMLImageElement;
-  textSettings: TextSettings;
   showFooter: boolean;
   onClose: () => void;
 }
@@ -25,7 +23,6 @@ interface NoticeDraftModalProps {
 export function NoticeDraftModal({
   sharedData,
   bgImg,
-  textSettings,
   showFooter,
   onClose,
 }: NoticeDraftModalProps) {
@@ -70,7 +67,7 @@ export function NoticeDraftModal({
       if (!res.ok) throw new Error("초안 생성 실패");
       const data = await res.json();
       setDraft(data);
-    } catch (err) {
+    } catch {
       setError("AI 초안을 생성하지 못했습니다.");
     } finally {
       setLoading(false);
@@ -83,9 +80,9 @@ export function NoticeDraftModal({
       renderPoster(mainPreviewRef.current, {
         bg: bgImg,
         ratio: sharedData.ratio,
-        title: sharedData.title,
-        bodyText: sharedData.bodyText,
-        text: textSettings,
+        title: "",
+        bodyText: "",
+        text: DEFAULT_TEXT_SETTINGS,
         showFooter,
         footerAssets: footerAssetsRef.current ?? undefined,
       });
@@ -95,9 +92,9 @@ export function NoticeDraftModal({
       renderPoster(thumbPreviewRef.current, {
         bg: bgImg,
         ratio: "16:9",
-        title: sharedData.title,
-        bodyText: sharedData.bodyText,
-        text: textSettings,
+        title: "",
+        bodyText: "",
+        text: DEFAULT_TEXT_SETTINGS,
         showFooter,
         footerAssets: footerAssetsRef.current ?? undefined,
       });

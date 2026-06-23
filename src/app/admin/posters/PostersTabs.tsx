@@ -37,16 +37,16 @@ export function PostersTabs() {
           active={tab === "prompt"}
           onClick={() => setTab("prompt")}
           icon={<Sparkles size={14} />}
-          label="① 프롬프트 만들기"
-          hint="입력 → 영문 프롬프트 → 복사 또는 바로 생성"
+          label="① 이미지 만들기"
+          hint="입력 → 프롬프트 생성 → GPT 이미지 생성/수정"
           dataTour="poster-prompt-tab"
         />
         <TabButton
           active={tab === "finalize"}
           onClick={() => setTab("finalize")}
           icon={<Wand2 size={14} />}
-          label="② 이미지 마무리"
-          hint="AI 결과 이미지 + 한글 텍스트 + 교회 footer 합성 → PNG"
+          label="② footer 마무리"
+          hint="AI 결과 이미지 + 교회 footer 합성 → PNG 또는 공지 등록"
           dataTour="poster-finalize-tab"
         />
       </div>

@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import sharp from "sharp";
+import { readFile } from "node:fs/promises";
+import path from "node:path";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
 import {
   callGeminiWithFallbackMultimodal,
@@ -15,6 +17,7 @@ import {
   MOTIFS,
   PEOPLE_HANDLINGS,
   REFERENCE_ASPECTS,
+  ART_STYLE_DEFS,
   buildMetaPromptForGemini,
   buildKoreanSummary,
   type PromptBuilderInput,
@@ -78,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     // ── 참고 이미지 처리 ───────────────────────────────────
     const referenceField = fd.get("reference");
-    let referenceImage: { base64: string; mimeType: string } | undefined;
+    let userReferenceImage: { base64: string; mimeType: string } | undefined;
 
     if (referenceField && typeof referenceField !== "string" && referenceField.size > 0) {
       const file = referenceField as File;
@@ -96,15 +99,7 @@ export async function POST(request: NextRequest) {
       }
       try {
         const buf = Buffer.from(await file.arrayBuffer());
-        const compressed = await sharp(buf)
-          .rotate() // EXIF orientation 적용
-          .resize({ width: 768, height: 768, fit: "inside", withoutEnlargement: true })
-          .jpeg({ quality: 85, mozjpeg: true })
-          .toBuffer();
-        referenceImage = {
-          base64: compressed.toString("base64"),
-          mimeType: "image/jpeg",
-        };
+        userReferenceImage = await compressReferenceImage(buf);
       } catch (e) {
         console.error("posters/build-prompt sharp error", e);
         return NextResponse.json(
@@ -114,9 +109,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const styleSampleImage = await loadStyleSampleImage(input.artStyle);
+    const referenceImages = [styleSampleImage, userReferenceImage].filter(
+      (image): image is { base64: string; mimeType: string } => Boolean(image),
+    );
+
     // ── Gemini 호출 ────────────────────────────────────────
-    const metaPrompt = buildMetaPromptForGemini(input, !!referenceImage);
-    const englishPrompt = await callGeminiWithFallbackMultimodal(metaPrompt, referenceImage);
+    const metaPrompt = buildMetaPromptForGemini(input, {
+      hasStyleSampleImage: Boolean(styleSampleImage),
+      hasUserReferenceImage: Boolean(userReferenceImage),
+    });
+    const englishPrompt = await callGeminiWithFallbackMultimodal(metaPrompt, referenceImages);
 
     const cleaned = sanitizePromptOutput(englishPrompt);
 
@@ -137,6 +140,35 @@ export async function POST(request: NextRequest) {
       { error: "프롬프트 생성 중 오류가 발생했습니다." },
       { status: 500 },
     );
+  }
+}
+
+async function compressReferenceImage(
+  buf: Buffer,
+): Promise<{ base64: string; mimeType: string }> {
+  const compressed = await sharp(buf)
+    .rotate()
+    .resize({ width: 768, height: 768, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 85, mozjpeg: true })
+    .toBuffer();
+  return {
+    base64: compressed.toString("base64"),
+    mimeType: "image/jpeg",
+  };
+}
+
+async function loadStyleSampleImage(
+  artStyle: PromptBuilderInput["artStyle"],
+): Promise<{ base64: string; mimeType: string } | undefined> {
+  const sampleSrc = ART_STYLE_DEFS[artStyle].sampleSrc;
+  const relativePath = sampleSrc.replace(/^\//, "");
+  const filePath = path.join(process.cwd(), "public", relativePath.replace(/^images[\\/]/, "images/"));
+  try {
+    const buf = await readFile(filePath);
+    return await compressReferenceImage(buf);
+  } catch (e) {
+    console.error("posters/build-prompt style sample load error", sampleSrc, e);
+    return undefined;
   }
 }
 
