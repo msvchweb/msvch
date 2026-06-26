@@ -141,7 +141,7 @@ const departments: Record<string, DepartmentInfo> = {
       "청년의 때에 악과 선을 분별할 수 있도록.",
     ],
     galleryTag: "청년부",
-    instagram: { url: "https://www.instagram.com/msvch_insta?igsh=dWJlZ3J2ZDhwZGdq", handle: "@msvch_insta" },
+    instagram: { url: "https://www.instagram.com/msvch_youth", handle: "@msvch_youth" },
   },
 };
 

@@ -39,9 +39,9 @@ const links: LinkItem[] = [
   },
   {
     label: '인스타그램 (청년부)',
-    href: 'https://www.instagram.com/msvch_insta/',
+    href: 'https://www.instagram.com/msvch_youth/',
     icon: 'instagram',
-    description: '@msvch_insta',
+    description: '@msvch_youth',
   },
   {
     label: '인스타그램 (청소년부)',

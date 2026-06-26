@@ -49,7 +49,7 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong>인스타그램 콘텐츠 동기화</strong>: 교회 운영 인스타그램
-                계정(@msvch_main, @msvch_children, @msvch_middle, @msvch_insta)의
+                계정(@msvch_main, @msvch_children, @msvch_middle, @msvch_youth)의
                 <em> 공개 게시물 메타데이터(미디어 ID, 캡션, 게시 시각, 미디어 URL,
                 썸네일 URL, 영구 링크)</em>
               </li>
