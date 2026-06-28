@@ -4,9 +4,11 @@ import sharp from "sharp";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
 import {
   ART_STYLES,
+  POSTER_CATEGORIES,
   POSTER_RATIOS,
   type PosterRatio,
 } from "@/lib/poster-prompts";
+import { logPosterUsage } from "@/lib/poster-usage-logs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 90;
@@ -18,6 +20,8 @@ const RequestSchema = z.object({
   mode: z.enum(["generate", "revise"]).default("generate"),
   revisionInstruction: z.string().trim().max(600).optional(),
   sourceImageDataUrl: z.string().trim().optional(),
+  posterTitle: z.string().trim().max(100).optional(),
+  posterCategory: z.enum(POSTER_CATEGORIES).optional(),
 });
 
 interface OpenAIImageResponse {
@@ -29,7 +33,7 @@ const DEFAULT_IMAGE_MODEL = "gpt-image-2";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    const { supabase, userId } = await requireAdmin(request);
 
     const body = await request.json();
     const parsed = RequestSchema.safeParse(body);
@@ -40,7 +44,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { prompt, ratio, mode, revisionInstruction, sourceImageDataUrl } = parsed.data;
+    const {
+      prompt,
+      ratio,
+      mode,
+      revisionInstruction,
+      sourceImageDataUrl,
+      posterTitle,
+      posterCategory,
+    } = parsed.data;
     const apiKey = process.env.OPENAI_API_KEY;
 
     if (!apiKey) {
@@ -98,6 +110,15 @@ export async function POST(request: NextRequest) {
         { status: 500 },
       );
     }
+
+    await logPosterUsage({
+      supabase,
+      userId,
+      action: mode === "revise" ? "revise_image" : "generate_image",
+      posterTitle,
+      posterCategory,
+      posterRatio: ratio,
+    });
 
     return NextResponse.json({
       imageBase64,

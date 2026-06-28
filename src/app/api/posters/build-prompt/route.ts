@@ -22,6 +22,7 @@ import {
   buildKoreanSummary,
   type PromptBuilderInput,
 } from "@/lib/poster-prompts";
+import { logPosterUsage } from "@/lib/poster-usage-logs";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 45;
@@ -57,7 +58,7 @@ interface BuildPromptResponse {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    const { supabase, userId } = await requireAdmin(request);
 
     // ── multipart 파싱 ─────────────────────────────────────
     const fd = await request.formData();
@@ -128,6 +129,14 @@ export async function POST(request: NextRequest) {
       englishPrompt: cleaned,
       koreanSummary: buildKoreanSummary(input),
     };
+    await logPosterUsage({
+      supabase,
+      userId,
+      action: "build_prompt",
+      posterTitle: input.title,
+      posterCategory: input.category,
+      posterRatio: input.ratio,
+    });
     return NextResponse.json(body);
   } catch (err) {
     if (err instanceof AuthError) {

@@ -50,6 +50,7 @@ export const ADMIN_ROUTE_PERMISSIONS: ReadonlyArray<RoutePermission> = [
   { prefix: "/admin/gallery", minRole: "staff" },
   { prefix: "/admin/boards", minRole: "staff" },
   { prefix: "/admin/posters", minRole: "staff" },
+  { prefix: "/admin/posters/logs", minRole: "master" },
   // master 단독
   { prefix: "/admin/members", minRole: "master" },
 ];

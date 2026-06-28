@@ -447,6 +447,8 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
           mode,
           revisionInstruction: mode === "revise" ? instruction : undefined,
           sourceImageDataUrl: mode === "revise" ? dalleImageUrl : undefined,
+          posterTitle: title.trim() || undefined,
+          posterCategory: category,
         }),
       });
       const data = (await r.json()) as GenerateImageResponse;
