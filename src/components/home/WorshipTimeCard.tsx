@@ -4,7 +4,7 @@ const SERVICES = [
   { when: "매주 일요일 (1·2·3부)", title: "주일예배", time: "8:00 / 10:00 / 12:00" },
   { when: "매주 수요일", title: "수요예배", time: "오후 7:30" },
   { when: "매주 금요일", title: "금요기도회", time: "오후 8:30" },
-  { when: "월~금 (토 6:30)", title: "새벽예배", time: "오전 6:00" },
+  { when: "월~금", title: "새벽예배", time: "오전 6:00" },
 ];
 
 export function WorshipTimeCard() {
