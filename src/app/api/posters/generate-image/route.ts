@@ -11,7 +11,7 @@ import {
 import { logPosterUsage } from "@/lib/poster-usage-logs";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 90;
+export const maxDuration = 120;
 
 const RequestSchema = z.object({
   prompt: z.string().trim().min(1),
@@ -30,6 +30,10 @@ interface OpenAIImageResponse {
 }
 
 const DEFAULT_IMAGE_MODEL = "gpt-image-2";
+const DEFAULT_IMAGE_QUALITY = "medium";
+const DEFAULT_IMAGE_OUTPUT_FORMAT = "jpeg";
+
+type ImageOutputFormat = "png" | "jpeg" | "webp";
 
 export async function POST(request: NextRequest) {
   try {
@@ -93,7 +97,7 @@ export async function POST(request: NextRequest) {
             ratio,
           });
 
-    const data = (await response.json()) as OpenAIImageResponse;
+    const data = await readOpenAIImageResponse(response);
 
     if (!response.ok) {
       console.error("OpenAI Image API Error:", data);
@@ -122,8 +126,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       imageBase64,
-      mimeType: "image/png",
-      imageUrl: `data:image/png;base64,${imageBase64}`,
+      mimeType: mimeTypeForOutputFormat(outputFormatForModel(model)),
+      imageUrl: `data:${mimeTypeForOutputFormat(outputFormatForModel(model))};base64,${imageBase64}`,
       revisedPrompt: data.data?.[0]?.revised_prompt,
     });
   } catch (err) {
@@ -192,8 +196,8 @@ async function callImageGeneration({
       model,
       prompt,
       size: sizeForRatio(ratio, model),
-      quality: process.env.OPENAI_IMAGE_QUALITY ?? "high",
-      output_format: "png",
+      quality: qualityForModel(model),
+      ...outputOptionsForModel(model),
     }),
   });
 }
@@ -219,8 +223,11 @@ async function callImageEdit({
   form.append("model", model);
   form.append("prompt", prompt);
   form.append("size", sizeForRatio(ratio, model));
-  form.append("quality", process.env.OPENAI_IMAGE_QUALITY ?? "high");
-  form.append("output_format", "png");
+  form.append("quality", qualityForModel(model));
+  const outputOptions = outputOptionsForModel(model);
+  for (const [key, value] of Object.entries(outputOptions)) {
+    form.append(key, String(value));
+  }
   form.append(
     "image[]",
     new Blob([Uint8Array.from(normalized)], { type: "image/png" }),
@@ -234,6 +241,54 @@ async function callImageEdit({
     },
     body: form,
   });
+}
+
+async function readOpenAIImageResponse(response: Response): Promise<OpenAIImageResponse> {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text) as OpenAIImageResponse;
+  } catch {
+    return {
+      error: {
+        message:
+          response.status === 504
+            ? "이미지 생성 시간이 초과되었습니다. 잠시 후 다시 시도해 주세요."
+            : `OpenAI 이미지 응답을 해석하지 못했습니다. (${response.status})`,
+      },
+    };
+  }
+}
+
+function isGptImageModel(model: string): boolean {
+  return model.startsWith("gpt-image-");
+}
+
+function qualityForModel(model: string): string {
+  if (!isGptImageModel(model)) return process.env.OPENAI_IMAGE_QUALITY ?? "standard";
+  return process.env.OPENAI_IMAGE_QUALITY ?? DEFAULT_IMAGE_QUALITY;
+}
+
+function outputFormatForModel(model: string): ImageOutputFormat {
+  if (!isGptImageModel(model)) return "png";
+  const raw = process.env.OPENAI_IMAGE_OUTPUT_FORMAT ?? DEFAULT_IMAGE_OUTPUT_FORMAT;
+  return raw === "png" || raw === "jpeg" || raw === "webp" ? raw : DEFAULT_IMAGE_OUTPUT_FORMAT;
+}
+
+function outputOptionsForModel(model: string): Record<string, string | number> {
+  if (!isGptImageModel(model)) return {};
+  const outputFormat = outputFormatForModel(model);
+  const options: Record<string, string | number> = {
+    output_format: outputFormat,
+  };
+  if (outputFormat === "jpeg" || outputFormat === "webp") {
+    options.output_compression = Number(process.env.OPENAI_IMAGE_OUTPUT_COMPRESSION ?? 85);
+  }
+  return options;
+}
+
+function mimeTypeForOutputFormat(format: ImageOutputFormat): string {
+  return format === "jpeg" ? "image/jpeg" : `image/${format}`;
 }
 
 function sizeForRatio(ratio: PosterRatio, model: string): string {

@@ -19,6 +19,16 @@ const CATEGORY_EYEBROW: Record<Notice["category"], string> = {
   행사: "교회행사",
 };
 
+const MYEONGBI_PRAYER_SLIDE: HeroSlide = {
+  id: "myeongbi-prayer-2026",
+  eyebrow: "기도사역",
+  title: "2026 명비 기도인 모집",
+  subtitle: "우리 교회는 기도합니다",
+  image: "/images/myeongbi-prayer-banner.avif",
+  href: "/myeongbi-prayer",
+  date: "2026-07-01",
+};
+
 function extractSubtitle(content: string, max = 80): string {
   const stripped = content
     .replace(/\[IMG:[^\]]+\]/g, "")
@@ -71,7 +81,7 @@ export async function getHeroSlides(limit = 5): Promise<HeroSlide[]> {
     if (slides.length >= limit) break;
   }
 
-  return slides;
+  return [MYEONGBI_PRAYER_SLIDE, ...slides];
 }
 
 export async function getNoticeBySlug(slug: string): Promise<Notice | null> {

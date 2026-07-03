@@ -451,7 +451,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
           posterCategory: category,
         }),
       });
-      const data = (await r.json()) as GenerateImageResponse;
+      const data = await readGenerateImageResponse(r);
       if (!r.ok) {
         alert(data.error ?? "이미지 생성 실패");
         return;
@@ -1147,6 +1147,27 @@ function formatSavedAt(value: number): string {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+async function readGenerateImageResponse(response: Response): Promise<GenerateImageResponse> {
+  const text = await response.text();
+  if (!text) {
+    return response.ok
+      ? {}
+      : { error: `이미지 생성 실패 (${response.status})` };
+  }
+
+  try {
+    return JSON.parse(text) as GenerateImageResponse;
+  } catch {
+    if (response.status === 504) {
+      return {
+        error:
+          "이미지 생성 시간이 초과되었습니다. 잠시 후 다시 시도하거나 프롬프트를 더 단순하게 줄여 다시 생성해 주세요.",
+      };
+    }
+    return { error: `이미지 생성 응답을 읽지 못했습니다. (${response.status})` };
+  }
 }
 
 // ── 컴포넌트 ───────────────────────────────────────────
