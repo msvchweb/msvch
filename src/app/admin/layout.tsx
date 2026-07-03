@@ -58,7 +58,11 @@ const baseNav: AdminNavItem[] = [
     label: "문의·새가족",
     href: "/admin/inquiries",
     icon: "inquiries",
-    matchPaths: ["/admin/inquiries", "/admin/new-families"],
+    matchPaths: [
+      "/admin/inquiries",
+      "/admin/new-families",
+      "/admin/myeongbi-prayers",
+    ],
   },
   { label: "회원관리", href: "/admin/members", icon: "members" },
 ];

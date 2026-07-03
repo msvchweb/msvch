@@ -45,10 +45,15 @@ const TAB_GROUPS: TabGroup[] = [
     ],
   },
   {
-    matchPaths: ["/admin/inquiries", "/admin/new-families"],
+    matchPaths: [
+      "/admin/inquiries",
+      "/admin/new-families",
+      "/admin/myeongbi-prayers",
+    ],
     tabs: [
       { label: "문의 내역", href: "/admin/inquiries" },
       { label: "새가족 등록", href: "/admin/new-families" },
+      { label: "명비 기도인", href: "/admin/myeongbi-prayers" },
     ],
   },
 ];

@@ -499,6 +499,29 @@ export const NewFamilyUpdateSchema = z.object({
   adminNote: z.string().max(2000).optional(),
 });
 
+/** 명비 기도인 신청 폼 (공개 페이지 → POST /api/myeongbi-prayer) */
+export const MyeongbiPrayerApplicationSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1, "이름을 입력하세요")
+    .max(50, "이름은 50자까지 입력할 수 있습니다."),
+  phone: z
+    .string()
+    .trim()
+    .min(1, "연락처를 입력하세요")
+    .max(30, "연락처는 30자까지 입력할 수 있습니다."),
+  affiliation: z
+    .string()
+    .trim()
+    .min(1, "소속을 입력하세요")
+    .max(100, "소속은 100자까지 입력할 수 있습니다."),
+  available: z.literal(true, {
+    message: "참여 가능 여부를 확인해 주세요.",
+  }),
+  message: z.string().trim().max(1000, "남기고 싶은 말은 1,000자까지 입력할 수 있습니다.").optional(),
+});
+
 /** 일정 알림 수신자 등록/수정 */
 export const EventSubscriberSchema = z.object({
   name: z.string().min(1, "이름을 입력하세요").max(100, "이름은 100자까지"),
