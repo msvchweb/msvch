@@ -165,14 +165,19 @@ export function BookRecommendationAutomation() {
     setError(null);
     setLoading("generate");
     try {
+      const coverDataUrl = coverImg ? await imageToDataUrl(coverImg) : undefined;
       const response = await fetch("/api/posters/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: buildBackgroundPrompt(book, draft, ratio),
+          prompt: buildCompletePosterPrompt(book, draft, ratio),
           ratio,
           artStyle: draft.posterPromptInput.artStyle,
-          mode: "generate",
+          mode: coverDataUrl ? "revise" : "generate",
+          revisionInstruction: coverDataUrl
+            ? "Use the attached book cover as the book-cover reference inside a complete Korean church recommendation poster. Include the book cover visibly in the poster."
+            : undefined,
+          sourceImageDataUrl: coverDataUrl,
           posterTitle: draft.posterTitle,
           posterCategory: "notice",
         }),
@@ -206,13 +211,13 @@ export function BookRecommendationAutomation() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: buildBackgroundPrompt(book, draft, ratio),
+          prompt: buildCompletePosterPrompt(book, draft, ratio),
           ratio,
           artStyle: draft.posterPromptInput.artStyle,
           mode: "revise",
           revisionInstruction: `${instruction}
 
-Keep this as a background only. Do not add a book cover, Korean text, logo, QR code, or footer. Leave clean space for a separately composited real book cover and church footer.`,
+Keep this as a complete Korean church book recommendation poster. Preserve the book-cover identity and Korean poster text as much as possible. Do not add a QR code or church footer; the footer will be overlaid separately.`,
           sourceImageDataUrl: backgroundUrl,
           posterTitle: draft.posterTitle,
           posterCategory: "notice",
@@ -239,7 +244,7 @@ Keep this as a background only. Do not add a book cover, Korean text, logo, QR c
   }
 
   async function handleRegisterNotice() {
-    if (!book || !draft || !backgroundImg || !coverImg) return;
+    if (!book || !draft || !backgroundImg) return;
     setError(null);
     setLoading("register");
     try {
@@ -288,7 +293,6 @@ Keep this as a background only. Do not add a book cover, Korean text, logo, QR c
     drawBookPoster(canvas, {
       ratio,
       bg: backgroundImg,
-      cover: coverImg,
       book,
       draft,
       showFooter,
@@ -305,7 +309,6 @@ Keep this as a background only. Do not add a book cover, Korean text, logo, QR c
     drawBookPoster(canvas, {
       ratio: targetRatio,
       bg: backgroundImg,
-      cover: coverImg,
       book,
       draft,
       showFooter,
@@ -315,7 +318,7 @@ Keep this as a background only. Do not add a book cover, Korean text, logo, QR c
   }
 
   const canGenerate = Boolean(book && draft && !loading);
-  const canRegister = Boolean(book && draft && backgroundImg && coverImg && !loading);
+  const canRegister = Boolean(book && draft && backgroundImg && !loading);
   const dim = FINAL_DIMENSIONS[ratio];
 
   return (
@@ -560,21 +563,27 @@ Keep this as a background only. Do not add a book cover, Korean text, logo, QR c
   );
 }
 
-function buildBackgroundPrompt(
+function buildCompletePosterPrompt(
   book: BookSourceData,
   draft: BookRecommendationDraft,
   ratio: PosterRatio,
 ): string {
-  return `Create a polished Korean church book recommendation poster background for the book "${book.title}" by ${book.author}.
+  return `Create a polished complete Korean church book recommendation poster for the book "${book.title}" by ${book.author}.
 
 Concept: ${draft.imageConcept}
 
+Poster text to include in Korean:
+- Main title: "${draft.posterTitle}"
+- Subtitle: "${draft.posterSubtitle}"
+- Book metadata: "${book.author} 저 · ${book.publisher}${book.isbn13 ? ` · ISBN ${book.isbn13}` : ""}"
+
 Hard requirements:
-- Background only. Do not render any book cover, Korean text, letters, numbers, logos, QR codes, or watermarks.
-- Leave a clear premium display area for a real book cover to be composited later.
+- Include a visible book cover as an important visual element. If a reference image is attached, use it as the book cover reference.
+- Render the Korean poster text directly in the image with clean Hangul typography.
 - Leave the bottom 14% clean for a church footer overlay.
 - Mood: calm, reverent, hopeful, warm, suitable for a Protestant church congregation.
 - Visual motifs may include an open Bible, soft rays of light, quiet reading desk, gentle paper texture, or abstract promise/path imagery.
+- Do not add a QR code, church logo, phone number, or address.
 - No realistic faces and no depiction of Jesus or specific religious figures.
 - Aspect ratio: ${ratio}.`;
 }
@@ -584,7 +593,7 @@ function drawBookPoster(
   input: {
     ratio: PosterRatio;
     bg: HTMLImageElement;
-    cover: HTMLImageElement | null;
+    cover?: HTMLImageElement | null;
     book: BookSourceData;
     draft: BookRecommendationDraft;
     showFooter: boolean;
@@ -600,30 +609,10 @@ function drawBookPoster(
     showFooter: input.showFooter,
     footerAssets: input.footerAssets,
   });
-
-  const ctx = canvas.getContext("2d");
-  if (!ctx) return;
-
-  const cw = canvas.width;
-  const ch = canvas.height;
-  const footerReserve = input.showFooter ? ch * 0.13 : 0;
-  const safeH = ch - footerReserve;
-  const scale = cw / 1080;
-
-  drawSoftPanel(ctx, cw, ch, safeH);
-  drawPosterText(ctx, input.draft, input.book, cw, safeH, scale, input.ratio);
-  if (input.cover) drawBookCover(ctx, input.cover, cw, safeH, scale, input.ratio);
+  return;
 }
 
-function drawSoftPanel(ctx: CanvasRenderingContext2D, cw: number, ch: number, safeH: number) {
-  const gradient = ctx.createLinearGradient(0, 0, cw, safeH);
-  gradient.addColorStop(0, "rgba(255,255,255,0.84)");
-  gradient.addColorStop(0.55, "rgba(255,255,255,0.35)");
-  gradient.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, cw, ch);
-}
-
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function drawPosterText(
   ctx: CanvasRenderingContext2D,
   draft: BookRecommendationDraft,
@@ -660,41 +649,6 @@ function drawPosterText(
   ctx.fillText("추천도서", left, titleY - 34 * scale);
 }
 
-function drawBookCover(
-  ctx: CanvasRenderingContext2D,
-  cover: HTMLImageElement,
-  cw: number,
-  safeH: number,
-  scale: number,
-  ratio: PosterRatio,
-) {
-  const coverW =
-    ratio === "9:16" ? cw * 0.48 : ratio === "1:1" ? cw * 0.3 : cw * 0.34;
-  const coverH = coverW * (cover.height / cover.width);
-  const x = ratio === "9:16" ? cw * 0.5 - coverW / 2 : cw - coverW - cw * 0.08;
-  const y = ratio === "9:16" ? safeH * 0.34 : safeH * 0.28;
-  const radius = 10 * scale;
-
-  ctx.save();
-  ctx.shadowColor = "rgba(15, 23, 42, 0.28)";
-  ctx.shadowBlur = 28 * scale;
-  ctx.shadowOffsetX = 0;
-  ctx.shadowOffsetY = 16 * scale;
-  roundedRect(ctx, x, y, coverW, coverH, radius);
-  ctx.fillStyle = "#ffffff";
-  ctx.fill();
-  ctx.clip();
-  ctx.drawImage(cover, x, y, coverW, coverH);
-  ctx.restore();
-
-  ctx.save();
-  roundedRect(ctx, x, y, coverW, coverH, radius);
-  ctx.strokeStyle = "rgba(17, 24, 39, 0.16)";
-  ctx.lineWidth = Math.max(1, 2 * scale);
-  ctx.stroke();
-  ctx.restore();
-}
-
 function wrapCanvasText(
   ctx: CanvasRenderingContext2D,
   text: string,
@@ -723,27 +677,6 @@ function wrapCanvasText(
   lines.forEach((line, index) => ctx.fillText(line, x, y + index * lineHeight));
 }
 
-function roundedRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y);
-  ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-  ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-  ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-  ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y);
-  ctx.closePath();
-}
-
 function loadImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -764,6 +697,23 @@ async function loadRemoteImage(url: string): Promise<HTMLImageElement> {
   } finally {
     URL.revokeObjectURL(objectUrl);
   }
+}
+
+function imageToDataUrl(img: HTMLImageElement): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || img.width;
+  canvas.height = img.naturalHeight || img.height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return Promise.reject(new Error("canvas context unavailable"));
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return new Promise((resolve, reject) => {
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      resolve(dataUrl);
+    } catch (err) {
+      reject(err);
+    }
+  });
 }
 
 function ensureBookMeta(content: string, book: BookSourceData): string {
