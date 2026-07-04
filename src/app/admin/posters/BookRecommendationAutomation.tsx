@@ -7,16 +7,13 @@ import {
   BookOpen,
   Loader2,
   MessageSquare,
-  RotateCcw,
   Send,
   Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
-  DEFAULT_TEXT_SETTINGS,
   FINAL_DIMENSIONS,
-  preloadFooterAssets,
-  renderPoster,
+  drawCover,
 } from "@/lib/poster-footer";
 import type { PosterRatio } from "@/lib/poster-prompts";
 import type {
@@ -52,15 +49,17 @@ const REVISION_CHIPS = [
   "전체 구도를 더 단순하게",
 ];
 
+const PERIOD_OPTIONS = ["1~2월", "3~4월", "5~6월", "7~8월", "9~10월", "11~12월"];
+
 export function BookRecommendationAutomation() {
   const [url, setUrl] = useState("https://www.yes24.com/Product/Goods/142813974");
+  const [periodLabel, setPeriodLabel] = useState(getDefaultPeriodLabel);
   const [book, setBook] = useState<BookSourceData | null>(null);
   const [draft, setDraft] = useState<BookRecommendationDraft | null>(null);
   const [ratio, setRatio] = useState<PosterRatio>("a4");
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [backgroundImg, setBackgroundImg] = useState<HTMLImageElement | null>(null);
   const [coverImg, setCoverImg] = useState<HTMLImageElement | null>(null);
-  const [showFooter, setShowFooter] = useState(true);
   const [loading, setLoading] = useState<"extract" | "generate" | "revise" | "register" | null>(
     null,
   );
@@ -69,24 +68,7 @@ export function BookRecommendationAutomation() {
   const [revisionText, setRevisionText] = useState("");
 
   const previewRef = useRef<HTMLCanvasElement>(null);
-  const footerAssetsRef = useRef<{ logo: HTMLImageElement; qr: HTMLImageElement } | null>(null);
   const supabase = createClient();
-
-  useEffect(() => {
-    let cancelled = false;
-    preloadFooterAssets()
-      .then((assets) => {
-        if (!cancelled) {
-          footerAssetsRef.current = assets;
-          drawPreview();
-        }
-      })
-      .catch((err) => console.error("Book poster footer assets failed", err));
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   useEffect(() => {
     if (!backgroundUrl) {
@@ -123,7 +105,7 @@ export function BookRecommendationAutomation() {
   useEffect(() => {
     drawPreview();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backgroundImg, coverImg, draft, book, ratio, showFooter]);
+  }, [backgroundImg, ratio]);
 
   async function handleExtractAndDraft() {
     setError(null);
@@ -165,19 +147,20 @@ export function BookRecommendationAutomation() {
     setError(null);
     setLoading("generate");
     try {
-      const coverDataUrl = coverImg ? await imageToDataUrl(coverImg) : undefined;
+      const sourceImageDataUrls = await buildPosterReferenceImages(coverImg);
       const response = await fetch("/api/posters/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: buildCompletePosterPrompt(book, draft, ratio),
+          prompt: buildCompletePosterPrompt(book, draft, ratio, periodLabel),
           ratio,
           artStyle: draft.posterPromptInput.artStyle,
-          mode: coverDataUrl ? "revise" : "generate",
-          revisionInstruction: coverDataUrl
-            ? "Use the attached book cover as the book-cover reference inside a complete Korean church recommendation poster. Include the book cover visibly in the poster."
+          mode: sourceImageDataUrls.length ? "revise" : "generate",
+          revisionInstruction: sourceImageDataUrls.length
+            ? "Use the attached reference images for the book cover, church logo, and QR code. Create one complete Korean church recommendation poster with all poster text and footer included."
             : undefined,
-          sourceImageDataUrl: coverDataUrl,
+          sourceImageDataUrls,
+          includeFooterContent: true,
           posterTitle: draft.posterTitle,
           posterCategory: "notice",
         }),
@@ -190,7 +173,7 @@ export function BookRecommendationAutomation() {
       setMessages([
         {
           role: "assistant",
-          content: "배경을 생성했습니다. 책 표지와 문구, footer는 별도로 합성됩니다.",
+          content: "포스터를 생성했습니다. 필요한 수정사항을 아래 대화창에 입력하세요.",
         },
       ]);
     } catch (err) {
@@ -207,18 +190,20 @@ export function BookRecommendationAutomation() {
     setLoading("revise");
     setMessages((prev) => [...prev, { role: "user", content: instruction }]);
     try {
+      const sourceImageDataUrls = [backgroundUrl, ...(await buildPosterReferenceImages(null))];
       const response = await fetch("/api/posters/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: buildCompletePosterPrompt(book, draft, ratio),
+          prompt: buildCompletePosterPrompt(book, draft, ratio, periodLabel),
           ratio,
           artStyle: draft.posterPromptInput.artStyle,
           mode: "revise",
           revisionInstruction: `${instruction}
 
-Keep this as a complete Korean church book recommendation poster. Preserve the book-cover identity and Korean poster text as much as possible. Do not add a QR code or church footer; the footer will be overlaid separately.`,
-          sourceImageDataUrl: backgroundUrl,
+Keep this as one complete Korean church book recommendation poster. Preserve the book-cover identity, Korean poster text, church logo, QR code, phone number, and address as much as possible.`,
+          sourceImageDataUrls,
+          includeFooterContent: true,
           posterTitle: draft.posterTitle,
           posterCategory: "notice",
         }),
@@ -233,7 +218,7 @@ Keep this as a complete Korean church book recommendation poster. Preserve the b
         ...prev,
         {
           role: "assistant",
-          content: "요청한 방향으로 배경을 수정했습니다. 표지와 footer는 유지됩니다.",
+          content: "요청한 방향으로 포스터를 수정했습니다.",
         },
       ]);
     } catch (err) {
@@ -293,10 +278,6 @@ Keep this as a complete Korean church book recommendation poster. Preserve the b
     drawBookPoster(canvas, {
       ratio,
       bg: backgroundImg,
-      book,
-      draft,
-      showFooter,
-      footerAssets: footerAssetsRef.current ?? undefined,
     });
   }
 
@@ -309,10 +290,6 @@ Keep this as a complete Korean church book recommendation poster. Preserve the b
     drawBookPoster(canvas, {
       ratio: targetRatio,
       bg: backgroundImg,
-      book,
-      draft,
-      showFooter,
-      footerAssets: footerAssetsRef.current ?? undefined,
     });
     return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
   }
@@ -337,6 +314,18 @@ Keep this as a complete Korean church book recommendation poster. Preserve the b
               placeholder="https://www.yes24.com/Product/Goods/..."
               className="min-h-11 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-primary-500 focus:outline-none"
             />
+            <select
+              value={periodLabel}
+              onChange={(event) => setPeriodLabel(event.target.value)}
+              className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-700 focus:border-primary-500 focus:outline-none"
+              aria-label="추천도서 기간"
+            >
+              {PERIOD_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
             <button
               type="button"
               onClick={handleExtractAndDraft}
@@ -403,7 +392,7 @@ Keep this as a complete Korean church book recommendation poster. Preserve the b
               <div>
                 <h2 className="text-base font-bold text-gray-900">포스터 생성</h2>
                 <p className="mt-1 text-sm text-gray-500">
-                  GPT는 배경만 만들고, 실제 표지와 문구는 별도 합성합니다.
+                  GPT가 책 표지, 문구, 교회 footer를 포함한 최종 포스터를 만듭니다.
                 </p>
               </div>
               <div className="flex gap-2">
@@ -429,14 +418,6 @@ Keep this as a complete Korean church book recommendation poster. Preserve the b
                 {loading === "generate" ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                 포스터 생성
               </button>
-              <label className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-gray-200 px-3 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  checked={showFooter}
-                  onChange={(event) => setShowFooter(event.target.checked)}
-                />
-                footer 포함
-              </label>
             </div>
           </section>
         )}
@@ -521,43 +502,6 @@ Keep this as a complete Korean church book recommendation poster. Preserve the b
             공지사항 초안 등록
           </button>
         </div>
-
-        {draft && (
-          <div className="rounded-xl border border-gray-200 bg-white p-4">
-            <h3 className="mb-3 text-sm font-bold text-gray-900">포스터 문구</h3>
-            <label className="mb-3 block">
-              <span className="mb-1 block text-xs font-semibold text-gray-500">제목</span>
-              <input
-                value={draft.posterTitle}
-                onChange={(event) => setDraft({ ...draft, posterTitle: event.target.value })}
-                className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm font-semibold focus:border-primary-500 focus:outline-none"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1 block text-xs font-semibold text-gray-500">부제</span>
-              <textarea
-                value={draft.posterSubtitle}
-                onChange={(event) => setDraft({ ...draft, posterSubtitle: event.target.value })}
-                rows={3}
-                className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
-              />
-            </label>
-          </div>
-        )}
-
-        {backgroundUrl && (
-          <button
-            type="button"
-            onClick={() => {
-              setBackgroundUrl(null);
-              setMessages([]);
-            }}
-            className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-sm font-semibold text-gray-600 hover:bg-gray-50"
-          >
-            <RotateCcw size={15} />
-            배경 다시 시작
-          </button>
-        )}
       </aside>
     </div>
   );
@@ -567,23 +511,34 @@ function buildCompletePosterPrompt(
   book: BookSourceData,
   draft: BookRecommendationDraft,
   ratio: PosterRatio,
+  periodLabel: string,
 ): string {
+  const periodTitle = `명성비전교회 ${periodLabel} 추천도서`;
+
   return `Create a polished complete Korean church book recommendation poster for the book "${book.title}" by ${book.author}.
 
 Concept: ${draft.imageConcept}
 
 Poster text to include in Korean:
+- Top title: "${periodTitle}"
 - Main title: "${draft.posterTitle}"
 - Subtitle: "${draft.posterSubtitle}"
 - Book metadata: "${book.author} 저 · ${book.publisher}${book.isbn13 ? ` · ISBN ${book.isbn13}` : ""}"
 
+Church footer content to include naturally at the bottom:
+- Use the attached church logo image.
+- Use the attached QR code image.
+- Phone: 02-534-0691
+- Address: 서울 동작구 사당로16바길 9
+
 Hard requirements:
 - Include a visible book cover as an important visual element. If a reference image is attached, use it as the book cover reference.
 - Render the Korean poster text directly in the image with clean Hangul typography.
-- Leave the bottom 14% clean for a church footer overlay.
+- Put "${periodTitle}" clearly at the top of the poster.
+- Integrate the church logo, QR code, phone number, and address as a polished readable footer at the bottom.
+- Do not invent another logo, QR code, phone number, or address.
 - Mood: calm, reverent, hopeful, warm, suitable for a Protestant church congregation.
 - Visual motifs may include an open Bible, soft rays of light, quiet reading desk, gentle paper texture, or abstract promise/path imagery.
-- Do not add a QR code, church logo, phone number, or address.
 - No realistic faces and no depiction of Jesus or specific religious figures.
 - Aspect ratio: ${ratio}.`;
 }
@@ -593,88 +548,40 @@ function drawBookPoster(
   input: {
     ratio: PosterRatio;
     bg: HTMLImageElement;
-    cover?: HTMLImageElement | null;
-    book: BookSourceData;
-    draft: BookRecommendationDraft;
-    showFooter: boolean;
-    footerAssets?: { logo: HTMLImageElement; qr: HTMLImageElement };
   },
 ) {
-  renderPoster(canvas, {
-    bg: input.bg,
-    ratio: input.ratio,
-    title: "",
-    bodyText: "",
-    text: DEFAULT_TEXT_SETTINGS,
-    showFooter: input.showFooter,
-    footerAssets: input.footerAssets,
-  });
-  return;
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function drawPosterText(
-  ctx: CanvasRenderingContext2D,
-  draft: BookRecommendationDraft,
-  book: BookSourceData,
-  cw: number,
-  safeH: number,
-  scale: number,
-  ratio: PosterRatio,
-) {
-  const left = cw * 0.08;
-  const maxWidth = ratio === "1:1" ? cw * 0.48 : cw * 0.56;
-  const titleY = safeH * (ratio === "9:16" ? 0.1 : 0.16);
-  const titlePx = Math.round((ratio === "1:1" ? 58 : 72) * scale);
-  const subtitlePx = Math.round((ratio === "1:1" ? 28 : 34) * scale);
-  const metaPx = Math.round(22 * scale);
-
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
-  ctx.fillStyle = "#111827";
-  ctx.font = `800 ${titlePx}px "Pretendard Variable", "Pretendard", "Noto Sans KR", system-ui, sans-serif`;
-  wrapCanvasText(ctx, draft.posterTitle, left, titleY, maxWidth, titlePx * 1.18, 3);
-
-  ctx.fillStyle = "#374151";
-  ctx.font = `500 ${subtitlePx}px "Pretendard Variable", "Pretendard", "Noto Sans KR", system-ui, sans-serif`;
-  wrapCanvasText(ctx, draft.posterSubtitle, left, titleY + titlePx * 2.65, maxWidth, subtitlePx * 1.35, 3);
-
-  ctx.fillStyle = "#4b5563";
-  ctx.font = `500 ${metaPx}px "Pretendard Variable", "Pretendard", "Noto Sans KR", system-ui, sans-serif`;
-  const meta = `${book.author} 저 · ${book.publisher}${book.isbn13 ? ` · ISBN ${book.isbn13}` : ""}`;
-  wrapCanvasText(ctx, meta, left, safeH * 0.76, cw * 0.72, metaPx * 1.35, 2);
-
-  ctx.fillStyle = "#b45309";
-  ctx.font = `700 ${Math.round(24 * scale)}px "Pretendard Variable", "Pretendard", "Noto Sans KR", system-ui, sans-serif`;
-  ctx.fillText("추천도서", left, titleY - 34 * scale);
-}
-
-function wrapCanvasText(
-  ctx: CanvasRenderingContext2D,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number,
-  maxLines: number,
-) {
-  const lines: string[] = [];
-  for (const paragraph of text.split(/\n+/)) {
-    let line = "";
-    for (const ch of paragraph.trim()) {
-      const next = line + ch;
-      if (ctx.measureText(next).width <= maxWidth) {
-        line = next;
-      } else {
-        if (line) lines.push(line);
-        line = ch;
-      }
-      if (lines.length >= maxLines) break;
-    }
-    if (line && lines.length < maxLines) lines.push(line);
-    if (lines.length >= maxLines) break;
+  const dim = FINAL_DIMENSIONS[input.ratio];
+  if (!canvas.width || !canvas.height) {
+    canvas.width = dim.w;
+    canvas.height = dim.h;
   }
-  lines.forEach((line, index) => ctx.fillText(line, x, y + index * lineHeight));
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+  drawCover(ctx, input.bg, canvas.width, canvas.height);
+}
+
+function getDefaultPeriodLabel(): string {
+  const month = new Date().getMonth() + 1;
+  if (month <= 2) return "1~2월";
+  if (month <= 4) return "3~4월";
+  if (month <= 6) return "5~6월";
+  if (month <= 8) return "7~8월";
+  if (month <= 10) return "9~10월";
+  return "11~12월";
+}
+
+async function buildPosterReferenceImages(coverImg: HTMLImageElement | null): Promise<string[]> {
+  const refs: string[] = [];
+  if (coverImg) refs.push(await imageToDataUrl(coverImg));
+
+  const assets = await Promise.allSettled([loadImage("/logo.png"), loadImage("/qr-links.svg")]);
+  for (const asset of assets) {
+    if (asset.status === "fulfilled") {
+      refs.push(await imageToDataUrl(asset.value));
+    }
+  }
+
+  return refs;
 }
 
 function loadImage(src: string): Promise<HTMLImageElement> {

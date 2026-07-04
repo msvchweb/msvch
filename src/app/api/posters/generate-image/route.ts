@@ -20,6 +20,8 @@ const RequestSchema = z.object({
   mode: z.enum(["generate", "revise"]).default("generate"),
   revisionInstruction: z.string().trim().max(600).optional(),
   sourceImageDataUrl: z.string().trim().optional(),
+  sourceImageDataUrls: z.array(z.string().trim()).max(6).optional(),
+  includeFooterContent: z.boolean().optional(),
   posterTitle: z.string().trim().max(100).optional(),
   posterCategory: z.enum(POSTER_CATEGORIES).optional(),
 });
@@ -54,6 +56,8 @@ export async function POST(request: NextRequest) {
       mode,
       revisionInstruction,
       sourceImageDataUrl,
+      sourceImageDataUrls,
+      includeFooterContent,
       posterTitle,
       posterCategory,
     } = parsed.data;
@@ -66,7 +70,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (mode === "revise" && !sourceImageDataUrl) {
+    const sourceImages = sourceImageDataUrls?.length
+      ? sourceImageDataUrls
+      : sourceImageDataUrl
+        ? [sourceImageDataUrl]
+        : [];
+
+    if (mode === "revise" && sourceImages.length === 0) {
       return NextResponse.json(
         { error: "수정할 원본 이미지가 누락됐습니다." },
         { status: 400 },
@@ -85,15 +95,15 @@ export async function POST(request: NextRequest) {
             apiKey,
             endpoint,
             model,
-            prompt: buildImagePrompt({ prompt, mode, revisionInstruction, ratio }),
+            prompt: buildImagePrompt({ prompt, mode, revisionInstruction, ratio, includeFooterContent }),
             ratio,
-            sourceImageDataUrl: sourceImageDataUrl!,
+            sourceImageDataUrls: sourceImages,
           })
         : await callImageGeneration({
             apiKey,
             endpoint,
             model,
-            prompt: buildImagePrompt({ prompt, mode, revisionInstruction, ratio }),
+            prompt: buildImagePrompt({ prompt, mode, revisionInstruction, ratio, includeFooterContent }),
             ratio,
           });
 
@@ -147,30 +157,36 @@ function buildImagePrompt({
   mode,
   revisionInstruction,
   ratio,
+  includeFooterContent,
 }: {
   prompt: string;
   mode: "generate" | "revise";
   revisionInstruction?: string;
   ratio: PosterRatio;
+  includeFooterContent?: boolean;
 }): string {
+  const footerInstruction = includeFooterContent
+    ? `- Include the requested church footer content naturally at the bottom of the poster. The footer may contain a church logo, QR code, phone number, and address if the prompt asks for them.`
+    : `- Reserve the bottom 14% of the canvas as clean empty space for a footer overlay.
+- Do not place any subject, face, important detail, text, logo, watermark, letter, or number in the bottom footer band.`;
+
   const base = `${prompt}
 
 Hard requirements:
 - Generate a Korean church poster image suitable for ${ratio}.
-- Reserve the bottom 14% of the canvas as clean empty space for a footer overlay.
-- Do not place any subject, face, important detail, text, logo, watermark, letter, or number in the bottom footer band.
+${footerInstruction}
 - Avoid grave imagery, gloomy tones, and specific religious figure faces.`;
 
   if (mode === "generate") return base;
 
   return `${base}
 
-The attached image is the current poster draft. Keep its overall composition unless the user explicitly asks otherwise.
+Use the attached image or images as visual references. If one attached image is the current poster draft, keep its overall composition unless the user explicitly asks otherwise.
 
 User revision request:
 ${revisionInstruction || "Create a cleaner, more polished version while preserving the original intent."}
 
-Apply only the requested revision, keep the footer band clear, and return one complete final image.`;
+Apply only the requested revision and return one complete final image.`;
 }
 
 async function callImageGeneration({
@@ -208,17 +224,15 @@ async function callImageEdit({
   model,
   prompt,
   ratio,
-  sourceImageDataUrl,
+  sourceImageDataUrls,
 }: {
   apiKey: string;
   endpoint: string;
   model: string;
   prompt: string;
   ratio: PosterRatio;
-  sourceImageDataUrl: string;
+  sourceImageDataUrls: string[];
 }): Promise<Response> {
-  const source = decodeDataUrlImage(sourceImageDataUrl);
-  const normalized = await normalizeImage(source.buffer);
   const form = new FormData();
   form.append("model", model);
   form.append("prompt", prompt);
@@ -228,11 +242,15 @@ async function callImageEdit({
   for (const [key, value] of Object.entries(outputOptions)) {
     form.append(key, String(value));
   }
-  form.append(
-    "image[]",
-    new Blob([Uint8Array.from(normalized)], { type: "image/png" }),
-    "current-poster.png",
-  );
+  for (const [index, sourceImageDataUrl] of sourceImageDataUrls.entries()) {
+    const source = decodeDataUrlImage(sourceImageDataUrl);
+    const normalized = await normalizeImage(source.buffer);
+    form.append(
+      "image[]",
+      new Blob([Uint8Array.from(normalized)], { type: "image/png" }),
+      `source-${index + 1}.png`,
+    );
+  }
 
   return fetch(endpoint, {
     method: "POST",
