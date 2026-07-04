@@ -5,6 +5,7 @@ import {
   AlertCircle,
   BellPlus,
   BookOpen,
+  Download,
   Loader2,
   MessageSquare,
   Send,
@@ -60,7 +61,7 @@ export function BookRecommendationAutomation() {
   const [backgroundUrl, setBackgroundUrl] = useState<string | null>(null);
   const [backgroundImg, setBackgroundImg] = useState<HTMLImageElement | null>(null);
   const [coverImg, setCoverImg] = useState<HTMLImageElement | null>(null);
-  const [loading, setLoading] = useState<"extract" | "generate" | "revise" | "register" | null>(
+  const [loading, setLoading] = useState<"extract" | "generate" | "revise" | "download" | "register" | null>(
     null,
   );
   const [error, setError] = useState<string | null>(null);
@@ -268,6 +269,29 @@ Keep this as one complete Korean church book recommendation poster. Preserve the
     }
   }
 
+  async function handleDownloadPoster() {
+    if (!book || !draft || !backgroundImg) return;
+    setError(null);
+    setLoading("download");
+    try {
+      const blob = await renderToBlob(ratio);
+      if (!blob) throw new Error("최종 포스터 이미지를 만들지 못했습니다.");
+
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = `book-recommendation-${periodLabel}-${Date.now()}.png`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "포스터 다운로드 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
   function drawPreview() {
     const canvas = previewRef.current;
     if (!canvas || !backgroundImg || !book || !draft) return;
@@ -296,6 +320,7 @@ Keep this as one complete Korean church book recommendation poster. Preserve the
 
   const canGenerate = Boolean(book && draft && !loading);
   const canRegister = Boolean(book && draft && backgroundImg && !loading);
+  const canDownload = Boolean(book && draft && backgroundImg && !loading);
   const dim = FINAL_DIMENSIONS[ratio];
 
   return (
@@ -494,6 +519,15 @@ Keep this as one complete Korean church book recommendation poster. Preserve the
           </div>
           <button
             type="button"
+            onClick={handleDownloadPoster}
+            disabled={!canDownload || loading === "download"}
+            className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+          >
+            {loading === "download" ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            최종 해상도 다운로드
+          </button>
+          <button
+            type="button"
             onClick={handleRegisterNotice}
             disabled={!canRegister || loading === "register"}
             className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700 disabled:bg-gray-300"
@@ -514,6 +548,8 @@ function buildCompletePosterPrompt(
   periodLabel: string,
 ): string {
   const periodTitle = `명성비전교회 ${periodLabel} 추천도서`;
+  const posterTitle = stripIsbnText(draft.posterTitle);
+  const posterSubtitle = stripIsbnText(draft.posterSubtitle);
 
   return `Create a polished complete Korean church book recommendation poster for the book "${book.title}" by ${book.author}.
 
@@ -521,9 +557,9 @@ Concept: ${draft.imageConcept}
 
 Poster text to include in Korean:
 - Top title: "${periodTitle}"
-- Main title: "${draft.posterTitle}"
-- Subtitle: "${draft.posterSubtitle}"
-- Book metadata: "${book.author} 저 · ${book.publisher}${book.isbn13 ? ` · ISBN ${book.isbn13}` : ""}"
+- Main title: "${posterTitle}"
+- Subtitle: "${posterSubtitle}"
+- Book metadata: "${book.author} 저 · ${book.publisher}"
 
 Church footer content to include naturally at the bottom:
 - Use the attached church logo image.
@@ -537,6 +573,7 @@ Hard requirements:
 - Put "${periodTitle}" clearly at the top of the poster.
 - Integrate the church logo, QR code, phone number, and address as a polished readable footer at the bottom.
 - Do not invent another logo, QR code, phone number, or address.
+- Do not include any ISBN text or ISBN number anywhere in the poster.
 - Mood: calm, reverent, hopeful, warm, suitable for a Protestant church congregation.
 - Visual motifs may include an open Bible, soft rays of light, quiet reading desk, gentle paper texture, or abstract promise/path imagery.
 - No realistic faces and no depiction of Jesus or specific religious figures.
@@ -640,6 +677,13 @@ function generateSlug(text: string) {
     .replace(/[^a-z0-9가-힣\s-]/g, "")
     .replace(/\s+/g, "-")
     .slice(0, 50)}-${Date.now().toString(36)}`;
+}
+
+function stripIsbnText(text: string): string {
+  return text
+    .replace(/\s*[·,|/-]?\s*ISBN(?:10|13)?\s*[:：]?\s*[0-9Xx-]+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 const chipClass =

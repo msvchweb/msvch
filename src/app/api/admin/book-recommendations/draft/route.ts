@@ -76,7 +76,6 @@ function buildDraftPrompt(book: BookSourceData): string {
 - 저자: ${book.author}
 - 출판사: ${book.publisher}
 - 출간일: ${book.publishedDate || "미상"}
-- ISBN13: ${book.isbn13 || "미상"}
 - 쪽수/크기: ${book.pageInfo || "미상"}
 - 분류: ${book.categoryPath.join(" > ") || "미상"}
 - 원문 링크: ${book.sourceUrl}
@@ -100,7 +99,8 @@ ${book.publisherReview || "없음"}
 4. 포스터 제목은 짧고 명확해야 합니다.
 5. 추천 포인트 3개와 묵상/나눔 질문 3개를 만드세요.
 6. 이미지 콘셉트는 실제 책 표지를 복제하지 않는 상징적 배경 설명이어야 합니다.
-7. 출력은 아래 JSON 형식만 사용하세요. 마크다운 코드블록으로 감싸지 마세요.
+7. 포스터 제목, 부제, 이미지 콘셉트에는 ISBN 또는 ISBN 번호를 절대 포함하지 마세요.
+8. 출력은 아래 JSON 형식만 사용하세요. 마크다운 코드블록으로 감싸지 마세요.
 
 {
   "noticeTitle": "공지사항 제목",
@@ -137,9 +137,9 @@ function parseJson(raw: string): Record<string, unknown> {
 function normalizeDraft(data: Record<string, unknown>, book: BookSourceData): BookRecommendationDraft {
   const recommendationPoints = stringArray(data.recommendationPoints).slice(0, 5);
   const discussionQuestions = stringArray(data.discussionQuestions).slice(0, 5);
-  const posterTitle = stringValue(data.posterTitle) || `추천도서: ${book.title}`;
+  const posterTitle = stripIsbnText(stringValue(data.posterTitle)) || `추천도서: ${book.title}`;
   const posterSubtitle =
-    stringValue(data.posterSubtitle) || `${book.author} 저 · ${book.publisher}`;
+    stripIsbnText(stringValue(data.posterSubtitle)) || `${book.author} 저 · ${book.publisher}`;
 
   return {
     noticeTitle: stringValue(data.noticeTitle) || `추천도서 | ${book.title}`,
@@ -166,7 +166,6 @@ function normalizeDraft(data: Record<string, unknown>, book: BookSourceData): Bo
       extraLines: [
         `${book.author} 저`,
         book.publisher,
-        book.isbn13 ? `ISBN ${book.isbn13}` : "",
       ].filter(Boolean),
       colorPalette: "navyIvory",
       artStyle: "paperCut",
@@ -179,6 +178,13 @@ function normalizeDraft(data: Record<string, unknown>, book: BookSourceData): Bo
       includeText: false,
     },
   };
+}
+
+function stripIsbnText(text: string): string {
+  return text
+    .replace(/\s*[·,|/-]?\s*ISBN(?:10|13)?\s*[:：]?\s*[0-9Xx-]+/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 function fallbackNotice(book: BookSourceData): string {
@@ -200,4 +206,3 @@ function stringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
 }
-
