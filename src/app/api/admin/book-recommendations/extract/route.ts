@@ -104,14 +104,18 @@ async function fetchHtml(url: string): Promise<string> {
 function extractYes24Book(html: string, sourceUrl: string, productId: string): BookSourceData {
   const root = parse(html);
   const rawText = normalize(root.structuredText || root.textContent || "");
+  const jsonLd = extractBookJsonLd(root);
+  const ogTitleParts = parseOgTitle(firstContent(root, ['meta[property="og:title"]']));
 
   const title =
     firstContent(root, [
-      'meta[property="og:title"]',
       'meta[name="title"]',
       "h2.gd_name",
       "h1",
-    ]) || capture(rawText, /(?:^|\n)\s*##\s*([^\n]+)\s*/);
+    ]) ||
+    jsonLd.title ||
+    ogTitleParts.title ||
+    capture(rawText, /(?:^|\n)\s*##\s*([^\n]+)\s*/);
 
   const coverImageUrl =
     absoluteUrl(
@@ -120,7 +124,7 @@ function extractYes24Book(html: string, sourceUrl: string, productId: string): B
         'meta[name="twitter:image"]',
         "#yesBigImg",
         ".gImg img",
-      ]),
+      ]) || jsonLd.coverImageUrl,
       sourceUrl,
     ) || undefined;
 
@@ -129,6 +133,16 @@ function extractYes24Book(html: string, sourceUrl: string, productId: string): B
     capture(rawText, new RegExp(`${escapeRegExp(title || "")}\\s+([^\\n]+?저\\s*\\|[^\\n]+)`));
 
   const meta = parseMainMeta(authorLine || rawText);
+  const author =
+    stripAuthorSuffix(firstContent(root, ['meta[name="author"]'])) ||
+    jsonLd.author ||
+    ogTitleParts.author ||
+    meta.author;
+  const publisher =
+    jsonLd.publisher ||
+    ogTitleParts.publisher ||
+    textFromSelector(root, ".gd_pub") ||
+    meta.publisher;
   const publishedDate =
     meta.publishedDate || capture(rawText, /발행일\s*([0-9]{4}년\s*[0-9]{1,2}월\s*[0-9]{1,2}일)/);
   const pageInfo =
@@ -164,6 +178,14 @@ function extractYes24Book(html: string, sourceUrl: string, productId: string): B
     quotes: quotesText ? splitQuotes(quotesText).slice(0, 5) : undefined,
   };
 
+  book.author = author || book.author;
+  book.publisher = publisher || book.publisher;
+  book.publishedDate = publishedDate || jsonLd.publishedDate || book.publishedDate;
+  book.isbn13 = isbn13 || jsonLd.isbn || book.isbn13;
+  book.pageInfo = pageInfo || jsonLd.pageInfo || book.pageInfo;
+  book.categoryPath =
+    categoryPath.length > 0 ? categoryPath : jsonLd.categoryPath.length > 0 ? jsonLd.categoryPath : book.categoryPath;
+
   return book;
 }
 
@@ -182,6 +204,137 @@ function textFromSelector(root: HTMLElement, selector: string): string | undefin
   const el = root.querySelector(selector);
   const value = normalize(el?.textContent || "");
   return value || undefined;
+}
+
+function parseOgTitle(value: string | undefined): {
+  title?: string;
+  author?: string;
+  publisher?: string;
+} {
+  if (!value) return {};
+  const cleaned = cleanTitle(value);
+  if (!cleaned) return {};
+  const parts = cleaned.split("|").map((part) => normalize(part)).filter(Boolean);
+  if (parts.length < 3) {
+    return { title: parts[0] || cleaned };
+  }
+  return {
+    title: parts[0],
+    author: stripAuthorSuffix(parts[1]),
+    publisher: stripYes24Suffix(parts[2]),
+  };
+}
+
+function stripAuthorSuffix(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = normalize(value)
+    .replace(/\s*저\s*$/u, "")
+    .replace(/\s*글\s*$/u, "");
+  return cleaned || undefined;
+}
+
+function stripYes24Suffix(value: string | undefined): string | undefined {
+  if (!value) return undefined;
+  const cleaned = normalize(value)
+    .replace(/\s*-\s*YES24\s*$/i, "")
+    .replace(/\s*-\s*예스24\s*$/u, "");
+  return cleaned || undefined;
+}
+
+function extractBookJsonLd(root: HTMLElement): {
+  title?: string;
+  author?: string;
+  publisher?: string;
+  publishedDate?: string;
+  isbn?: string;
+  pageInfo?: string;
+  categoryPath: string[];
+  coverImageUrl?: string;
+} {
+  for (const script of root.querySelectorAll('script[type="application/ld+json"]')) {
+    const raw = script.textContent.trim();
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      const book = findBookJsonLd(parsed);
+      if (!book) continue;
+      const pages = numberValue(book.numberOfPages);
+      return {
+        title: stringValue(book.name),
+        author: authorFromJsonLd(book.author) || stripAuthorSuffix(stringValue(book.creditText)),
+        publisher: publisherFromJsonLd(book.publisher),
+        publishedDate: stringValue(book.datePublished),
+        isbn: stringValue(book.isbn),
+        pageInfo: pages ? `${pages}쪽` : undefined,
+        categoryPath: arrayStringValue(book.genre),
+        coverImageUrl: imageFromJsonLd(book.image),
+      };
+    } catch {
+      continue;
+    }
+  }
+  return { categoryPath: [] };
+}
+
+function findBookJsonLd(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object") return null;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const found = findBookJsonLd(item);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const type = record["@type"];
+  const types = Array.isArray(type) ? type : [type];
+  if (types.some((item) => item === "Book" || item === "Product")) return record;
+
+  return findBookJsonLd(record["@graph"]);
+}
+
+function authorFromJsonLd(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === "string") return stripAuthorSuffix(value);
+  if (Array.isArray(value)) return authorFromJsonLd(value[0]);
+  if (typeof value === "object") return stripAuthorSuffix(stringValue((value as Record<string, unknown>).name));
+  return undefined;
+}
+
+function publisherFromJsonLd(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === "string") return normalize(value);
+  if (typeof value === "object") return stringValue((value as Record<string, unknown>).name);
+  return undefined;
+}
+
+function imageFromJsonLd(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === "string") return value;
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    return stringValue(record.url) || stringValue(record.contentUrl);
+  }
+  return undefined;
+}
+
+function stringValue(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? normalize(value) : undefined;
+}
+
+function numberValue(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+}
+
+function arrayStringValue(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => stringValue(item)).filter((item): item is string => Boolean(item));
 }
 
 function parseMainMeta(input: string): {
