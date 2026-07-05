@@ -387,7 +387,6 @@ Keep this as one complete Korean church book recommendation poster. Preserve the
                 <h3 className="mt-1 text-xl font-bold text-gray-900">{book.title}</h3>
                 <p className="mt-1 text-sm text-gray-600">
                   {book.author} 저 · {book.publisher}
-                  {book.isbn13 ? ` · ISBN ${book.isbn13}` : ""}
                 </p>
               </div>
               <div>
@@ -665,7 +664,7 @@ function ensureBookMeta(content: string, book: BookSourceData): string {
     "",
     "---",
     "",
-    `도서 정보: ${book.author} 저, ${book.publisher}${book.isbn13 ? `, ISBN ${book.isbn13}` : ""}`,
+    `도서 정보: ${book.author} 저, ${book.publisher}`,
     `도서 링크: ${book.sourceUrl}`,
   ].join("\n");
   return content.includes(book.sourceUrl) ? content : `${content.trim()}\n${meta}`;

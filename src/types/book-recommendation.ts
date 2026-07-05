@@ -8,8 +8,6 @@ export interface BookSourceData {
   author: string;
   publisher: string;
   publishedDate?: string;
-  isbn13?: string;
-  isbn10?: string;
   pageInfo?: string;
   categoryPath: string[];
   coverImageUrl?: string;
@@ -30,4 +28,3 @@ export interface BookRecommendationDraft {
   imageConcept: string;
   posterPromptInput: PromptBuilderInput;
 }
-

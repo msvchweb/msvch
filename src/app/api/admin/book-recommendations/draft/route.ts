@@ -18,8 +18,6 @@ const BookSchema = z.object({
   author: z.string().trim().min(1),
   publisher: z.string().trim().min(1),
   publishedDate: z.string().trim().optional(),
-  isbn13: z.string().trim().optional(),
-  isbn10: z.string().trim().optional(),
   pageInfo: z.string().trim().optional(),
   categoryPath: z.array(z.string()).default([]),
   coverImageUrl: z.string().trim().url().optional(),
@@ -194,7 +192,7 @@ function fallbackNotice(book: BookSourceData): string {
 
 ${book.description || "함께 읽으며 믿음의 여정을 돌아볼 수 있는 책입니다."}
 
-도서 정보: ${book.author} 저, ${book.publisher}${book.isbn13 ? `, ISBN ${book.isbn13}` : ""}
+도서 정보: ${book.author} 저, ${book.publisher}
 도서 링크: ${book.sourceUrl}`;
 }
 

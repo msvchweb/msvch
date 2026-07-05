@@ -148,8 +148,6 @@ function extractYes24Book(html: string, sourceUrl: string, productId: string): B
   const pageInfo =
     capture(rawText, /쪽수,\s*무게,\s*크기\s*([^\n]+)/) ||
     capture(rawText, /([0-9]+쪽\s*\|\s*[0-9* xX]+mm)/);
-  const isbn13 = capture(rawText, /ISBN13\s*([0-9Xx-]+)/);
-  const isbn10 = capture(rawText, /ISBN10\s*([0-9Xx-]+)/);
   const categoryPath = extractCategoryPath(root, rawText);
 
   const description = sectionText(rawText, "책소개", ["관련 동영상", "목차"]);
@@ -166,8 +164,6 @@ function extractYes24Book(html: string, sourceUrl: string, productId: string): B
     author: meta.author || "저자 미상",
     publisher: meta.publisher || "출판사 미상",
     publishedDate: publishedDate || undefined,
-    isbn13: isbn13 || undefined,
-    isbn10: isbn10 || undefined,
     pageInfo: pageInfo || undefined,
     categoryPath,
     coverImageUrl,
@@ -181,7 +177,6 @@ function extractYes24Book(html: string, sourceUrl: string, productId: string): B
   book.author = author || book.author;
   book.publisher = publisher || book.publisher;
   book.publishedDate = publishedDate || jsonLd.publishedDate || book.publishedDate;
-  book.isbn13 = isbn13 || jsonLd.isbn || book.isbn13;
   book.pageInfo = pageInfo || jsonLd.pageInfo || book.pageInfo;
   book.categoryPath =
     categoryPath.length > 0 ? categoryPath : jsonLd.categoryPath.length > 0 ? jsonLd.categoryPath : book.categoryPath;
@@ -246,7 +241,6 @@ function extractBookJsonLd(root: HTMLElement): {
   author?: string;
   publisher?: string;
   publishedDate?: string;
-  isbn?: string;
   pageInfo?: string;
   categoryPath: string[];
   coverImageUrl?: string;
@@ -264,7 +258,6 @@ function extractBookJsonLd(root: HTMLElement): {
         author: authorFromJsonLd(book.author) || stripAuthorSuffix(stringValue(book.creditText)),
         publisher: publisherFromJsonLd(book.publisher),
         publishedDate: stringValue(book.datePublished),
-        isbn: stringValue(book.isbn),
         pageInfo: pages ? `${pages}쪽` : undefined,
         categoryPath: arrayStringValue(book.genre),
         coverImageUrl: imageFromJsonLd(book.image),
