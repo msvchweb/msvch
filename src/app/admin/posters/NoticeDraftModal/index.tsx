@@ -4,7 +4,12 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, Loader2, Check, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_TEXT_SETTINGS, renderPoster, preloadFooterAssets } from "@/lib/poster-footer";
+import {
+  DEFAULT_TEXT_SETTINGS,
+  FINAL_DIMENSIONS,
+  renderPoster,
+  preloadFooterAssets,
+} from "@/lib/poster-footer";
 import type { SharedPosterData } from "../PostersTabs";
 
 interface NoticeDraft {
@@ -77,6 +82,9 @@ export function NoticeDraftModal({
   function drawPreviews() {
     // 1) 메인 포스터 (사용자 설정 비율)
     if (mainPreviewRef.current) {
+      const dim = FINAL_DIMENSIONS[sharedData.ratio];
+      mainPreviewRef.current.width = dim.w;
+      mainPreviewRef.current.height = dim.h;
       renderPoster(mainPreviewRef.current, {
         bg: bgImg,
         ratio: sharedData.ratio,
@@ -89,6 +97,9 @@ export function NoticeDraftModal({
     }
     // 2) 썸네일용 가로형 (16:9)
     if (thumbPreviewRef.current) {
+      const dim = FINAL_DIMENSIONS["16:9"];
+      thumbPreviewRef.current.width = dim.w;
+      thumbPreviewRef.current.height = dim.h;
       renderPoster(thumbPreviewRef.current, {
         bg: bgImg,
         ratio: "16:9",

@@ -31,8 +31,8 @@ export default async function AdminPostersPage() {
             포스터 도구
           </h1>
           <p className="text-sm text-gray-600">
-            행사 정보를 입력해 그림체 샘플 기반 이미지를 만들고 수정한 뒤 교회 footer를
-            합성해 PNG 저장 또는 공지사항 등록까지 진행합니다.
+            행사 정보를 입력해 교회 footer가 포함된 이미지를 만들고 수정한 뒤 PNG 저장 또는
+            공지사항 등록까지 진행합니다.
           </p>
         </div>
         {isMaster && (

@@ -166,7 +166,10 @@ function buildImagePrompt({
   includeFooterContent?: boolean;
 }): string {
   const footerInstruction = includeFooterContent
-    ? `- Include the requested church footer content naturally at the bottom of the poster. The footer may contain a church logo, QR code, phone number, and address if the prompt asks for them.`
+    ? `- Integrate a polished, readable church footer naturally at the bottom of the poster.
+- Use the attached reference images for the church logo and QR code when provided.
+- Footer content must include church name "명성비전교회", phone "02-534-0691", and address "서울 동작구 여의대방로16바길 9".
+- Do not invent a different church name, phone number, address, logo, or QR code.`
     : `- Reserve the bottom 14% of the canvas as clean empty space for a footer overlay.
 - Do not place any subject, face, important detail, text, logo, watermark, letter, or number in the bottom footer band.`;
 

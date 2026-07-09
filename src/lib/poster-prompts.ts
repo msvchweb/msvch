@@ -441,10 +441,10 @@ ${
 - 모든 한국어 원문은 영문 프롬프트 안에 **큰따옴표로 정확히** 포함되어야 함 (오타·재해석 금지).
 - "render Korean text crisply with proper hangul typography" 명시.
 - "if Korean rendering fails, leave clearly defined empty zones in matching positions so the user can add text manually" fallback 명시.
-- 모든 한국어 텍스트(제목·일시·장소·정보)는 **하단 약 14% 영역을 침범하지 않도록** 그 위쪽에만 배치하라고 명시.`
+- 모든 한국어 텍스트(제목·일시·장소·정보)는 **하단 footer 영역을 침범하지 않도록** 그 위쪽에만 배치하라고 명시.`
     : `사용자는 AI 가 텍스트를 그리지 않기를 원합니다 (한국어 텍스트는 따로 합성). 영문 프롬프트에 다음을 명시하세요.
 
-- "absolutely no text, no letters, no numbers, no logos in the image".
+- "outside the church footer, absolutely no event text, letters, numbers, or logos in the image".
 - 빈 공간을 의도적으로 확보: 상단(제목 자리), 일정 표시 영역(${schedules.length > 0 ? "여러 회차 — 세로 리스트나 캘린더 형식 자리" : "필요시 1줄"}), 위치/대상/부가정보 자리(${location || audience || extraLines.length > 0 ? "각각 별도 배지/인포 영역" : "필요시"}).
 - "make the empty zones clearly defined so the user can overlay Korean text afterwards."`;
 
@@ -487,8 +487,8 @@ ${referenceSection}
 [작성 요구사항]
 1. 위 요소들을 자연스러운 영문 산문체로 엮어 한국 교회 분위기에 어울리는 영문 이미지 프롬프트를 작성하세요.
 2. ${textInstruction}
-3. **하단 푸터 공간 필수 확보** — 생성된 이미지 위에 교회 푸터(로고·전화·주소·QR)를 후합성합니다. 영문 프롬프트에 반드시 다음 취지를 명확히 포함하세요:
-   "Reserve the bottom 14% of the canvas as completely empty space (or only soft, low-contrast background gradient). Do NOT place any subject, focal element, face, important detail, text, or logo within this bottom 14% — this strip is reserved for a footer overlay added in post-production. The composition's center of interest must sit clearly above this reserved bottom band."
+3. **교회 footer 기본 포함** — 포스터 하단에 교회 footer를 자연스럽게 통합합니다. 영문 프롬프트에 반드시 다음 취지를 명확히 포함하세요:
+   "Integrate a polished, readable church footer naturally at the bottom of the poster. Include the church logo area, QR code area, church name '명성비전교회', phone number '02-534-0691', and address '서울 동작구 여의대방로16바길 9'. Keep the footer visually connected to the poster design while preserving strong readability. Do not invent a different church name, phone number, address, logo, or QR code."
 4. 비율은 반드시 프롬프트에 포함: "${aiRatio}".
 5. 다음은 절대 포함하지 마세요:
    - 묘비, 무덤 위 십자가

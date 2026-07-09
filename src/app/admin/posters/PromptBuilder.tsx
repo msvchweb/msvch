@@ -4,8 +4,10 @@ import { useEffect, useState, useRef } from "react";
 import {
   Sparkles,
   Loader2,
+  BellPlus,
   Copy,
   Check,
+  Download,
   Save,
   FolderOpen,
   Trash2,
@@ -22,6 +24,7 @@ import {
   Eye,
   type LucideIcon,
 } from "lucide-react";
+import { NoticeDraftModal } from "./NoticeDraftModal";
 import {
   POSTER_CATEGORIES,
   POSTER_RATIOS,
@@ -125,9 +128,9 @@ const QUICK_REVISION_CHIPS: { label: string; instruction: string }[] = [
     instruction: "Remove all visible text, letters, numbers, logos, and watermark-like marks.",
   },
   {
-    label: "footer 공간 확보",
+    label: "footer 선명하게",
     instruction:
-      "Reserve more clear empty space at the bottom for the church footer. Do not place any subject, text, face, or important detail in the bottom band.",
+      "Make the church footer at the bottom cleaner, more readable, and naturally integrated. Preserve the church logo, QR code, phone number, and address.",
   },
   {
     label: "교회 행사 느낌",
@@ -158,7 +161,7 @@ const TARGET_TOOLS: { name: string; href: string; hint: string }[] = [
   },
 ];
 
-export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterData) => void }) {
+export function PromptBuilder() {
   const [category, setCategory] = useState<PosterCategory>("event");
   const [ratio, setRatio] = useState<PosterRatio>("a4");
   const [title, setTitle] = useState("");
@@ -203,6 +206,8 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
   const [revisionInstruction, setRevisionInstruction] = useState("");
   const [imageHistory, setImageHistory] = useState<GeneratedPosterImage[]>([]);
   const [savedPrompts, setSavedPrompts] = useState<SavedPosterPrompt[]>([]);
+  const [noticeDraftData, setNoticeDraftData] = useState<SharedPosterData | null>(null);
+  const [noticeDraftImg, setNoticeDraftImg] = useState<HTMLImageElement | null>(null);
 
   // 미리보기 URL 생명주기 관리
   useEffect(() => {
@@ -437,6 +442,18 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
 
     setGeneratingImage(true);
     try {
+      const footerReferenceImages = await buildFooterReferenceImages();
+      const sourceImageDataUrls =
+        mode === "revise"
+          ? [dalleImageUrl!, ...footerReferenceImages]
+          : footerReferenceImages;
+      const apiMode = sourceImageDataUrls.length > 0 ? "revise" : "generate";
+      const footerRevisionInstruction =
+        mode === "revise"
+          ? `${instruction}
+
+Keep this as one complete Korean church poster. Preserve the Korean poster text and keep the church footer naturally integrated at the bottom with the logo, QR code, phone number, and address.`
+          : "Use the attached reference images for the church logo and QR code. Create one complete Korean church poster with the requested poster content and a polished readable church footer naturally integrated at the bottom.";
       const r = await fetch("/api/posters/generate-image", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -444,9 +461,10 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
           prompt: result.englishPrompt,
           ratio: ratio,
           artStyle,
-          mode,
-          revisionInstruction: mode === "revise" ? instruction : undefined,
-          sourceImageDataUrl: mode === "revise" ? dalleImageUrl : undefined,
+          mode: apiMode,
+          revisionInstruction: apiMode === "revise" ? footerRevisionInstruction : undefined,
+          sourceImageDataUrls: sourceImageDataUrls.length > 0 ? sourceImageDataUrls : undefined,
+          includeFooterContent: true,
           posterTitle: title.trim() || undefined,
           posterCategory: category,
         }),
@@ -480,10 +498,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
     }
   }
 
-  function handleFinishAndEdit() {
-    if (!dalleImageUrl) return;
-
-    // 부제목(bodyText) 구성
+  function buildSharedPosterData(imageUrl: string): SharedPosterData {
     const cleanedSchedules = schedules.map((s) => s.trim()).filter((s) => s.length > 0);
     const cleanedExtraLines = extraInfoText
       .split(/\r?\n/)
@@ -495,14 +510,14 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
     if (location.trim()) bodyParts.push(location.trim());
     if (audience.trim()) bodyParts.push(audience.trim());
 
-    onTransfer({
+    return {
       ratio,
       title: title.trim(),
       bodyText: bodyParts.join("\n"),
-      imageUrl: dalleImageUrl,
+      imageUrl,
       fullInput: {
         category,
-        title,
+        title: title.trim(),
         schedules: cleanedSchedules,
         location,
         audience,
@@ -517,7 +532,29 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
         ratio,
         includeText,
       },
-    });
+    };
+  }
+
+  function handleDownloadGeneratedImage() {
+    if (!dalleImageUrl) return;
+    const link = document.createElement("a");
+    link.href = dalleImageUrl;
+    const safeTitle = (title.trim() || "poster").replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
+    link.download = `${safeTitle}-${ratio.replace(":", "x")}.${extensionForImageUrl(dalleImageUrl)}`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  async function handleOpenNoticeDraft() {
+    if (!dalleImageUrl) return;
+    try {
+      const img = await loadImageElement(dalleImageUrl);
+      setNoticeDraftData(buildSharedPosterData(dalleImageUrl));
+      setNoticeDraftImg(img);
+    } catch {
+      alert("공지 등록용 이미지를 불러오지 못했습니다.");
+    }
   }
 
   async function handleCopy() {
@@ -1001,7 +1038,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                             value={revisionInstruction}
                             onChange={(e) => setRevisionInstruction(e.target.value)}
                             rows={3}
-                            placeholder="예: 하단 footer 공간을 더 비우고 전체 톤을 더 밝고 따뜻하게 해줘"
+                            placeholder="예: footer를 더 선명하게 유지하고 전체 톤을 더 밝고 따뜻하게 해줘"
                             className="w-full resize-none rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none"
                           />
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -1061,11 +1098,18 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                           </div>
                         )}
                         <button
-                          onClick={handleFinishAndEdit}
+                          onClick={handleDownloadGeneratedImage}
                           className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-4 text-base font-bold text-white shadow-md hover:bg-emerald-700"
                         >
-                          <Wand2 size={20} />
-                          이 이미지로 마무리 작업하기
+                          <Download size={20} />
+                          최종 이미지 다운로드
+                        </button>
+                        <button
+                          onClick={handleOpenNoticeDraft}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-primary-600 bg-white py-4 text-base font-bold text-primary-700 shadow-sm hover:bg-primary-50"
+                        >
+                          <BellPlus size={20} />
+                          공지사항으로 바로 등록
                         </button>
                         <button
                           onClick={() => handleGenerateImage("generate")}
@@ -1091,7 +1135,7 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
                         {generatingImage ? "이미지 생성 중..." : "이미지 바로 만들기"}
                       </button>
                       <p className="text-[10px] text-gray-400">
-                        * 선택한 그림체 샘플을 참고해 GPT 이미지 API로 생성합니다.
+                        * 선택한 그림체 샘플과 교회 footer 참고 이미지를 함께 사용해 GPT 이미지 API로 생성합니다.
                       </p>
                     </div>
                   )}
@@ -1123,6 +1167,18 @@ export function PromptBuilder({ onTransfer }: { onTransfer: (data: SharedPosterD
           )}
         </div>
       </div>
+
+      {noticeDraftData && noticeDraftImg && (
+        <NoticeDraftModal
+          sharedData={noticeDraftData}
+          bgImg={noticeDraftImg}
+          showFooter={false}
+          onClose={() => {
+            setNoticeDraftData(null);
+            setNoticeDraftImg(null);
+          }}
+        />
+      )}
 
       {/* 모바일 하단 플로팅 버튼 (AdminBottomTabBar 위로) */}
       <div className="fixed bottom-14 inset-x-0 z-30 flex items-center justify-center p-4 lg:hidden">
@@ -1168,6 +1224,48 @@ async function readGenerateImageResponse(response: Response): Promise<GenerateIm
     }
     return { error: `이미지 생성 응답을 읽지 못했습니다. (${response.status})` };
   }
+}
+
+async function buildFooterReferenceImages(): Promise<string[]> {
+  const refs: string[] = [];
+  const assets = await Promise.allSettled([
+    loadImageElement("/logo.png"),
+    loadImageElement("/qr-links.svg"),
+  ]);
+
+  for (const asset of assets) {
+    if (asset.status === "fulfilled") {
+      refs.push(await imageToDataUrl(asset.value));
+    }
+  }
+
+  return refs;
+}
+
+function loadImageElement(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("image load failed"));
+    img.src = src;
+  });
+}
+
+function imageToDataUrl(img: HTMLImageElement): Promise<string> {
+  const canvas = document.createElement("canvas");
+  canvas.width = img.naturalWidth || img.width || 512;
+  canvas.height = img.naturalHeight || img.height || 512;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return Promise.reject(new Error("canvas context unavailable"));
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return Promise.resolve(canvas.toDataURL("image/png"));
+}
+
+function extensionForImageUrl(imageUrl: string): "png" | "jpg" | "webp" {
+  if (imageUrl.startsWith("data:image/jpeg")) return "jpg";
+  if (imageUrl.startsWith("data:image/webp")) return "webp";
+  return "png";
 }
 
 // ── 컴포넌트 ───────────────────────────────────────────

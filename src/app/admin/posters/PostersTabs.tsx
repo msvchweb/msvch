@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, Sparkles, Wand2 } from "lucide-react";
+import { BookOpen, Sparkles } from "lucide-react";
 import { PromptBuilder } from "./PromptBuilder";
-import { Finalizer } from "./Finalizer";
 import { BookRecommendationAutomation } from "./BookRecommendationAutomation";
 import type { PosterRatio, PromptBuilderInput } from "@/lib/poster-prompts";
 
-type Tab = "prompt" | "finalize" | "book";
+type Tab = "prompt" | "book";
 
 export interface SharedPosterData {
   ratio: PosterRatio;
@@ -19,12 +18,6 @@ export interface SharedPosterData {
 
 export function PostersTabs() {
   const [tab, setTab] = useState<Tab>("prompt");
-  const [sharedData, setSharedData] = useState<SharedPosterData | null>(null);
-
-  const handleTransferToFinalize = (data: SharedPosterData) => {
-    setSharedData(data);
-    setTab("finalize");
-  };
 
   return (
     <div>
@@ -38,14 +31,6 @@ export function PostersTabs() {
           dataTour="poster-prompt-tab"
         />
         <TabButton
-          active={tab === "finalize"}
-          onClick={() => setTab("finalize")}
-          icon={<Wand2 size={14} />}
-          label="footer 마무리"
-          hint="AI 이미지에 교회 footer를 합성하고 PNG 저장 또는 공지 등록을 진행합니다."
-          dataTour="poster-finalize-tab"
-        />
-        <TabButton
           active={tab === "book"}
           onClick={() => setTab("book")}
           icon={<BookOpen size={14} />}
@@ -55,10 +40,7 @@ export function PostersTabs() {
       </div>
 
       <div className={tab === "prompt" ? "" : "hidden"} aria-hidden={tab !== "prompt"}>
-        <PromptBuilder onTransfer={handleTransferToFinalize} />
-      </div>
-      <div className={tab === "finalize" ? "" : "hidden"} aria-hidden={tab !== "finalize"}>
-        <Finalizer sharedData={sharedData} />
+        <PromptBuilder />
       </div>
       <div className={tab === "book" ? "" : "hidden"} aria-hidden={tab !== "book"}>
         <BookRecommendationAutomation />
@@ -99,4 +81,3 @@ function TabButton({
     </button>
   );
 }
-
