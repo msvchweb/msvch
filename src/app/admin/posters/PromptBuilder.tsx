@@ -203,11 +203,17 @@ export function PromptBuilder() {
   // GPT 이미지 직접 생성/수정 관련
   const [generatingImage, setGeneratingImage] = useState(false);
   const [dalleImageUrl, setDalleImageUrl] = useState<string | null>(null);
+  const [selectedImageId, setSelectedImageId] = useState<string | null>(null);
   const [revisionInstruction, setRevisionInstruction] = useState("");
   const [imageHistory, setImageHistory] = useState<GeneratedPosterImage[]>([]);
   const [savedPrompts, setSavedPrompts] = useState<SavedPosterPrompt[]>([]);
   const [noticeDraftData, setNoticeDraftData] = useState<SharedPosterData | null>(null);
   const [noticeDraftImg, setNoticeDraftImg] = useState<HTMLImageElement | null>(null);
+  const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const selectedImage = selectedImageId
+    ? imageHistory.find((item) => item.id === selectedImageId)
+    : null;
+  const currentPreviewImageUrl = selectedImage?.imageUrl ?? dalleImageUrl;
 
   // 미리보기 URL 생명주기 관리
   useEffect(() => {
@@ -347,6 +353,7 @@ export function PromptBuilder() {
     });
     setCopied(false);
     setDalleImageUrl(null);
+    setSelectedImageId(null);
     setRevisionInstruction("");
     setImageHistory([]);
     requestAnimationFrame(() => {
@@ -367,6 +374,7 @@ export function PromptBuilder() {
     setLoading(true);
     setCopied(false);
     setDalleImageUrl(null); // 새 프롬프트 뽑으면 이전 생성 결과 리셋
+    setSelectedImageId(null);
     setRevisionInstruction("");
     setImageHistory([]);
     try {
@@ -431,7 +439,7 @@ export function PromptBuilder() {
   ) {
     if (!result?.englishPrompt) return;
     const instruction = (instructionOverride ?? revisionInstruction).trim();
-    if (mode === "revise" && !dalleImageUrl) {
+    if (mode === "revise" && !currentPreviewImageUrl) {
       alert("먼저 수정할 이미지를 생성해 주세요.");
       return;
     }
@@ -445,7 +453,7 @@ export function PromptBuilder() {
       const footerReferenceImages = await buildFooterReferenceImages();
       const sourceImageDataUrls =
         mode === "revise"
-          ? [dalleImageUrl!, ...footerReferenceImages]
+          ? [currentPreviewImageUrl!, ...footerReferenceImages]
           : footerReferenceImages;
       const apiMode = sourceImageDataUrls.length > 0 ? "revise" : "generate";
       const footerRevisionInstruction =
@@ -478,17 +486,16 @@ Keep this as one complete Korean church poster. Preserve the Korean poster text 
         alert("이미지 데이터를 받지 못했습니다.");
         return;
       }
+      const generatedItem: GeneratedPosterImage = {
+        id: `${Date.now()}-${imageHistory.length}`,
+        imageUrl: data.imageUrl,
+        source: mode,
+        instruction: mode === "revise" ? instruction : undefined,
+        createdAt: Date.now(),
+      };
       setDalleImageUrl(data.imageUrl);
-      setImageHistory((prev) => [
-        {
-          id: `${Date.now()}-${prev.length}`,
-          imageUrl: data.imageUrl!,
-          source: mode,
-          instruction: mode === "revise" ? instruction : undefined,
-          createdAt: Date.now(),
-        },
-        ...prev,
-      ]);
+      setSelectedImageId(generatedItem.id);
+      setImageHistory((prev) => [generatedItem, ...prev]);
       if (mode === "revise") setRevisionInstruction("");
     } catch (e) {
       console.error(e);
@@ -536,21 +543,22 @@ Keep this as one complete Korean church poster. Preserve the Korean poster text 
   }
 
   function handleDownloadGeneratedImage() {
-    if (!dalleImageUrl) return;
+    if (!currentPreviewImageUrl) return;
     const link = document.createElement("a");
-    link.href = dalleImageUrl;
+    link.href = currentPreviewImageUrl;
     const safeTitle = (title.trim() || "poster").replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
-    link.download = `${safeTitle}-${ratio.replace(":", "x")}.${extensionForImageUrl(dalleImageUrl)}`;
+    const stamp = selectedImage?.createdAt ?? Date.now();
+    link.download = `${safeTitle}-${ratio.replace(":", "x")}-${stamp}.${extensionForImageUrl(currentPreviewImageUrl)}`;
     document.body.appendChild(link);
     link.click();
     link.remove();
   }
 
   async function handleOpenNoticeDraft() {
-    if (!dalleImageUrl) return;
+    if (!currentPreviewImageUrl) return;
     try {
-      const img = await loadImageElement(dalleImageUrl);
-      setNoticeDraftData(buildSharedPosterData(dalleImageUrl));
+      const img = await loadImageElement(currentPreviewImageUrl);
+      setNoticeDraftData(buildSharedPosterData(currentPreviewImageUrl));
       setNoticeDraftImg(img);
     } catch {
       alert("공지 등록용 이미지를 불러오지 못했습니다.");
@@ -1023,13 +1031,59 @@ Keep this as one complete Korean church poster. Preserve the Korean poster text 
                   </h3>
                 </div>
                 <div className="p-5 sm:p-8">
-                  {dalleImageUrl ? (
+                  {currentPreviewImageUrl ? (
                     <div className="flex flex-col items-center gap-6">
-                      <div className="relative aspect-[3/4] w-full max-w-sm overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewModalOpen(true)}
+                        className="group relative aspect-[3/4] w-full max-w-sm overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl transition hover:border-primary-300 focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        aria-label="생성 이미지 크게 보기"
+                      >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={dalleImageUrl} alt="GPT 이미지 결과" className="h-full w-full object-contain" />
-                      </div>
+                        <img
+                          src={currentPreviewImageUrl}
+                          alt="GPT 이미지 결과"
+                          className="h-full w-full object-contain"
+                        />
+                        <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/55 px-3 py-2 text-center text-xs font-semibold text-white opacity-0 transition group-hover:opacity-100">
+                          크게 보기
+                        </span>
+                      </button>
                       <div className="w-full space-y-3">
+                        {imageHistory.length > 1 && (
+                          <div className="rounded-xl border border-gray-200 bg-white p-4">
+                            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
+                              생성/수정 결과 선택
+                            </p>
+                            <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
+                              {imageHistory.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedImageId(item.id);
+                                    setDalleImageUrl(item.imageUrl);
+                                  }}
+                                  title={item.instruction || "초안 생성"}
+                                  className={cn(
+                                    "aspect-square overflow-hidden rounded-lg border bg-gray-100",
+                                    item.id === selectedImageId
+                                      ? "border-primary-600 ring-2 ring-primary-500"
+                                      : "border-gray-200 hover:border-gray-300",
+                                  )}
+                                  aria-label={item.source === "revise" ? "수정 결과 선택" : "생성 결과 선택"}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={item.imageUrl}
+                                    alt={item.source === "revise" ? "수정 결과" : "생성 결과"}
+                                    className="h-full w-full object-cover"
+                                  />
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div className="rounded-xl border border-gray-200 bg-white p-4">
                           <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-gray-400">
                             수정 요청
@@ -1067,42 +1121,12 @@ Keep this as one complete Korean church poster. Preserve the Korean poster text 
                             수정해서 다시 만들기
                           </button>
                         </div>
-                        {imageHistory.length > 1 && (
-                          <div className="rounded-xl border border-gray-200 bg-white p-4">
-                            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-400">
-                              이전 결과
-                            </p>
-                            <div className="grid grid-cols-4 gap-2">
-                              {imageHistory.map((item) => (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  onClick={() => setDalleImageUrl(item.imageUrl)}
-                                  title={item.instruction || "초안 생성"}
-                                  className={cn(
-                                    "aspect-square overflow-hidden rounded-lg border bg-gray-100",
-                                    item.imageUrl === dalleImageUrl
-                                      ? "border-primary-600 ring-2 ring-primary-500"
-                                      : "border-gray-200 hover:border-gray-300",
-                                  )}
-                                >
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src={item.imageUrl}
-                                    alt={item.source === "revise" ? "수정 결과" : "생성 결과"}
-                                    className="h-full w-full object-cover"
-                                  />
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                         <button
                           onClick={handleDownloadGeneratedImage}
                           className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-4 text-base font-bold text-white shadow-md hover:bg-emerald-700"
                         >
                           <Download size={20} />
-                          최종 이미지 다운로드
+                          현재 선택 이미지 다운로드
                         </button>
                         <button
                           onClick={handleOpenNoticeDraft}
@@ -1167,6 +1191,39 @@ Keep this as one complete Korean church poster. Preserve the Korean poster text 
           )}
         </div>
       </div>
+
+      {previewModalOpen && currentPreviewImageUrl && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+          onClick={() => setPreviewModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="생성 이미지 크게 보기"
+        >
+          <button
+            type="button"
+            onClick={(event) => {
+              event.stopPropagation();
+              setPreviewModalOpen(false);
+            }}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/95 text-gray-700 shadow-lg hover:bg-white"
+            aria-label="닫기"
+          >
+            <X size={20} />
+          </button>
+          <div
+            className="flex max-h-[90vh] max-w-[92vw] items-center justify-center"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={currentPreviewImageUrl}
+              alt="확대된 GPT 이미지 결과"
+              className="max-h-[90vh] max-w-full rounded-xl bg-white object-contain shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
 
       {noticeDraftData && noticeDraftImg && (
         <NoticeDraftModal
