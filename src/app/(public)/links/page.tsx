@@ -31,29 +31,38 @@ const links: LinkItem[] = [
     icon: 'youtube',
     description: '@msvchphoto',
   },
+];
+
+const instagramLinks: LinkItem[] = [
   {
-    label: '인스타그램 (메인)',
+    label: '메인',
     href: 'https://www.instagram.com/msvch_main',
     icon: 'instagram',
     description: '@msvch_main',
   },
   {
-    label: '인스타그램 (청년부)',
+    label: '청년부',
     href: 'https://www.instagram.com/msvch_youth/',
     icon: 'instagram',
     description: '@msvch_youth',
   },
   {
-    label: '인스타그램 (청소년부)',
+    label: '청소년부',
     href: 'https://www.instagram.com/msvch_middle/',
     icon: 'instagram',
     description: '@msvch_middle',
   },
   {
-    label: '인스타그램 (아동부)',
+    label: '아동부',
     href: 'https://www.instagram.com/msvch_children/',
     icon: 'instagram',
     description: '@msvch_children',
+  },
+  {
+    label: '영유치부',
+    href: 'https://www.instagram.com/msvch_seed?igsh=MXRzZjlzczRsb202dA%3D%3D',
+    icon: 'instagram',
+    description: '@msvch_seed',
   },
 ];
 
@@ -126,6 +135,34 @@ export default async function LinksPage() {
             </a>
           );
         })}
+
+        <section className="bg-white/5 border border-white/10 rounded-lg px-2 py-4 text-white">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="text-church-gold">
+              <InstagramIcon size={18} className="shrink-0" />
+            </span>
+            <h2 className="text-sm font-semibold leading-tight">인스타그램</h2>
+          </div>
+          <div className="grid grid-cols-5 gap-1">
+            {instagramLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`인스타그램 ${link.label}`}
+                className="group flex min-w-0 flex-col items-center gap-1 rounded-lg border border-white/10 px-0.5 py-2 text-center transition-all duration-200 hover:border-church-gold/50 hover:bg-church-gold/20"
+              >
+                <span className="text-church-gold transition-transform duration-200 group-hover:scale-110">
+                  <InstagramIcon size={18} className="shrink-0" />
+                </span>
+                <span className="w-full whitespace-nowrap text-[9px] font-medium leading-tight">
+                  {link.label}
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
       </div>
 
       {/* QR 코드 */}
