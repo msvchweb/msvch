@@ -730,16 +730,57 @@ AI 포스터 생성 메타 + 최종 PNG URL (마이그레이션 026).
 | `linked_event_id` | `uuid` | `events.id` ON DELETE SET NULL (Phase 2 연결용, 현재 NULL) |
 | `linked_notice_id` | `uuid` | `notices.id` ON DELETE SET NULL (Phase 2 연결용, 현재 NULL) |
 | `cost_cents` | `int` | 생성 비용 (선택) |
+| `current_version_id` | `uuid` | 최신 저장본 (`poster_versions.id`) |
+
+**RLS 정책**:
+- SELECT: staff (`is_staff()`)
+- INSERT: staff + (`created_by IS NULL OR created_by = auth.uid()`)
+- UPDATE: staff (`is_staff()`) — 저장된 포스터 이어 수정 시 최신 버전 갱신
+- DELETE: 작성자 본인 OR admin/master
+
+**인덱스**: `idx_posters_created_at (created_at DESC)`, `idx_posters_created_by (created_by, created_at DESC)`
+
+**현재 사용 상태**:
+포스터 도구의 `이미지 만들기`, `추천도서자동화` 탭에서 다운로드한 최종본을 `poster-images` Storage에 저장하고, `posters.final_image_url/current_version_id`를 최신 저장본으로 동기화한다. 저장된 결과는 `저장된 포스터` 탭에서 이어 수정할 수 있다.
+
+---
+
+### `poster_versions`
+
+포스터 저장본 버전 이력 (마이그레이션 045).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `poster_id` | `uuid NOT NULL` | `posters.id` ON DELETE CASCADE |
+| `version_no` | `int NOT NULL` | 포스터별 1부터 증가 |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+| `created_by` | `uuid` | `auth.users.id` ON DELETE SET NULL |
+| `created_by_name` | `text` | 작성 시점 닉네임 스냅샷 |
+| `source_type` | `text NOT NULL CHECK` | `generated` \| `revised` \| `uploaded` \| `book_recommendation` |
+| `image_url` | `text NOT NULL` | 저장본 공개 URL |
+| `thumbnail_url` | `text` | 목록용 썸네일 URL |
+| `storage_path` | `text NOT NULL` | 원본 Storage path |
+| `thumbnail_storage_path` | `text` | 썸네일 Storage path |
+| `prompt_used` | `text` | 생성/수정 기준 프롬프트 |
+| `revision_instruction` | `text` | 수정 요청 문구 |
+| `input_version_id` | `uuid` | 직전 기준 버전 |
+| `mime_type` | `text NOT NULL DEFAULT 'image/png'` | |
+| `width` / `height` | `int` | 이미지 크기 |
+| `file_size_bytes` | `int` | 저장 파일 크기 |
+| `model` / `quality` / `size` | `text` | OpenAI 이미지 생성 메타 |
+| `estimated_cost_cents` | `int` | 추정 비용 |
+
+**제약/인덱스**:
+- `unique (poster_id, version_no)`
+- `version_no > 0`
+- `idx_poster_versions_poster_created_at (poster_id, created_at DESC)`
+- `idx_poster_versions_created_at (created_at DESC)`
 
 **RLS 정책**:
 - SELECT: staff (`is_staff()`)
 - INSERT: staff + (`created_by IS NULL OR created_by = auth.uid()`)
 - UPDATE/DELETE: 작성자 본인 OR admin/master
-
-**인덱스**: `idx_posters_created_at (created_at DESC)`, `idx_posters_created_by (created_by, created_at DESC)`
-
-**현재 사용 상태 (피벗 후)**:
-2026-05-06 피벗 — Gemini 이미지 모델 직접 호출은 무료 티어 quota 한계로 포기. 대신 **프롬프트 빌더**가 영문 프롬프트만 만들어 사용자가 자기 AI 도구(ChatGPT/Gemini/Midjourney 등)에 붙여 이미지를 생성하고, **이미지 마무리 합성기**가 그 결과 이미지에 한글 텍스트·교회 푸터를 합성한다. **테이블·로그·Storage 버킷은 026에서 만들어졌으나 현재 표시·저장 흐름과 연결되지 않음**. Phase 2 에서 events/notices 와 양방향 연결 시 활성화 예정.
 
 ---
 
@@ -949,7 +990,7 @@ interface ShortsClip {
 | `shorts` | public | 쇼츠 mp4 (임시, 발행 후 삭제 가능) |
 | `blog-images` | public | 네이버 블로그 동기화 이미지 + 관리자 UI 히어로 이미지 (notices/churchschool_posts 첨부, 홈 히어로 슬라이더 소스) |
 | `board-images` | public | 소모임 게시판 글 첨부 이미지 (마이그레이션 025). 5MB 제한, jpg/png/webp/gif. 멤버만 업로드/삭제 |
-| `poster-images` | public | AI 포스터 이미지 (마이그레이션 026). 10MB 제한, png/jpeg/webp. staff 만 업로드/수정/삭제. 피벗 이후 현재 표시 흐름과 미연결 (Phase 2 대기) |
+| `poster-images` | public | 포스터 최종본/버전 이미지 (마이그레이션 026, 045). 10MB 제한, png/jpeg/webp. staff 만 업로드/수정/삭제 |
 
 각 버킷 정책: 누구나 읽기, admin만 업로드/삭제. `shorts` 버킷은 service_role도 업로드/삭제 가능 (GitHub Actions용).
 `blog-images`는 service_role(네이버 블로그 sync 스크립트) + staff(`is_staff()`, 마이그레이션 016)이 업로드/수정/삭제 가능.
@@ -994,7 +1035,7 @@ interface ShortsClip {
 | `023_alimtalk_subscribers.sql` | event_subscribers + alimtalk_sent (카카오 비즈 알림톡 인프라) |
 | `024_new_family_registrations.sql` | new_family_registrations 테이블 (공개 새가족 등록 폼 — 누구나 INSERT, staff SELECT/UPDATE, admin/master DELETE) |
 | `025_boards.sql` | 소모임 게시판 시스템 — boards/board_members/board_posts/board_comments + is_board_member/can_view_board 헬퍼 + storage 버킷 board-images. ad-hoc 멤버 모델 (admin 이 제목 입력해 신설 + 멤버 임의 지정 + is_visible 토글로 숨김) |
-| `026_posters.sql` | AI 포스터 인프라 — posters/poster_generations_log + storage 버킷 poster-images. 2026-05-06 피벗 이후 직접 호출 제거되어 표시·저장 흐름과 현재 미연결 (Phase 2 대기) |
+| `026_posters.sql` | AI 포스터 인프라 — posters/poster_generations_log + storage 버킷 poster-images |
 | `027_drop_weekly_legacy_fields.sql` | weeklies.hymn_number, weeklies.scripture (최상위) DROP — 신규 worship_items 기반 렌더로 통합 |
 | `028_weeklies_afternoon_mokjang_mode.sql` | weeklies.afternoon_mokjang_mode boolean — 페이지2 좌상단 셀을 목장모임 이미지로 대체하는 토글 |
 | `029_weeklies_special_offering.sql` | weeklies.special_offering jsonb — 헌금 4번째 슬롯(부활감사 자리)을 토글/라벨 변경 가능한 특별헌금으로 분리 |
@@ -1007,3 +1048,4 @@ interface ShortsClip {
 | `036_drop_weeklies_pdf_url.sql` | weeklies.pdf_url 컬럼 DROP — PDF 자동 생성 라우트가 모든 호출 동선을 잃어 dead 상태. 컬럼/라우트/puppeteer 의존성(@sparticuz/chromium*, puppeteer-core) 일괄 정리. Storage 버킷 'weeklies' 와 정책은 보존 |
 | `037_align_rls_with_ui_matrix.sql` | UI 매트릭스(`src/lib/admin-permissions.ts`)와 RLS 일치. notices / weeklies(+storage) / weekly masters(church_settings·mokjang_entries·servants·support_sections·community_prayers) / events INSERT·UPDATE / event_subscribers SELECT / alimtalk_sent SELECT / chat_inquiries SELECT / new_family_registrations SELECT·UPDATE / storage 'blog-images' 의 staff 정책을 `is_admin_or_master()` 로 좁힘. 공개 SELECT, 작성자 본인 DELETE(021), anon INSERT(chat/new-family) 흐름은 보존 |
 | `038_weekly_imports.sql` | `weekly_imports` 테이블 — 주보 HWP/HWPX 자동 채우기 업로드·변환·파싱 추적. status enum 5개 (uploaded/converting/parsing/parsed/failed), source_format CHECK (hwp/hwpx), RLS admin/master 전용 (037 매트릭스 일치), `touch_weekly_imports_updated_at()` 트리거, retention/status 인덱스. Storage 는 기존 'weeklies' 버킷의 `imports/` 폴더 재사용. 7일 초과는 매일 04:00 KST cron 으로 정리 |
+| `045_poster_versions.sql` | 포스터 저장본 버전 이력 — poster_versions + posters.current_version_id. 다운로드한 최종본과 업로드 seed를 `poster-images` Storage에 저장하고 이어 수정 가능 |

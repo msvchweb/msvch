@@ -17,6 +17,11 @@ import {
   drawCover,
 } from "@/lib/poster-footer";
 import type { PosterRatio } from "@/lib/poster-prompts";
+import {
+  downloadBlob,
+  safePosterFilename,
+  savePosterVersion,
+} from "@/lib/poster-storage";
 import type {
   BookRecommendationDraft,
   BookSourceData,
@@ -67,6 +72,8 @@ export function BookRecommendationAutomation() {
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [revisionText, setRevisionText] = useState("");
+  const [posterId, setPosterId] = useState<string | null>(null);
+  const [lastSavedVersionId, setLastSavedVersionId] = useState<string | null>(null);
 
   const previewRef = useRef<HTMLCanvasElement>(null);
   const supabase = createClient();
@@ -113,6 +120,8 @@ export function BookRecommendationAutomation() {
     setLoading("extract");
     setBackgroundUrl(null);
     setMessages([]);
+    setPosterId(null);
+    setLastSavedVersionId(null);
     try {
       const extractRes = await fetch("/api/admin/book-recommendations/extract", {
         method: "POST",
@@ -277,14 +286,32 @@ Keep this as one complete Korean church book recommendation poster. Preserve the
       const blob = await renderToBlob(ratio);
       if (!blob) throw new Error("최종 포스터 이미지를 만들지 못했습니다.");
 
-      const objectUrl = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = objectUrl;
-      link.download = `book-recommendation-${periodLabel}-${Date.now()}.png`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(objectUrl);
+      const filename = `${safePosterFilename(draft.posterTitle, "book-recommendation")}-${ratio.replace(":", "x")}-${Date.now()}.png`;
+      downloadBlob(blob, filename);
+
+      try {
+        const saved = await savePosterVersion({
+          supabase,
+          blob,
+          title: draft.posterTitle || draft.noticeTitle || "추천도서 포스터",
+          category: "notice",
+          ratio,
+          sourceType: "book_recommendation",
+          promptUsed: buildCompletePosterPrompt(book, draft, ratio, periodLabel),
+          bodyText: draft.posterSubtitle,
+          revisionInstruction: messages.filter((message) => message.role === "user").at(-1)?.content ?? null,
+          posterId,
+          inputVersionId: lastSavedVersionId,
+          model: "gpt-image-2",
+          quality: "medium",
+          size: ratio,
+        });
+        setPosterId(saved.posterId);
+        setLastSavedVersionId(saved.versionId);
+      } catch (saveError) {
+        console.error(saveError);
+        setError("로컬 다운로드는 완료됐지만 저장된 포스터 목록에 업로드하지 못했습니다.");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "포스터 다운로드 중 오류가 발생했습니다.");
     } finally {

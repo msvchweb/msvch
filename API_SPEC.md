@@ -1010,11 +1010,13 @@ Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. b
 
 ## 포스터 도구
 
-행사·공지용 포스터 생성을 두 단계로 분리:
-1. **프롬프트 빌더** — 칩으로 입력한 행사 정보·스타일을 Gemini 텍스트 모델로 영문 이미지 프롬프트로 변환. 사용자가 복사해 자기 AI 이미지 도구(ChatGPT/Gemini/Midjourney/DALL·E 등)에 붙여 이미지를 만든다.
-2. **이미지 마무리** — 만들어 온 이미지에 한글 텍스트 오버레이 + 교회 푸터(로고·전화·QR)를 클라이언트 Canvas 로 합성해 PNG 다운로드.
+행사·공지용 포스터 생성/수정 도구. 관리자 화면은 세 탭으로 구성된다.
 
-피벗 메모(2026-05-06): 무료 티어 이미지 생성 quota=0 이라 직접 이미지 생성은 서버에서 하지 않음. 마이그레이션 026 의 `posters` 테이블·`poster-images` 버킷은 향후 통합용으로 남겨두었으나 현재 표시·저장 흐름엔 연결되지 않음.
+1. **이미지 만들기** — 행사 정보·스타일을 영문 이미지 프롬프트로 변환하고, GPT 이미지 API로 생성/수정한다.
+2. **추천도서자동화** — 도서 URL에서 추천도서 포스터 초안을 만들고, GPT 이미지 API로 배경 생성/수정 후 최종 캔버스를 다운로드한다.
+3. **저장된 포스터** — 다운로드 시 `poster-images` Storage와 `posters/poster_versions`에 저장된 최종본 목록을 조회하고, 기존 버전 또는 업로드한 이미지에서 수정 프롬프트를 이어간다.
+
+다운로드 버튼은 로컬 파일 다운로드를 먼저 실행한 뒤 저장된 포스터 목록용 Storage 업로드/DB 저장을 시도한다. 저장 실패가 발생해도 로컬 다운로드는 유지된다.
 
 ### POST `/api/posters/build-prompt`
 
@@ -1073,6 +1075,53 @@ Storage RLS 가 멤버 여부 검증 — 비멤버는 upload 시점에 차단. b
   5. `callGeminiWithFallbackMultimodal()` 호출 — Gemini 텍스트 모델이 영문 프롬프트 작성
   6. `sanitizePromptOutput()` — 모델이 끼우는 머리말/따옴표/마크다운 제거
   7. `buildKoreanSummary(input)` 으로 한국어 요약 생성
+
+### POST `/api/posters/generate-image`
+
+GPT 이미지 API로 포스터 이미지를 생성하거나 기존 이미지를 수정한다. 포스터 도구의 `이미지 만들기`, `추천도서자동화`, `저장된 포스터` 탭이 공통으로 사용한다.
+
+- **인증**: staff/admin/master (`requireAdmin()`)
+- **요청 형식**: `application/json`
+- **입력 요약**:
+  - `prompt` — 영문 이미지 프롬프트
+  - `ratio` — `"1:1"` \| `"9:16"` \| `"a4"`
+  - `artStyle` — `poster-prompts.ts`의 `ART_STYLES`
+  - `mode` — `"generate"` \| `"revise"`
+  - `revisionInstruction` — 수정 모드 설명
+  - `sourceImageDataUrls` — 수정/참고 이미지 data URL 배열, 최대 6장
+  - `includeFooterContent`, `posterTitle`, `posterCategory`
+- **응답**: `{ imageUrl, imageBase64?, mimeType?, revisedPrompt? }`
+- **저장 주의**: 이 route는 이미지를 생성만 한다. `posters/poster_versions` 저장은 관리자 클라이언트가 다운로드 시 `poster-images` Storage와 DB에 기록한다.
+
+---
+
+### GET `/api/admin/openai/monthly-spend`
+
+포스터 도구 상단에 표시할 OpenAI API 해당 월 총 사용 금액을 조회한다.
+
+- **인증**: staff/admin/master (`requireAdmin()`)
+- **환경 변수**:
+  - `OPENAI_ADMIN_KEY` — OpenAI Organization Admin API key. 클라이언트에 노출 금지.
+  - `OPENAI_PROJECT_ID` — 선택. 설정 시 프로젝트 비용만 필터링.
+- **처리**:
+  1. Asia/Seoul 기준 현재 월 시작/다음 달 시작 Unix seconds 계산
+  2. OpenAI Costs API `/v1/organization/costs` 호출
+  3. `bucket.results[].amount.value` 합산
+- **응답**:
+
+```json
+{
+  "totalUsd": 0,
+  "currency": "usd",
+  "monthLabel": "7월",
+  "startTime": 1782831600,
+  "endTime": 1785510000
+}
+```
+
+UI는 실패 시 포스터 도구 전체를 깨뜨리지 않고 `총 사용량 - / 7월` 형태로 표시한다.
+
+---
 
 ### POST `/api/admin/weeklies/[id]/extract-events`
 
@@ -1342,8 +1391,10 @@ Vercel Cron — 매일 04:00 KST (UTC 19:00). 7일 초과한 weekly_imports 행�
 | POST `/api/boards/[id]/posts` | `BoardPostSchema` | 글 작성 (이미지 URL board-images 버킷 강제) |
 | PATCH `/api/boards/[id]/posts/[postId]` | `BoardPostPatchSchema` | 본인 글 수정 |
 | POST `/api/boards/[id]/posts/[postId]/comments` | `BoardCommentSchema` | 댓글 작성 |
-| POST `/api/posters/build-prompt` | route 내부 Zod (`PayloadSchema`) | 포스터 영문 프롬프트 생성. multipart payload+reference. (마이그레이션 026 — 현재 DB 미연결) |
+| POST `/api/posters/build-prompt` | route 내부 Zod (`PayloadSchema`) | 포스터 영문 프롬프트 생성. multipart payload+reference |
+| POST `/api/posters/generate-image` | route 내부 Zod (`RequestSchema`) | GPT 이미지 생성/수정. 저장은 다운로드 시 클라이언트가 `poster_versions`에 기록 |
 | GET `/api/posters/proxy-image` | URL 검증 + SSRF 차단 | 외부 이미지 origin 우회 |
+| GET `/api/admin/openai/monthly-spend` | Admin auth + 서버 env | OpenAI Costs API 월 총액 조회 |
 | POST `/api/admin/weeklies/[id]/extract-events` | UUID 검증 + 응답 시 `ExtractEventsResponseSchema` | Gemini 응답 JSON 강제, 마이그레이션 034 |
 | POST `/api/admin/calendar/batch` | `EventBatchInsertSchema` (1~30건) | AI 추출 검수 통과 일괄 INSERT, 207 partial 가능 |
 

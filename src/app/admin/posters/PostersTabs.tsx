@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, Sparkles } from "lucide-react";
+import { BookOpen, Images, Sparkles } from "lucide-react";
 import { PromptBuilder } from "./PromptBuilder";
 import { BookRecommendationAutomation } from "./BookRecommendationAutomation";
+import { SavedPosters } from "./SavedPosters";
 import type { PosterRatio, PromptBuilderInput } from "@/lib/poster-prompts";
 
-type Tab = "prompt" | "book";
+type Tab = "prompt" | "book" | "saved";
 
 export interface SharedPosterData {
   ratio: PosterRatio;
@@ -37,6 +38,13 @@ export function PostersTabs() {
           label="추천도서 자동화"
           hint="YES24 도서 URL로 추천도서 포스터와 공지사항 초안을 만듭니다."
         />
+        <TabButton
+          active={tab === "saved"}
+          onClick={() => setTab("saved")}
+          icon={<Images size={14} />}
+          label="저장된 포스터"
+          hint="다운로드하며 저장된 포스터를 보고 이어 수정합니다."
+        />
       </div>
 
       <div className={tab === "prompt" ? "" : "hidden"} aria-hidden={tab !== "prompt"}>
@@ -44,6 +52,9 @@ export function PostersTabs() {
       </div>
       <div className={tab === "book" ? "" : "hidden"} aria-hidden={tab !== "book"}>
         <BookRecommendationAutomation />
+      </div>
+      <div className={tab === "saved" ? "" : "hidden"} aria-hidden={tab !== "saved"}>
+        <SavedPosters />
       </div>
     </div>
   );

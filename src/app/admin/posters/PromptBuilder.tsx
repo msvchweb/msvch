@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import {
   Sparkles,
   Loader2,
@@ -53,6 +53,13 @@ import {
   type ReferenceAspect,
 } from "@/lib/poster-prompts";
 import type { SharedPosterData } from "./PostersTabs";
+import { createClient } from "@/lib/supabase/client";
+import {
+  dataUrlToBlob,
+  downloadBlob,
+  safePosterFilename,
+  savePosterVersion,
+} from "@/lib/poster-storage";
 import { cn } from "@/lib/utils";
 
 interface BuildPromptResponse {
@@ -162,6 +169,7 @@ const TARGET_TOOLS: { name: string; href: string; hint: string }[] = [
 ];
 
 export function PromptBuilder() {
+  const supabase = useMemo(() => createClient(), []);
   const [category, setCategory] = useState<PosterCategory>("event");
   const [ratio, setRatio] = useState<PosterRatio>("a4");
   const [title, setTitle] = useState("");
@@ -210,6 +218,9 @@ export function PromptBuilder() {
   const [noticeDraftData, setNoticeDraftData] = useState<SharedPosterData | null>(null);
   const [noticeDraftImg, setNoticeDraftImg] = useState<HTMLImageElement | null>(null);
   const [previewModalOpen, setPreviewModalOpen] = useState(false);
+  const [savingPoster, setSavingPoster] = useState(false);
+  const [posterId, setPosterId] = useState<string | null>(null);
+  const [lastSavedVersionId, setLastSavedVersionId] = useState<string | null>(null);
   const selectedImage = selectedImageId
     ? imageHistory.find((item) => item.id === selectedImageId)
     : null;
@@ -356,6 +367,8 @@ export function PromptBuilder() {
     setSelectedImageId(null);
     setRevisionInstruction("");
     setImageHistory([]);
+    setPosterId(null);
+    setLastSavedVersionId(null);
     requestAnimationFrame(() => {
       resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
@@ -377,6 +390,8 @@ export function PromptBuilder() {
     setSelectedImageId(null);
     setRevisionInstruction("");
     setImageHistory([]);
+    setPosterId(null);
+    setLastSavedVersionId(null);
     try {
       // 구조화 부가 정보 정리
       const cleanedSchedules = schedules.map((s) => s.trim()).filter((s) => s.length > 0);
@@ -542,16 +557,40 @@ Keep this as one complete Korean church poster. Preserve the Korean poster text 
     };
   }
 
-  function handleDownloadGeneratedImage() {
+  async function handleDownloadGeneratedImage() {
     if (!currentPreviewImageUrl) return;
-    const link = document.createElement("a");
-    link.href = currentPreviewImageUrl;
-    const safeTitle = (title.trim() || "poster").replace(/[\\/:*?"<>|]/g, "_").slice(0, 40);
+    const blob = await dataUrlToBlob(currentPreviewImageUrl);
     const stamp = selectedImage?.createdAt ?? Date.now();
-    link.download = `${safeTitle}-${ratio.replace(":", "x")}-${stamp}.${extensionForImageUrl(currentPreviewImageUrl)}`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    const filename = `${safePosterFilename(title.trim() || "poster")}-${ratio.replace(":", "x")}-${stamp}.${extensionForImageUrl(currentPreviewImageUrl)}`;
+    downloadBlob(blob, filename);
+
+    setSavingPoster(true);
+    try {
+      const sharedPosterData = buildSharedPosterData(currentPreviewImageUrl);
+      const saved = await savePosterVersion({
+        supabase,
+        blob,
+        title: title.trim() || "포스터",
+        category,
+        ratio,
+        sourceType: selectedImage?.source === "revise" ? "revised" : "generated",
+        promptUsed: result?.englishPrompt ?? "Generated poster image",
+        bodyText: sharedPosterData.bodyText,
+        revisionInstruction: selectedImage?.instruction ?? null,
+        posterId,
+        inputVersionId: selectedImage?.source === "revise" ? lastSavedVersionId : null,
+        model: "gpt-image-2",
+        quality: "medium",
+        size: ratio,
+      });
+      setPosterId(saved.posterId);
+      setLastSavedVersionId(saved.versionId);
+    } catch (err) {
+      console.error(err);
+      alert("로컬 다운로드는 완료됐지만 저장된 포스터 목록에 업로드하지 못했습니다.");
+    } finally {
+      setSavingPoster(false);
+    }
   }
 
   async function handleOpenNoticeDraft() {
@@ -1123,10 +1162,11 @@ Keep this as one complete Korean church poster. Preserve the Korean poster text 
                         </div>
                         <button
                           onClick={handleDownloadGeneratedImage}
-                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-4 text-base font-bold text-white shadow-md hover:bg-emerald-700"
+                          disabled={savingPoster}
+                          className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 py-4 text-base font-bold text-white shadow-md hover:bg-emerald-700 disabled:bg-gray-300"
                         >
-                          <Download size={20} />
-                          현재 선택 이미지 다운로드
+                          {savingPoster ? <Loader2 className="animate-spin" size={20} /> : <Download size={20} />}
+                          {savingPoster ? "저장 중..." : "현재 선택 이미지 다운로드"}
                         </button>
                         <button
                           onClick={handleOpenNoticeDraft}
