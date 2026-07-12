@@ -22,7 +22,7 @@ export function PostersTabs() {
 
   return (
     <div>
-      <div className="mb-5 flex gap-1 overflow-x-auto border-b border-gray-200">
+      <div className="mb-5 grid grid-cols-3 gap-1 border-b border-gray-200 sm:flex">
         <TabButton
           active={tab === "prompt"}
           onClick={() => setTab("prompt")}
@@ -81,14 +81,14 @@ function TabButton({
       onClick={onClick}
       title={hint}
       data-tour={dataTour}
-      className={`flex shrink-0 items-center gap-1.5 px-4 py-2.5 text-sm transition-colors ${
+      className={`flex min-w-0 items-center justify-center gap-1 px-1.5 py-2.5 text-xs transition-colors sm:shrink-0 sm:justify-start sm:gap-1.5 sm:px-4 sm:text-sm ${
         active
           ? "border-b-2 border-primary-600 font-semibold text-primary-700"
           : "border-b-2 border-transparent text-gray-500 hover:text-gray-800"
       }`}
     >
       {icon}
-      {label}
+      <span className="truncate">{label}</span>
     </button>
   );
 }
