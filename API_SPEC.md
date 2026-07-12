@@ -1103,8 +1103,8 @@ GPT 이미지 API로 포스터 이미지를 생성하거나 기존 이미지를 
 - **환경 변수**:
   - `OPENAI_ADMIN_KEY` — OpenAI Organization Admin API key. 클라이언트에 노출 금지.
 - **처리**:
-  1. Asia/Seoul 기준 현재 월 시작/다음 달 시작 Unix seconds 계산
-  2. OpenAI Costs API `/v1/organization/costs` 호출로 조직 전체 비용 조회
+  1. Asia/Seoul 기준 현재 월 시작 Unix seconds 계산
+  2. OpenAI Costs API `/v1/organization/costs` 호출로 현재 시점까지의 조직 전체 비용 조회
   3. `bucket.results[].amount.value` 합산
 - **응답**:
 
@@ -1113,8 +1113,7 @@ GPT 이미지 API로 포스터 이미지를 생성하거나 기존 이미지를 
   "totalUsd": 0,
   "currency": "usd",
   "monthLabel": "7월",
-  "startTime": 1782831600,
-  "endTime": 1785510000
+  "startTime": 1782831600
 }
 ```
 

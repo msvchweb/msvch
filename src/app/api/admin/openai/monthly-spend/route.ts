@@ -14,6 +14,7 @@ interface CostBucket {
 
 interface CostsResponse {
   data?: CostBucket[];
+  next_page?: string | null;
   error?: { message?: string };
 }
 
@@ -29,28 +30,9 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { startTime, endTime, monthLabel } = getCurrentKoreanMonthRange();
-    const url = new URL("https://api.openai.com/v1/organization/costs");
-    url.searchParams.set("start_time", String(startTime));
-    url.searchParams.set("end_time", String(endTime));
-    url.searchParams.set("bucket_width", "1d");
-    url.searchParams.set("limit", "31");
-
-    const response = await fetch(url, {
-      headers: {
-        Authorization: `Bearer ${adminKey}`,
-        "Content-Type": "application/json",
-      },
-      cache: "no-store",
-    });
-    const data = (await response.json().catch(() => ({}))) as CostsResponse;
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: data.error?.message ?? "OpenAI 비용 조회에 실패했습니다." },
-        { status: response.status },
-      );
-    }
+    const { startTime, monthLabel } = getCurrentKoreanMonthRange();
+    const { data, error, status } = await fetchMonthlyCosts(adminKey, startTime);
+    if (error) return NextResponse.json({ error }, { status });
 
     let totalUsd = 0;
     let currency = "usd";
@@ -67,7 +49,6 @@ export async function GET(request: NextRequest) {
       currency,
       monthLabel,
       startTime,
-      endTime,
     });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -81,9 +62,43 @@ export async function GET(request: NextRequest) {
   }
 }
 
+async function fetchMonthlyCosts(
+  adminKey: string,
+  startTime: number,
+): Promise<{ data: CostsResponse; status: number; error?: string }> {
+  const headers = {
+    Authorization: `Bearer ${adminKey}`,
+    "Content-Type": "application/json",
+  };
+  const allBuckets: CostBucket[] = [];
+  let page: string | null | undefined;
+
+  do {
+    const url = new URL("https://api.openai.com/v1/organization/costs");
+    url.searchParams.set("start_time", String(startTime));
+    url.searchParams.set("bucket_width", "1d");
+    url.searchParams.set("limit", "31");
+    if (page) url.searchParams.set("page", page);
+
+    const response = await fetch(url, { headers, cache: "no-store" });
+    const data = (await response.json().catch(() => ({}))) as CostsResponse;
+    if (!response.ok) {
+      return {
+        data,
+        status: response.status,
+        error: data.error?.message ?? "OpenAI 비용 조회에 실패했습니다.",
+      };
+    }
+
+    allBuckets.push(...(data.data ?? []));
+    page = data.next_page;
+  } while (page);
+
+  return { data: { data: allBuckets }, status: 200 };
+}
+
 function getCurrentKoreanMonthRange(): {
   startTime: number;
-  endTime: number;
   monthLabel: string;
 } {
   const parts = new Intl.DateTimeFormat("en-US", {
@@ -93,12 +108,9 @@ function getCurrentKoreanMonthRange(): {
   }).formatToParts(new Date());
   const year = Number(parts.find((part) => part.type === "year")?.value);
   const month = Number(parts.find((part) => part.type === "month")?.value);
-  const nextYear = month === 12 ? year + 1 : year;
-  const nextMonth = month === 12 ? 1 : month + 1;
 
   return {
     startTime: Math.floor(Date.UTC(year, month - 1, 1, -9) / 1000),
-    endTime: Math.floor(Date.UTC(nextYear, nextMonth - 1, 1, -9) / 1000),
     monthLabel: `${month}월`,
   };
 }

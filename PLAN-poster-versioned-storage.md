@@ -180,8 +180,7 @@ MVP가 아니라 최종 구현이므로, 저장/버전 생성은 서버 Route Ha
   "totalUsd": 0,
   "currency": "usd",
   "monthLabel": "7월",
-  "startTime": 1782831600,
-  "endTime": 1785510000
+  "startTime": 1782831600
 }
 ```
 
