@@ -49,7 +49,7 @@ export function OpenAIMonthlySpendBadge() {
   const monthLabel = spend?.monthLabel ?? fallbackMonth;
   const value =
     typeof spend?.totalUsd === "number"
-      ? `$${spend.totalUsd.toFixed(2)}`
+      ? formatUsd(spend.totalUsd)
       : "-";
 
   return (
@@ -57,4 +57,9 @@ export function OpenAIMonthlySpendBadge() {
       총 사용량 {value} / {monthLabel}
     </span>
   );
+}
+
+function formatUsd(value: number): string {
+  if (value > 0 && value < 0.01) return "<$0.01";
+  return `$${value.toFixed(2)}`;
 }
