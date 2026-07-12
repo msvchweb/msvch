@@ -488,7 +488,7 @@ ${referenceSection}
 1. 위 요소들을 자연스러운 영문 산문체로 엮어 한국 교회 분위기에 어울리는 영문 이미지 프롬프트를 작성하세요.
 2. ${textInstruction}
 3. **교회 footer 기본 포함** — 포스터 하단에 교회 footer를 자연스럽게 통합합니다. 영문 프롬프트에 반드시 다음 취지를 명확히 포함하세요:
-   "Integrate a polished, readable church footer naturally at the bottom of the poster. Include the church logo area, QR code area, church name '명성비전교회', phone number '02-534-0691', and address '서울 동작구 여의대방로16바길 9'. Keep the footer visually connected to the poster design while preserving strong readability. Do not invent a different church name, phone number, address, logo, or QR code."
+   "Integrate a polished, readable church footer naturally at the bottom of the poster. Include the church logo area, QR code area, church name '명성비전교회', phone number '02-534-0691', and address '서울 동작구 사당로 16바길 9'. Keep the footer visually connected to the poster design while preserving strong readability. Do not invent a different church name, phone number, address, logo, or QR code."
 4. 비율은 반드시 프롬프트에 포함: "${aiRatio}".
 5. 다음은 절대 포함하지 마세요:
    - 묘비, 무덤 위 십자가
