@@ -36,11 +36,6 @@ export async function GET(request: NextRequest) {
     url.searchParams.set("bucket_width", "1d");
     url.searchParams.set("limit", "31");
 
-    const projectId = process.env.OPENAI_PROJECT_ID;
-    if (projectId) {
-      url.searchParams.append("project_ids", projectId);
-    }
-
     const response = await fetch(url, {
       headers: {
         Authorization: `Bearer ${adminKey}`,

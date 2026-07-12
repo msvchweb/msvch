@@ -200,7 +200,7 @@ GET https://api.openai.com/v1/organization/costs
 - 일반 `OPENAI_API_KEY`가 아니라 조직 Admin API key가 필요하다.
 - `OPENAI_ADMIN_KEY`는 절대 `NEXT_PUBLIC_`로 만들지 않는다.
 - 같은 OpenAI 조직에서 다른 프로젝트도 함께 쓰면 조직 총액이 섞인다.
-- 홈페이지/포스터 비용만 보고 싶으면 OpenAI Project를 분리하고 `OPENAI_PROJECT_ID`를 추가해 `project_ids` 필터를 사용한다.
+- 포스터 도구 상단의 `총 사용량`은 조직 전체 월 비용으로 표시한다. 프로젝트별 비용은 OpenAI 대시보드에서 별도로 확인한다.
 - API 실패 시 UI 전체를 깨뜨리지 않고 `총 사용량 - / 7월` 또는 작은 오류 상태로 표시한다.
 
 ## UX 설계
