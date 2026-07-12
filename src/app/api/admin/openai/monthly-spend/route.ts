@@ -4,11 +4,15 @@ import { requireAdmin, AuthError } from "@/lib/admin-auth";
 export const dynamic = "force-dynamic";
 
 interface CostBucket {
+  start_time?: number;
+  end_time?: number;
   results?: Array<{
     amount?: {
-      value?: number;
+      value?: number | string;
       currency?: string;
     };
+    line_item?: string | null;
+    project_id?: string | null;
   }>;
 }
 
@@ -30,6 +34,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const debug = request.nextUrl.searchParams.get("debug") === "1";
     const { startTime, monthLabel } = getCurrentKoreanMonthRange();
     const { data, error, status } = await fetchMonthlyCosts(adminKey, startTime);
     if (error) return NextResponse.json({ error }, { status });
@@ -38,8 +43,8 @@ export async function GET(request: NextRequest) {
     let currency = "usd";
     for (const bucket of data.data ?? []) {
       for (const result of bucket.results ?? []) {
-        const value = result.amount?.value;
-        if (typeof value === "number") totalUsd += value;
+        const value = parseAmount(result.amount?.value);
+        if (value !== null) totalUsd += value;
         if (result.amount?.currency) currency = result.amount.currency;
       }
     }
@@ -49,6 +54,7 @@ export async function GET(request: NextRequest) {
       currency,
       monthLabel,
       startTime,
+      ...(debug ? { debug: buildDebugSummary(data) } : {}),
     });
   } catch (err) {
     if (err instanceof AuthError) {
@@ -95,6 +101,38 @@ async function fetchMonthlyCosts(
   } while (page);
 
   return { data: { data: allBuckets }, status: 200 };
+}
+
+function parseAmount(value: number | string | undefined): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function buildDebugSummary(data: CostsResponse) {
+  const buckets = data.data ?? [];
+  const results = buckets.flatMap((bucket) => bucket.results ?? []);
+  return {
+    bucketCount: buckets.length,
+    resultCount: results.length,
+    nonZeroResultCount: results.filter((result) => {
+      const value = parseAmount(result.amount?.value);
+      return value !== null && value !== 0;
+    }).length,
+    firstBuckets: buckets.slice(0, 3).map((bucket) => ({
+      startTime: bucket.start_time ?? null,
+      endTime: bucket.end_time ?? null,
+      resultCount: bucket.results?.length ?? 0,
+      results: (bucket.results ?? []).slice(0, 3).map((result) => ({
+        amount: result.amount ?? null,
+        lineItem: result.line_item ?? null,
+        projectId: result.project_id ?? null,
+      })),
+    })),
+  };
 }
 
 function getCurrentKoreanMonthRange(): {
