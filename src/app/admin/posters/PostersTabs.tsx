@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { BookOpen, Images, Sparkles } from "lucide-react";
+import { BookOpen, Images, Newspaper, Sparkles } from "lucide-react";
 import { PromptBuilder } from "./PromptBuilder";
 import { BookRecommendationAutomation } from "./BookRecommendationAutomation";
 import { SavedPosters } from "./SavedPosters";
+import { CardNewsEditor } from "./CardNewsEditor";
 import type { PosterRatio, PromptBuilderInput } from "@/lib/poster-prompts";
 
-type Tab = "prompt" | "book" | "saved";
+type Tab = "prompt" | "cardNews" | "book" | "saved";
 
 export interface SharedPosterData {
   ratio: PosterRatio;
@@ -22,7 +23,7 @@ export function PostersTabs() {
 
   return (
     <div>
-      <div className="mb-5 grid grid-cols-3 gap-1 border-b border-gray-200 sm:flex">
+      <div className="mb-5 grid grid-cols-4 gap-1 border-b border-gray-200 sm:flex">
         <TabButton
           active={tab === "prompt"}
           onClick={() => setTab("prompt")}
@@ -30,6 +31,13 @@ export function PostersTabs() {
           label="이미지 만들기"
           hint="입력값으로 이미지 프롬프트와 GPT 이미지를 생성합니다."
           dataTour="poster-prompt-tab"
+        />
+        <TabButton
+          active={tab === "cardNews"}
+          onClick={() => setTab("cardNews")}
+          icon={<Newspaper size={14} />}
+          label="카드뉴스"
+          hint="공통 배경에 여러 페이지 텍스트를 얹어 인스타 카드뉴스를 만듭니다."
         />
         <TabButton
           active={tab === "book"}
@@ -49,6 +57,9 @@ export function PostersTabs() {
 
       <div className={tab === "prompt" ? "" : "hidden"} aria-hidden={tab !== "prompt"}>
         <PromptBuilder />
+      </div>
+      <div className={tab === "cardNews" ? "" : "hidden"} aria-hidden={tab !== "cardNews"}>
+        <CardNewsEditor />
       </div>
       <div className={tab === "book" ? "" : "hidden"} aria-hidden={tab !== "book"}>
         <BookRecommendationAutomation />
