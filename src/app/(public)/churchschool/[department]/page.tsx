@@ -112,7 +112,7 @@ const departments: Record<string, DepartmentInfo> = {
       "아이들을 통하여 가정과 학교와 삶이 변화되길.",
     ],
     galleryTag: "청소년부",
-    instagram: { url: "https://www.instagram.com/msvch_middle?igsh=Y3prOHR0d2trajRn", handle: "@msvch_middle" },
+    instagram: { url: "https://www.instagram.com/p/DbApO0_pwfX/?igsh=bmRhYWtiYWNvNHR2", handle: "@msvisionch" },
   },
   youth: {
     title: "청년부",

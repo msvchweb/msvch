@@ -48,9 +48,9 @@ const instagramLinks: LinkItem[] = [
   },
   {
     label: '청소년부',
-    href: 'https://www.instagram.com/msvch_middle/',
+    href: 'https://www.instagram.com/p/DbApO0_pwfX/?igsh=bmRhYWtiYWNvNHR2',
     icon: 'instagram',
-    description: '@msvch_middle',
+    description: '@msvisionch',
   },
   {
     label: '아동부',
