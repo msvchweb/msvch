@@ -131,6 +131,7 @@ function weeklyToPrefill(w: Weekly): WeeklyContentInput {
     cumulative_total: w.cumulative_total ?? "",
     // 새 주보는 직전 주 사진을 끌고 오지 않는다 (매주 다른 사진) — 의도적으로 비움
     photo_images: [],
+    mobile_services: [],
   };
 }
 
