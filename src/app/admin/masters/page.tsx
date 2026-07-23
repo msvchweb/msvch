@@ -26,6 +26,11 @@ const sections = [
     title: "교회공동체 기도제목",
     desc: "주보 2페이지 '교회공동체 기도제목' 목록 (최대 7줄)",
   },
+  {
+    href: "/admin/masters/worship-resources",
+    title: "예배자료",
+    desc: "성경·찬송가·신앙고백 본문과 출처를 관리합니다.",
+  },
 ];
 
 export default function AdminMastersHubPage() {

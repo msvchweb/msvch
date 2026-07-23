@@ -68,6 +68,7 @@ function weeklyToFormData(w: Weekly): WeeklyContentInput {
     week_total: w.week_total ?? "",
     cumulative_total: w.cumulative_total ?? "",
     photo_images: w.photo_images ?? [],
+    mobile_services: w.mobile_services ?? [],
   };
 }
 

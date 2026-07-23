@@ -1,5 +1,124 @@
 import { z } from "zod";
 
+const KST_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00$/;
+const YOUTUBE_LIVE_HOSTS = new Set([
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "youtu.be",
+]);
+
+function isHttpsUrl(value: string): boolean {
+  try {
+    return new URL(value).protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function nullableBlankString(max: number) {
+  return z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? null : value,
+    z.string().max(max).nullable(),
+  );
+}
+
+const MobileServiceItemSchema = z.object({
+  id: z.string().min(1).max(64),
+  label: z.string().min(1).max(60),
+  summary: z.string().max(500),
+  assignees: z.array(z.string().max(80)).max(8),
+  emphasized: z.boolean(),
+  visible: z.boolean(),
+  resourceId: z.string().uuid().nullable(),
+  externalUrl: z.string().max(2000).nullable(),
+});
+
+export const MobileServiceSchema = z.object({
+  id: z.string().min(1).max(64),
+  type: z.enum(["sunday", "wednesday", "friday", "other"]),
+  label: z.string().min(1).max(60),
+  startsAt: z.string().regex(KST_TIMESTAMP_PATTERN),
+  endsAt: z.string().regex(KST_TIMESTAMP_PATTERN),
+  primary: z.boolean(),
+  visible: z.boolean(),
+  leader: z.string().max(120),
+  liveUrl: z.string().max(2000).nullable(),
+  videoId: z.string().regex(/^[A-Za-z0-9_-]{6,50}$/).nullable(),
+  items: z.array(MobileServiceItemSchema).max(32),
+});
+
+export const MobileServicesSchema = z.array(MobileServiceSchema).max(8).superRefine((services, context) => {
+  const serviceIds = new Set<string>();
+  const itemIds = new Set<string>();
+  let primaryCount = 0;
+
+  services.forEach((service, serviceIndex) => {
+    if (serviceIds.has(service.id)) {
+      context.addIssue({ code: "custom", message: "예배 ID가 중복되었습니다", path: [serviceIndex, "id"] });
+    }
+    serviceIds.add(service.id);
+
+    if (service.primary) primaryCount += 1;
+    if (service.endsAt <= service.startsAt) {
+      context.addIssue({ code: "custom", message: "종료 시각은 시작 시각 이후여야 합니다", path: [serviceIndex, "endsAt"] });
+    }
+    if (service.liveUrl) {
+      let host = "";
+      try {
+        const parsed = new URL(service.liveUrl);
+        host = parsed.hostname.toLowerCase();
+        if (parsed.protocol !== "https:" || !YOUTUBE_LIVE_HOSTS.has(host)) {
+          context.addIssue({ code: "custom", message: "YouTube HTTPS 라이브 주소만 사용할 수 있습니다", path: [serviceIndex, "liveUrl"] });
+        }
+      } catch {
+        context.addIssue({ code: "custom", message: "YouTube HTTPS 라이브 주소만 사용할 수 있습니다", path: [serviceIndex, "liveUrl"] });
+      }
+    }
+
+    service.items.forEach((item, itemIndex) => {
+      if (itemIds.has(item.id)) {
+        context.addIssue({ code: "custom", message: "예배 순서 ID가 중복되었습니다", path: [serviceIndex, "items", itemIndex, "id"] });
+      }
+      itemIds.add(item.id);
+      if (item.externalUrl && !isHttpsUrl(item.externalUrl)) {
+        context.addIssue({ code: "custom", message: "HTTPS 외부 주소만 사용할 수 있습니다", path: [serviceIndex, "items", itemIndex, "externalUrl"] });
+      }
+    });
+  });
+
+  if (primaryCount > 1) {
+    context.addIssue({ code: "custom", message: "기본 예배는 하나만 지정할 수 있습니다" });
+  }
+});
+
+export const WorshipResourceInputSchema = z.object({
+  kind: z.enum(["creed", "hymn", "scripture", "text", "link"]),
+  title: z.string().min(1).max(120),
+  reference: z.string().max(200),
+  content: z.string().max(30000),
+  external_url: z.preprocess(
+    (value) => typeof value === "string" && value.trim() === "" ? null : value,
+    z.string().max(2000).nullable().refine((value) => value === null || isHttpsUrl(value), "HTTPS URL만 사용할 수 있습니다"),
+  ),
+  source_label: nullableBlankString(200),
+  rights_note: nullableBlankString(2000),
+  is_active: z.boolean(),
+}).superRefine((resource, context) => {
+  if (
+    (resource.kind === "hymn" || resource.kind === "scripture") &&
+    resource.content.trim() !== ""
+  ) {
+    if (!resource.source_label) {
+      context.addIssue({ code: "custom", message: "출처 표기를 입력하세요", path: ["source_label"] });
+    }
+    if (!resource.rights_note) {
+      context.addIssue({ code: "custom", message: "권리 고지를 입력하세요", path: ["rights_note"] });
+    }
+  }
+});
+export type WorshipResourceInput = z.infer<typeof WorshipResourceInputSchema>;
+
 // ──────────────────────────────────────────────
 //  공통 상수
 // ──────────────────────────────────────────────
@@ -293,6 +412,7 @@ export const WeeklyContentSchema = z.object({
     )
     .max(MAX_WEEKLY_PHOTOS, `사진은 최대 ${MAX_WEEKLY_PHOTOS}장`)
     .default([]),
+  mobile_services: MobileServicesSchema.default([]),
 });
 
 // ── 마스터 데이터 스키마 (admin/masters CRUD 에서 사용) ───────────────
@@ -386,6 +506,7 @@ export function createEmptyWeeklyInput(): WeeklyContentInput {
     week_total: "",
     cumulative_total: "",
     photo_images: [],
+    mobile_services: [],
   };
 }
 

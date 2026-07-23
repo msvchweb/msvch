@@ -28,6 +28,8 @@ import { MokjangEditor } from "./masters/MokjangEditor";
 import { ServantsEditor } from "./masters/ServantsEditor";
 import { SupportsEditor } from "./masters/SupportsEditor";
 import { CommunityPrayersEditor } from "./masters/CommunityPrayersEditor";
+import { MobileBulletinEditorLoader } from "./mobile/MobileBulletinEditorLoader";
+import { rebaseMobileServices } from "@/lib/mobile-bulletin";
 import { Field, SectionTitle } from "./form/Field";
 import { inputCls, inputErrCls, textareaCls, weekOfMonth, stripLeadingNumber } from "./form/shared";
 import {
@@ -344,7 +346,16 @@ export function WeeklyForm({
     key: K,
     value: WeeklyContentInput[K],
   ) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev) => {
+      if (key === "date" && prev.date && value && value !== prev.date) {
+        return {
+          ...prev,
+          [key]: value,
+          mobile_services: rebaseMobileServices(prev.mobile_services, prev.date, value as string),
+        };
+      }
+      return { ...prev, [key]: value };
+    });
   }
 
   /**
@@ -392,6 +403,12 @@ export function WeeklyForm({
       label: "페이지1(주일예배)",
       description: "순서지(1페이지 우측) · 암송말씀을 관리합니다.",
       content: <WorshipTab form={form} set={set} />,
+    },
+    {
+      key: "mobile",
+      label: "모바일 주보",
+      description: "예배별 모바일 순서·라이브·지난 설교·상세자료를 관리합니다.",
+      content: <MobileBulletinEditorLoader value={form.mobile_services} weekly={form} onChange={(mobile_services) => set("mobile_services", mobile_services)} />,
     },
     {
       key: "back-left",

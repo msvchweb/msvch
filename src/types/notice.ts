@@ -1,3 +1,5 @@
+import type { MobileService } from "@/types/mobile-bulletin";
+
 export interface Notice {
   id: string;
   title: string;
@@ -166,4 +168,5 @@ export interface Weekly {
    * 비어있지 않으면 공개 상세뷰에서 구조화 렌더링 대신 사진을 표시. DB default '{}' 라 항상 배열.
    */
   photo_images: string[];
+  mobile_services: MobileService[];
 }

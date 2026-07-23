@@ -41,6 +41,8 @@ yarn-error.log*
 
 docs/
 .temp/
+.worktrees/
+.superpowers/
 
 # personal files
 claudeprompt

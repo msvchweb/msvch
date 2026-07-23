@@ -14,6 +14,7 @@ import {
   weeklyToBackData,
 } from "@/components/bulletin/BulletinBack";
 import { WeeklyForm, applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
+import { MobileBulletinPreview } from "@/components/weekly/mobile/MobileBulletinPreview";
 import type { WeeklyContentInput } from "@/lib/validation";
 import type { BulletinMasterData } from "@/types/bulletin-master";
 import type { Weekly } from "@/types/notice";
@@ -64,6 +65,7 @@ function inputToWeekly(input: WeeklyContentInput, weeklyId?: string): Weekly {
     week_total: input.week_total,
     cumulative_total: input.cumulative_total,
     photo_images: input.photo_images,
+    mobile_services: input.mobile_services,
   };
 }
 
@@ -144,6 +146,7 @@ export function WeeklyEditorWithPreview({
   const supabase = useMemo(() => createClient(), []);
   const [form, setForm] = useState<WeeklyContentInput>(initial);
   const [master, setMaster] = useState<BulletinMasterData | null>(null);
+  const [mobilePreview, setMobilePreview] = useState(false);
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef<(HTMLDivElement | null)[]>([null, null, null, null]);
@@ -172,6 +175,11 @@ export function WeeklyEditorWithPreview({
   );
 
   const handleTabChange = useCallback((key: string) => {
+    if (key === "mobile") {
+      setMobilePreview(true);
+      return;
+    }
+    setMobilePreview(false);
     const idx = TAB_TO_PAGE[key];
     if (idx === undefined) return;
     const target = pageRefs.current[idx];
@@ -201,7 +209,9 @@ export function WeeklyEditorWithPreview({
             <h2 className="text-sm font-semibold text-gray-700">실시간 미리보기</h2>
             <span className="text-xs text-gray-400">페이지 1 → 4 순서 (세로 스크롤)</span>
           </div>
-          {frontData && backData ? (
+          {mobilePreview ? (
+            <MobileBulletinPreview weekly={form} />
+          ) : frontData && backData ? (
             <div
               ref={scrollContainerRef}
               className="max-h-[calc(100vh-6rem)] space-y-3 overflow-y-auto overflow-x-hidden rounded-xl border border-gray-200 bg-gray-100 p-3"

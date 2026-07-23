@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { applyPlaceholderDefaults } from "@/components/weekly/WeeklyForm";
 import { WeeklyEditorWithPreview } from "@/components/weekly/WeeklyEditorWithPreview";
+import { rebaseMobileServices } from "@/lib/mobile-bulletin";
 import {
   WeeklyContentSchema,
   createEmptyWeeklyInput,
@@ -131,6 +132,8 @@ function weeklyToPrefill(w: Weekly): WeeklyContentInput {
     cumulative_total: w.cumulative_total ?? "",
     // 새 주보는 직전 주 사진을 끌고 오지 않는다 (매주 다른 사진) — 의도적으로 비움
     photo_images: [],
+    mobile_services: rebaseMobileServices(w.mobile_services ?? [], w.date ?? date, date)
+      .map((service) => ({ ...service, videoId: null })),
   };
 }
 
