@@ -236,8 +236,11 @@ export function MobileServiceExperience({
                 {selectedService.items
                   .filter((item) => item.visible)
                   .map((item, index, visibleItems) => {
-                    const resource = item.resourceId
+                    const resolvedResource = item.resourceId
                       ? resourcesById[item.resourceId]
+                      : undefined;
+                    const resource = resolvedResource?.is_active
+                      ? resolvedResource
                       : undefined;
                     const externalUrl = safeExternalUrl(item.externalUrl);
                     return (

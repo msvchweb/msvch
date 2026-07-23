@@ -188,6 +188,19 @@ describe("MobileServiceExperience", () => {
     expect(trigger).toHaveFocus();
   });
 
+  it("does not expose an inactive linked resource", () => {
+    render(
+      <MobileServiceExperience
+        {...baseProps}
+        resourcesById={{ [creed.id]: { ...creed, is_active: false } }}
+      />,
+    );
+    expect(
+      screen.queryByRole("button", { name: "사도신경 내용 보기" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("사도신경")).toBeInTheDocument();
+  });
+
   it("does not expose an unsafe resource URL", () => {
     const unsafeCreed: WorshipResource = {
       ...creed,
