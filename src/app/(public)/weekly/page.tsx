@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FileText } from "lucide-react";
+import { FileText, Smartphone } from "lucide-react";
 import { Container } from "@/components/ui/Container";
 import { PageHeader } from "@/components/ui/PageHeader";
 import Bulletin from "@/components/bulletin/Bulletin";
@@ -33,6 +33,15 @@ export default async function WeeklyPage() {
     <>
       <PageHeader title="주보" description="매주 주보를 확인하세요" />
       <Container>
+        <div className="mb-4 flex justify-end">
+          <Link
+            href="/weekly/mobile"
+            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-liturgy-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-liturgy-brand/90 motion-reduce:transition-none"
+          >
+            <Smartphone aria-hidden="true" size={17} />
+            모바일 주보 보기
+          </Link>
+        </div>
         {!latest ? (
           <p className="py-12 text-center text-gray-400">
             주보가 준비 중입니다.
