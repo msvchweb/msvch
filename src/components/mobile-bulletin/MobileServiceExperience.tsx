@@ -100,8 +100,7 @@ export function MobileServiceExperience({
   const selectedIndex = selectedService
     ? visibleServices.findIndex((service) => service.id === selectedService.id)
     : -1;
-  const panelId =
-    selectedIndex >= 0 ? `${idPrefix}-service-panel-${selectedIndex}` : undefined;
+  const panelId = selectedService ? `${idPrefix}-service-panel` : undefined;
   const liveVideoId = selectedService
     ? extractYouTubeVideoId(selectedService.liveUrl)
     : null;
@@ -155,7 +154,7 @@ export function MobileServiceExperience({
                     type="button"
                     role="tab"
                     aria-selected={selected}
-                    aria-controls={`${idPrefix}-service-panel-${index}`}
+                    aria-controls={panelId}
                     tabIndex={selected ? 0 : -1}
                     onClick={() => selectService(service.id)}
                     onKeyDown={(event) => handleTabKeyDown(event, index)}

@@ -9,6 +9,16 @@ function resourceActionLabel(kind: WorshipResource["kind"]): string {
   return "내용 보기";
 }
 
+function safeExternalUrl(raw: string | null): string | null {
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function WorshipResourceSheet({
   resource,
 }: {
@@ -19,6 +29,7 @@ export function WorshipResourceSheet({
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const actionLabel = resourceActionLabel(resource.kind);
+  const externalUrl = safeExternalUrl(resource.external_url);
 
   function open() {
     dialogRef.current?.showModal();
@@ -90,9 +101,9 @@ export function WorshipResourceSheet({
             </div>
           )}
 
-          {resource.external_url && (
+          {externalUrl && (
             <a
-              href={resource.external_url}
+              href={externalUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-5 inline-flex min-h-11 items-center rounded-full border border-liturgy-brand px-4 py-2 text-sm font-semibold text-liturgy-brand hover:bg-liturgy-brand-soft"

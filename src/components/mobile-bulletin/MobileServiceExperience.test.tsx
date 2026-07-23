@@ -124,6 +124,29 @@ describe("MobileServiceExperience", () => {
     );
   });
 
+  it("points every tab at an existing tabpanel", () => {
+    render(<MobileServiceExperience {...baseProps} />);
+    for (const tab of screen.getAllByRole("tab")) {
+      const panelId = tab.getAttribute("aria-controls");
+      expect(panelId).toBeTruthy();
+      expect(document.getElementById(panelId!)).toBeInTheDocument();
+    }
+  });
+
+  it("moves to the last and first tabs with End and Home", () => {
+    render(<MobileServiceExperience {...baseProps} />);
+    const sunday = screen.getByRole("tab", { name: "주일예배" });
+    const wednesday = screen.getByRole("tab", { name: "수요예배" });
+
+    fireEvent.keyDown(sunday, { key: "End" });
+    expect(wednesday).toHaveFocus();
+    expect(wednesday).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(wednesday, { key: "Home" });
+    expect(sunday).toHaveFocus();
+    expect(sunday).toHaveAttribute("aria-selected", "true");
+  });
+
   it("changes both the order and the recording with the selected service", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-30T03:00:00Z"));
@@ -163,5 +186,23 @@ describe("MobileServiceExperience", () => {
     fireEvent.click(screen.getByRole("button", { name: "닫기" }));
     expect(screen.queryByRole("dialog", { name: "사도신경" })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  it("does not expose an unsafe resource URL", () => {
+    const unsafeCreed: WorshipResource = {
+      ...creed,
+      external_url: "http://example.com/resource",
+    };
+    render(
+      <MobileServiceExperience
+        {...baseProps}
+        resourcesById={{ [unsafeCreed.id]: unsafeCreed }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "사도신경 내용 보기" }));
+    expect(
+      screen.queryByRole("link", { name: "원문 링크 열기" }),
+    ).not.toBeInTheDocument();
   });
 });
