@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { WorshipResource } from "@/types/mobile-bulletin";
-import type { WorshipResourceInput } from "@/lib/validation";
+import { WorshipResourceInputSchema, type WorshipResourceInput } from "@/lib/validation";
 import { WorshipResourceForm } from "./WorshipResourceForm";
 
 const RESOURCE_COLUMNS = "id,kind,title,reference,content,external_url,source_label,rights_note,is_active,created_at,updated_at";
@@ -39,6 +39,10 @@ export function WorshipResourcesEditor() {
   useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const selected = resources.find((resource) => resource.id === selectedId) ?? null;
+  const formInitial = useMemo(
+    () => selected ? toInput(selected) : emptyResource,
+    [selected],
+  );
   const normalizedFilter = filter.trim().toLocaleLowerCase();
   const filteredResources = resources.filter((resource) => {
     const matchesActivity = activity === "all" || (activity === "active" ? resource.is_active : !resource.is_active);
@@ -61,8 +65,16 @@ export function WorshipResourcesEditor() {
   async function deactivate(resource: WorshipResource) {
     if (!window.confirm("비활성화해도 저장된 참조는 데이터에 남아 있지만 공개 상세 동작에서는 숨겨집니다. 계속하시겠습니까?")) return;
     setError(null);
+    const parsed = WorshipResourceInputSchema.safeParse({
+      ...toInput(resource),
+      is_active: false,
+    });
+    if (!parsed.success) {
+      setError(parsed.error.issues.map((issue) => issue.message).join(", "));
+      return;
+    }
     setSaving(true);
-    const { error: dbError } = await supabase.from("worship_resources").update({ is_active: false }).eq("id", resource.id).select("id").single();
+    const { error: dbError } = await supabase.from("worship_resources").update(parsed.data).eq("id", resource.id).select("id").single();
     setSaving(false);
     if (dbError) { setError(dbError.message); return; }
     await load();
@@ -90,7 +102,7 @@ export function WorshipResourcesEditor() {
 
         <section className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
           <h2 className="mb-4 text-base font-semibold text-gray-900">{selected ? "예배 자료 수정" : "새 예배 자료"}</h2>
-          <WorshipResourceForm key={selected?.id ?? "new"} initial={selected ? toInput(selected) : emptyResource} saving={saving} onSave={save} onCancel={selected ? () => setSelectedId(null) : undefined} />
+          <WorshipResourceForm key={selected?.id ?? "new"} initial={formInitial} saving={saving} onSave={save} onCancel={selected ? () => setSelectedId(null) : undefined} />
           {selected && <div className="mt-6 border-t border-gray-200 pt-4"><h3 className="text-sm font-semibold text-gray-800">저장된 내용 미리보기</h3><dl className="mt-3 space-y-3 text-sm text-gray-700"><div><dt className="font-medium">본문</dt><dd className="whitespace-pre-wrap">{selected.content || "-"}</dd></div><div><dt className="font-medium">출처</dt><dd className="whitespace-pre-wrap">{selected.source_label || "-"}</dd></div><div><dt className="font-medium">권리 고지</dt><dd className="whitespace-pre-wrap">{selected.rights_note || "-"}</dd></div></dl></div>}
         </section>
       </div>

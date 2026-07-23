@@ -13,8 +13,15 @@ interface WorshipResourceFormProps {
 const fieldClassName = "w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-primary-400 focus:outline-none focus:ring-1 focus:ring-primary-400";
 
 export function WorshipResourceForm({ initial, saving, onSave, onCancel }: WorshipResourceFormProps) {
+  const [previousInitial, setPreviousInitial] = useState(initial);
   const [value, setValue] = useState<WorshipResourceInput>(initial);
   const [errors, setErrors] = useState<string[]>([]);
+
+  if (initial !== previousInitial) {
+    setPreviousInitial(initial);
+    setValue(initial);
+    setErrors([]);
+  }
 
   function update<K extends keyof WorshipResourceInput>(key: K, next: WorshipResourceInput[K]) {
     setValue((current) => ({ ...current, [key]: next }));
