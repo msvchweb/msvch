@@ -141,6 +141,21 @@ it("keeps hidden IDs for save-time relation validation but omits them publicly",
   expect(collectStoredVideoIds([...services, hidden])).toEqual(["past123", "hidden123"]);
 });
 
+it("ignores a hidden item while retaining its stored reference", () => {
+  const hidden = structuredClone(services);
+  hidden[0].items[0].visible = false;
+  expect(collectRelationIds(hidden)).toEqual({ resourceIds: [], videoIds: ["past123"] });
+  expect(collectStoredResourceIds(hidden)).toEqual([APOSTLES_CREED_RESOURCE_ID]);
+});
+
+it("ignores hidden services publicly but validates their stored relations", () => {
+  const hidden = structuredClone(services);
+  hidden[0].visible = false;
+  expect(collectRelationIds(hidden)).toEqual({ resourceIds: [], videoIds: [] });
+  expect(collectStoredResourceIds(hidden)).toEqual([APOSTLES_CREED_RESOURCE_ID]);
+  expect(collectStoredVideoIds(hidden)).toEqual(["past123"]);
+});
+
 it("maps legacy Sunday and Wednesday content and links the creed", () => {
   const mapped = legacyWeeklyToMobileServices(legacyWeekly);
   expect(mapped.map((service) => service.type)).toEqual(["sunday", "wednesday"]);
