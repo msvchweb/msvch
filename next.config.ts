@@ -60,7 +60,8 @@ const nextConfig: NextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' https://*.ytimg.com https://*.supabase.co https://lh3.googleusercontent.com https://*.kakaocdn.net data: blob:",
               "media-src 'self' https://*.supabase.co",
-              "frame-src https://www.youtube.com https://www.google.com",
+              // youtube-nocookie: 모바일 주보 영상. 재생 전까지 추적 쿠키를 심지 않는다.
+              "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://www.google.com",
               "connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com https://accounts.google.com https://kauth.kakao.com https://kapi.kakao.com",
               "font-src 'self'",
             ].join("; "),
