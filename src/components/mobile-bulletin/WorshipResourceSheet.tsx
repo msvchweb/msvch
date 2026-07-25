@@ -9,6 +9,15 @@ function resourceActionLabel(kind: WorshipResource["kind"]): string {
   return "내용 보기";
 }
 
+/** 순서 카드 우측 알약 뱃지에 표시할 짧은 라벨. 접근성 이름은 actionLabel 이 담당한다. */
+function resourceBadgeLabel(kind: WorshipResource["kind"]): string {
+  if (kind === "scripture") return "본문";
+  if (kind === "hymn") return "가사";
+  if (kind === "creed") return "전문";
+  if (kind === "link") return "열기";
+  return "보기";
+}
+
 function safeExternalUrl(raw: string | null): string | null {
   if (!raw) return null;
   try {
@@ -47,9 +56,10 @@ export function WorshipResourceSheet({
         ref={triggerRef}
         type="button"
         onClick={open}
-        className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full border border-liturgy-brand px-4 py-2 text-sm font-semibold text-liturgy-brand transition-colors hover:bg-liturgy-brand-soft motion-reduce:transition-none"
+        aria-label={`${resource.title} ${actionLabel}`}
+        className="inline-grid min-h-11 min-w-11 place-items-center rounded-full bg-[var(--bt-acc-soft)] px-2.5 text-[10.5px] font-extrabold text-[var(--bt-acc)] transition-colors motion-reduce:transition-none"
       >
-        {resource.title} {actionLabel}
+        {resourceBadgeLabel(resource.kind)}
       </button>
 
       <dialog
@@ -63,19 +73,29 @@ export function WorshipResourceSheet({
         onClick={(event) => {
           if (event.target === event.currentTarget) close();
         }}
-        className="fixed inset-0 m-0 h-dvh w-full max-w-none bg-transparent p-0 backdrop:bg-black/40 open:flex open:items-end open:justify-center sm:open:items-center"
+        className="fixed inset-0 m-0 h-dvh w-full max-w-none bg-transparent p-0 backdrop:bg-[rgba(6,10,18,0.6)] open:flex open:items-end open:justify-center sm:open:items-center"
       >
         <div
-          className="max-h-[85dvh] w-full overflow-y-auto rounded-t-2xl border border-stone-200 bg-white px-5 pb-8 pt-5 text-left text-stone-800 transition-transform motion-reduce:transition-none sm:max-w-2xl sm:rounded-2xl sm:px-8 sm:py-7"
+          className="flex max-h-[84dvh] w-full flex-col rounded-t-[22px] bg-[var(--bt-sheet)] text-left text-[var(--bt-ink)] sm:max-w-2xl sm:rounded-[22px]"
           onClick={(event) => event.stopPropagation()}
         >
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex shrink-0 justify-center pt-3">
+            <span
+              aria-hidden="true"
+              className="h-[5px] w-[38px] rounded-[3px] bg-[var(--bt-line)]"
+            />
+          </div>
+
+          <div className="flex shrink-0 items-start justify-between gap-4 px-[22px] pb-3.5 pt-2.5">
             <div className="min-w-0">
-              <h2 id={titleId} className="break-words text-xl font-bold text-stone-950">
+              <h2
+                id={titleId}
+                className="break-words text-base font-extrabold tracking-[-0.03em] text-[var(--bt-ink)]"
+              >
                 {resource.title}
               </h2>
               {resource.reference.trim() && (
-                <p className="mt-1 break-words text-sm text-stone-600">
+                <p className="mt-1 break-words text-[12.5px] text-[var(--bt-sub)]">
                   {resource.reference}
                 </p>
               )}
@@ -84,33 +104,36 @@ export function WorshipResourceSheet({
               ref={closeButtonRef}
               type="button"
               onClick={close}
-              className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-stone-300 px-3 text-sm font-semibold text-stone-700 hover:bg-stone-100"
+              aria-label="닫기"
+              className="grid size-11 shrink-0 place-items-center rounded-full bg-[var(--bt-acc-soft)] text-[17px] leading-none text-[var(--bt-acc)]"
             >
-              닫기
+              <span aria-hidden="true">×</span>
             </button>
           </div>
 
-          <div className="mt-6 whitespace-pre-wrap break-words text-base leading-8 text-stone-800">
-            {resource.content}
-          </div>
-
-          {(resource.source_label || resource.rights_note) && (
-            <div className="mt-6 border-t border-stone-200 pt-4 text-sm leading-6 text-stone-500">
-              {resource.source_label && <p>출처: {resource.source_label}</p>}
-              {resource.rights_note && <p>{resource.rights_note}</p>}
+          <div className="overflow-y-auto px-[22px] pb-10 pt-1">
+            <div className="whitespace-pre-wrap break-words text-[16.5px] leading-[1.85] tracking-[-0.01em] text-[var(--bt-ink)]">
+              {resource.content}
             </div>
-          )}
 
-          {externalUrl && (
-            <a
-              href={externalUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-5 inline-flex min-h-11 items-center rounded-full border border-liturgy-brand px-4 py-2 text-sm font-semibold text-liturgy-brand hover:bg-liturgy-brand-soft"
-            >
-              원문 링크 열기
-            </a>
-          )}
+            {(resource.source_label || resource.rights_note) && (
+              <div className="mt-6 border-t border-[var(--bt-line)] pt-4 text-[12.5px] leading-6 text-[var(--bt-faint)]">
+                {resource.source_label && <p>출처: {resource.source_label}</p>}
+                {resource.rights_note && <p>{resource.rights_note}</p>}
+              </div>
+            )}
+
+            {externalUrl && (
+              <a
+                href={externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-5 inline-flex min-h-11 items-center text-[13.5px] font-bold text-[var(--bt-acc)]"
+              >
+                원문 링크 열기 →
+              </a>
+            )}
+          </div>
         </div>
       </dialog>
     </>

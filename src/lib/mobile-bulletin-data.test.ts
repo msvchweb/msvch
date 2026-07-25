@@ -43,6 +43,7 @@ function createServices(): MobileService[] {
       summary: "",
       assignees: [],
       emphasized: false,
+      standing: false,
       visible: true,
       resourceId: RESOURCE_ID,
       externalUrl: null,

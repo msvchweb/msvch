@@ -29,6 +29,8 @@ const MobileServiceItemSchema = z.object({
   summary: z.string().max(500),
   assignees: z.array(z.string().max(80)).max(8),
   emphasized: z.boolean(),
+  // 나중에 추가된 필드 — standing 키가 없는 기존 저장 데이터도 그대로 통과해야 한다.
+  standing: z.boolean().default(false),
   visible: z.boolean(),
   resourceId: z.string().uuid().nullable(),
   externalUrl: z.string().max(2000).nullable(),
@@ -422,6 +424,14 @@ export const ChurchSettingTopicSchema = z.object({
   year: z.number().int().min(2000).max(2200),
 });
 export type ChurchSettingTopicInput = z.infer<typeof ChurchSettingTopicSchema>;
+
+export const OfferingAccountSchema = z.object({
+  bank: z.string().min(1, "은행명을 입력해 주세요").max(40),
+  number: z.string().min(1, "계좌번호를 입력해 주세요").max(40),
+  holder: z.string().min(1, "예금주를 입력해 주세요").max(60),
+  note: z.string().max(200),
+});
+export type OfferingAccountInput = z.infer<typeof OfferingAccountSchema>;
 
 export const MokjangEntrySchema = z.object({
   id: z.number().int().min(1).max(200),

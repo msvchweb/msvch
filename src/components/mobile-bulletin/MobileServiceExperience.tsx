@@ -8,6 +8,7 @@ import {
   selectMobileServiceId,
 } from "@/lib/mobile-bulletin";
 import type { MobileService, WorshipResource } from "@/types/mobile-bulletin";
+import { useBulletinTheme } from "./BulletinThemeShell";
 import { WorshipResourceSheet } from "./WorshipResourceSheet";
 
 type MobileServiceExperienceProps = {
@@ -50,6 +51,7 @@ export function MobileServiceExperience({
   const manualSelectionRef = useRef(false);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const idPrefix = useId().replaceAll(":", "");
+  const { theme, toggle } = useBulletinTheme();
 
   useEffect(() => {
     function refresh() {
@@ -115,32 +117,67 @@ export function MobileServiceExperience({
         : null
     : null;
 
+  // overflow-x-clip: hidden 은 스크롤 컨테이너를 만들어 하위 스냅 영역을 뷰포트에서 떼어낸다.
   return (
-    <article className="mx-auto w-full max-w-3xl overflow-x-hidden bg-church-cream text-stone-800">
-      <header className="border-b border-stone-200 bg-white px-5 py-8 sm:px-8">
-        <p className="text-sm font-semibold text-liturgy-brand">{liturgyLabel}</p>
-        <h1 className="mt-2 break-words text-3xl font-bold tracking-tight text-stone-950">
-          {title}
-        </h1>
-        <time dateTime={date} className="mt-3 block text-sm text-stone-600">
-          {date}
-        </time>
+    <article className="overflow-x-clip bg-[var(--bt-bg)] text-[var(--bt-ink)] transition-colors duration-300 motion-reduce:transition-none">
+      <header className="px-4 pt-4 sm:px-6">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <span
+              aria-hidden="true"
+              className="grid size-[30px] shrink-0 place-items-center rounded-[9px] bg-[var(--bt-acc)] text-[13px] font-extrabold text-white"
+            >
+              명
+            </span>
+            <div className="min-w-0">
+              <h1 className="truncate text-sm font-extrabold tracking-[-0.03em] text-[var(--bt-ink)]">
+                {title}
+              </h1>
+              <p className="mt-0.5 truncate text-[11px] text-[var(--bt-faint)]">
+                {liturgyLabel}
+                {date && (
+                  <>
+                    {" · "}
+                    <time dateTime={date}>{date}</time>
+                  </>
+                )}
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={toggle}
+              aria-pressed={theme === "dark"}
+              aria-label={theme === "light" ? "어두운 화면으로 전환" : "밝은 화면으로 전환"}
+              className="grid size-11 place-items-center rounded-full border border-[var(--bt-line)] bg-[var(--bt-card)] text-[15px] transition-colors motion-reduce:transition-none"
+            >
+              <span aria-hidden="true">{theme === "light" ? "🌙" : "☀️"}</span>
+            </button>
+            <Link
+              href="/weekly"
+              className="grid min-h-11 place-items-center rounded-full bg-[var(--bt-acc-soft)] px-3.5 text-xs font-bold text-[var(--bt-acc)]"
+            >
+              종이 주보 ↗
+            </Link>
+          </div>
+        </div>
       </header>
 
       {visibleServices.length === 0 || !selectedService ? (
         <section className="px-5 py-16 text-center sm:px-8">
-          <h2 className="text-xl font-bold text-stone-900">모바일 주보 준비 중</h2>
-          <p className="mt-3 text-base text-stone-600">
+          <h2 className="text-xl font-bold text-[var(--bt-ink)]">모바일 주보 준비 중</h2>
+          <p className="mt-3 text-base text-[var(--bt-sub)]">
             예배 순서를 준비하고 있습니다.
           </p>
         </section>
       ) : (
         <>
-          <div className="border-b border-stone-200 bg-white px-4 sm:px-8">
+          <div className="px-4 sm:px-6">
             <div
               role="tablist"
               aria-label="예배 선택"
-              className="flex max-w-full gap-1 overflow-x-auto py-2"
+              className="flex max-w-full gap-4.5 overflow-x-auto"
             >
               {visibleServices.map((service, index) => {
                 const selected = service.id === selectedService.id;
@@ -158,13 +195,19 @@ export function MobileServiceExperience({
                     tabIndex={selected ? 0 : -1}
                     onClick={() => selectService(service.id)}
                     onKeyDown={(event) => handleTabKeyDown(event, index)}
-                    className={`min-h-11 min-w-11 shrink-0 rounded-full px-4 py-2 text-base font-semibold transition-colors motion-reduce:transition-none ${
+                    className={`relative min-h-11 shrink-0 pt-2 pb-3 text-[13.5px] tracking-[-0.02em] transition-colors motion-reduce:transition-none ${
                       selected
-                        ? "bg-liturgy-brand-soft text-liturgy-brand"
-                        : "text-stone-600 hover:bg-stone-100"
+                        ? "font-extrabold text-[var(--bt-ink)]"
+                        : "font-medium text-[var(--bt-faint)]"
                     }`}
                   >
                     {service.label}
+                    {selected && (
+                      <span
+                        aria-hidden="true"
+                        className="absolute inset-x-0 bottom-0 h-[2.5px] rounded-sm bg-[var(--bt-acc)]"
+                      />
+                    )}
                   </button>
                 );
               })}
@@ -176,44 +219,63 @@ export function MobileServiceExperience({
             role="tabpanel"
             aria-labelledby={`${idPrefix}-service-tab-${selectedIndex}`}
             tabIndex={0}
+            className="px-4 pt-4 pb-10 sm:px-6"
           >
-            <div className="border-b border-stone-200 bg-white px-5 py-6 sm:px-8">
-              <div className="flex flex-wrap items-center gap-3">
-                <h2 className="min-w-0 break-words text-2xl font-bold text-stone-950">
-                  {selectedService.label}
-                </h2>
-                {serviceIsLive && (
-                  <span className="rounded-full bg-red-700 px-3 py-1 text-sm font-bold text-white">
-                    LIVE
-                  </span>
-                )}
-              </div>
-              {selectedService.leader.trim() && (
-                <p className="mt-2 break-words text-sm text-stone-600">
-                  인도 {selectedService.leader}
-                </p>
-              )}
-
-              {playableVideoId ? (
-                <div className="mt-6 aspect-video w-full overflow-hidden rounded-xl border border-stone-200 bg-black">
-                  <iframe
-                    className="h-full w-full"
-                    src={`https://www.youtube-nocookie.com/embed/${playableVideoId}`}
-                    title={`${selectedService.label} 영상`}
-                    loading="lazy"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                    allowFullScreen
+            <div
+              key={selectedService.id}
+              className="animate-[bulletin-slide-in_.34s_cubic-bezier(.2,.7,.3,1)] motion-reduce:animate-none"
+            >
+              <div className="scroll-mt-20 snap-start">
+                <div className="relative flex min-h-[190px] flex-col justify-end overflow-hidden rounded-[20px] bg-[var(--bt-acc)] bg-[linear-gradient(150deg,var(--color-liturgy-brand),var(--color-liturgy-brand-strong)_130%)] p-[18px] text-white">
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-0 bg-[radial-gradient(120%_90%_at_80%_0%,rgba(255,255,255,0.18),transparent_60%)]"
                   />
+                  {serviceIsLive && (
+                    <span className="absolute left-3.5 top-3.5 z-[2] inline-flex items-center gap-1.5 rounded-full bg-[#e0393b] px-2.5 py-[5px] text-[10.5px] font-extrabold tracking-[0.04em] text-white">
+                      <span
+                        aria-hidden="true"
+                        className="size-1.5 animate-[bulletin-pulse_1.4s_infinite] rounded-full bg-white motion-reduce:animate-none"
+                      />
+                      LIVE
+                    </span>
+                  )}
+                  <div className="relative z-[2]">
+                    <p className="mb-1.5 text-[11px] tracking-[0.08em] text-white/72">
+                      {liturgyLabel}
+                    </p>
+                    <h2 className="break-words text-[23px] font-extrabold leading-[1.15] tracking-[-0.035em]">
+                      {selectedService.label}
+                    </h2>
+                    {selectedService.leader.trim() && (
+                      <p className="mt-1.5 break-words text-[12.5px] text-white/82">
+                        인도 {selectedService.leader}
+                      </p>
+                    )}
+                    {!playableVideoId && (
+                      <p className="mt-2 text-[11.5px] text-white/75">
+                        예배 후 영상이 업로드됩니다
+                      </p>
+                    )}
+                  </div>
                 </div>
-              ) : (
-                <div className="mt-6 rounded-xl border border-stone-200 bg-church-cream px-5 py-6">
-                  <p className="text-base leading-7 text-stone-700">
-                    재생할 수 있는 예배 영상이 아직 준비되지 않았습니다.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-3">
+
+                {playableVideoId ? (
+                  <div className="mt-2.5 aspect-video w-full overflow-hidden rounded-[20px] bg-black">
+                    <iframe
+                      className="h-full w-full"
+                      src={`https://www.youtube-nocookie.com/embed/${playableVideoId}`}
+                      title={`${selectedService.label} 영상`}
+                      loading="lazy"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-2.5 flex flex-wrap gap-2.5">
                     <Link
                       href="/sermons"
-                      className="inline-flex min-h-11 items-center rounded-full border border-liturgy-brand px-4 py-2 text-sm font-semibold text-liturgy-brand hover:bg-liturgy-brand-soft"
+                      className="inline-flex min-h-11 items-center rounded-full bg-[var(--bt-acc-soft)] px-4 text-[13px] font-bold text-[var(--bt-acc)]"
                     >
                       설교 영상 보기
                     </Link>
@@ -221,61 +283,83 @@ export function MobileServiceExperience({
                       href="https://www.youtube.com/@msvchphoto"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-white"
+                      className="inline-flex min-h-11 items-center rounded-full border border-[var(--bt-line)] bg-[var(--bt-card)] px-4 text-[13px] font-bold text-[var(--bt-sub)]"
                     >
                       교회 YouTube 채널
                     </a>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
 
-            <div className="px-5 py-10 sm:px-8">
-              <h3 className="text-xl font-bold text-stone-950">예배 순서</h3>
-              <ol className="mt-6 space-y-0">
-                {selectedService.items
-                  .filter((item) => item.visible)
-                  .map((item, index, visibleItems) => {
-                    const resolvedResource = item.resourceId
-                      ? resourcesById[item.resourceId]
-                      : undefined;
-                    const resource = resolvedResource?.is_active
-                      ? resolvedResource
-                      : undefined;
-                    const externalUrl = safeExternalUrl(item.externalUrl);
-                    return (
-                      <li key={item.id} className="relative flex min-w-0 gap-4 pb-8 last:pb-0">
-                        {index < visibleItems.length - 1 && (
-                          <span
-                            aria-hidden="true"
-                            className="absolute bottom-0 left-[21px] top-11 w-px bg-stone-300"
-                          />
-                        )}
-                        <span className="relative z-10 flex size-11 shrink-0 items-center justify-center rounded-full border border-liturgy-brand bg-white text-sm font-bold text-liturgy-brand">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0 flex-1 pt-1.5">
-                          <p
-                            className={`break-words text-base leading-7 ${
-                              item.emphasized
-                                ? "font-bold text-liturgy-brand"
-                                : "font-semibold text-stone-900"
-                            }`}
-                          >
-                            {item.label}
-                          </p>
-                          {item.summary.trim() && (
-                            <p className="mt-1 whitespace-pre-wrap break-words text-base leading-7 text-stone-700">
-                              {item.summary}
+              <div className="mt-6 scroll-mt-20 snap-start">
+                <div className="mb-3 flex items-baseline gap-2 px-0.5">
+                  <h3 className="text-[17px] font-extrabold tracking-[-0.035em] text-[var(--bt-ink)]">
+                    예배 순서
+                  </h3>
+                  <span className="text-xs text-[var(--bt-faint)]">
+                    자료가 있는 항목을 눌러보세요
+                  </span>
+                </div>
+
+                <ol className="flex flex-col gap-2">
+                  {selectedService.items
+                    .filter((item) => item.visible)
+                    .map((item, index) => {
+                      const resolvedResource = item.resourceId
+                        ? resourcesById[item.resourceId]
+                        : undefined;
+                      const resource = resolvedResource?.is_active
+                        ? resolvedResource
+                        : undefined;
+                      const externalUrl = safeExternalUrl(item.externalUrl);
+                      return (
+                        <li
+                          key={item.id}
+                          className={`flex min-w-0 items-center gap-3.5 rounded-[15px] px-[15px] py-3.5 ${
+                            item.emphasized
+                              ? "border border-transparent bg-[var(--bt-acc-soft)]"
+                              : "border border-[var(--bt-line)] bg-[var(--bt-card)]"
+                          }`}
+                        >
+                          <span className="w-4 shrink-0 text-[11px] font-extrabold tabular-nums text-[var(--bt-acc)]">
+                            {index + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={`break-words text-[15px] tracking-[-0.025em] text-[var(--bt-ink)] ${
+                                item.emphasized ? "font-extrabold" : "font-bold"
+                              }`}
+                            >
+                              {item.standing && (
+                                <span
+                                  aria-hidden="true"
+                                  className="mr-1.5 align-[0.15em] text-[9px] text-[var(--bt-faint)]"
+                                >
+                                  ▲
+                                </span>
+                              )}
+                              {item.standing && <span className="sr-only">기립 </span>}
+                              {item.label}
                             </p>
-                          )}
-                          {item.assignees.length > 0 && (
-                            <p className="mt-2 break-words text-sm text-stone-500">
-                              {item.assignees.join(" · ")}
-                            </p>
-                          )}
+                            {item.summary.trim() && (
+                              <p
+                                className={`mt-0.5 whitespace-pre-wrap break-words text-[12.5px] leading-relaxed ${
+                                  item.emphasized
+                                    ? "font-bold text-[var(--bt-acc)]"
+                                    : "text-[var(--bt-sub)]"
+                                }`}
+                              >
+                                {item.summary}
+                              </p>
+                            )}
+                            {item.assignees.length > 0 && (
+                              <p className="mt-0.5 break-words text-[11px] text-[var(--bt-faint)]">
+                                {item.assignees.join(" · ")}
+                              </p>
+                            )}
+                          </div>
                           {(resource || externalUrl) && (
-                            <div className="mt-4 flex flex-wrap gap-3">
+                            <div className="flex shrink-0 items-center gap-1.5">
                               {resource && <WorshipResourceSheet resource={resource} />}
                               {externalUrl && (
                                 <a
@@ -283,18 +367,23 @@ export function MobileServiceExperience({
                                   aria-label={`${item.label} 외부 링크 열기`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex min-h-11 min-w-11 items-center rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-white"
+                                  className="inline-grid min-h-11 min-w-11 place-items-center rounded-full bg-[var(--bt-acc-soft)] px-2.5 text-[10.5px] font-extrabold text-[var(--bt-acc)]"
                                 >
-                                  관련 링크 열기
+                                  링크
                                 </a>
                               )}
                             </div>
                           )}
-                        </div>
-                      </li>
-                    );
-                  })}
-              </ol>
+                        </li>
+                      );
+                    })}
+                </ol>
+                {selectedService.items.some((item) => item.visible && item.standing) && (
+                  <p className="px-1.5 pt-2 text-[11.5px] text-[var(--bt-faint)]">
+                    ▲ 표는 일어서 주시기 바랍니다
+                  </p>
+                )}
+              </div>
             </div>
           </section>
         </>

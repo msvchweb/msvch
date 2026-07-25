@@ -105,6 +105,59 @@
   --liturgy-brand-strong: #1B5E20;
 }
 
+/* ─── 모바일 주보 팔레트 — /weekly/mobile 한정 라이트·다크 ───
+   절기 액센트(--color-liturgy-brand)는 그대로 쓰고 표면색만 전환한다. */
+[data-bulletin-theme] {
+  --bt-shell: #eef1f6;
+  --bt-bg: #f6f8fb;
+  --bt-card: #ffffff;
+  --bt-sheet: #ffffff;
+  --bt-ink: #151b26;
+  --bt-sub: rgba(21, 27, 38, 0.56);
+  --bt-faint: rgba(21, 27, 38, 0.4);
+  --bt-line: rgba(21, 27, 38, 0.09);
+  /* 절기 액센트를 주보 표면에 맞춰 다시 노출한다. */
+  --bt-acc: var(--color-liturgy-brand);
+  --bt-acc-soft: var(--color-liturgy-brand-soft);
+}
+
+[data-bulletin-theme="dark"] {
+  --bt-shell: #0a0e16;
+  --bt-bg: #0f1622;
+  --bt-card: #182131;
+  --bt-sheet: #151f2e;
+  --bt-ink: #eef2f8;
+  --bt-sub: rgba(238, 242, 248, 0.56);
+  --bt-faint: rgba(238, 242, 248, 0.4);
+  --bt-line: rgba(255, 255, 255, 0.08);
+  /* 절기색 원본은 어두운 표면에서 대비가 부족하다. 액센트는 밝게 올리고
+     soft 는 밝은 파스텔 대신 액센트의 반투명 워시로 바꾼다. */
+  --bt-acc: color-mix(in srgb, var(--color-liturgy-brand) 52%, white);
+  --bt-acc-soft: color-mix(in srgb, var(--color-liturgy-brand) 24%, transparent);
+}
+
+/* 모바일 주보 세로 섹션 스냅 — 문서 스크롤러에 걸어야 동작한다.
+   해당 페이지가 열려 있을 때만 활성화. */
+html:has([data-bulletin-snap]) {
+  scroll-snap-type: y proximity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:has([data-bulletin-snap]) {
+    scroll-snap-type: none;
+  }
+}
+
+@keyframes bulletin-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@keyframes bulletin-slide-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @keyframes fade-in {
   from { opacity: 0; }
   to { opacity: 1; }

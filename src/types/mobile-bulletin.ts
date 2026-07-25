@@ -7,6 +7,8 @@ export interface MobileServiceItem {
   summary: string;
   assignees: string[];
   emphasized: boolean;
+  /** 회중이 일어서는 순서. 공개 화면에서 ▲ 표시. */
+  standing: boolean;
   visible: boolean;
   resourceId: string | null;
   externalUrl: string | null;

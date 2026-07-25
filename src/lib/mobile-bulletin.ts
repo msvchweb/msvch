@@ -33,7 +33,7 @@ function kstCalendarDate(date: Date): string {
 }
 
 function makeItem(id: string, label: string, summary: string, assignees: string[] = [], emphasized = false): MobileServiceItem {
-  return { id, label, summary, assignees, emphasized, visible: true, resourceId: null, externalUrl: null };
+  return { id, label, summary, assignees, emphasized, standing: false, visible: true, resourceId: null, externalUrl: null };
 }
 
 function hasText(value: string | null | undefined): value is string {

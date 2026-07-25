@@ -1,10 +1,50 @@
 import Link from "next/link";
+import type { OfferingAccountValue } from "@/types/bulletin-master";
 import type { GuideCommitteeRow, NewsItem } from "@/types/notice";
 
 const PART_LABELS = ["1부", "2부", "3부"];
 
 function nonEmpty(value: string): boolean {
   return value.trim().length > 0;
+}
+
+function SectionHeading({ children, sub }: { children: React.ReactNode; sub?: string }) {
+  return (
+    <div className="mb-3 flex items-baseline gap-2 px-0.5">
+      <h2 className="text-[17px] font-extrabold tracking-[-0.035em] text-[var(--bt-ink)]">
+        {children}
+      </h2>
+      {sub && <span className="text-xs text-[var(--bt-faint)]">{sub}</span>}
+    </div>
+  );
+}
+
+/** 분류 라벨 왼쪽 + 부별 명단 오른쪽. 핸드오프의 Committee 행 형태. */
+function ServingGroup({
+  label,
+  rows,
+  first,
+}: {
+  label: string;
+  rows: Array<{ part: string; name: string }>;
+  first: boolean;
+}) {
+  if (rows.length === 0) return null;
+  return (
+    <div className={`flex gap-3 py-3.5 ${first ? "" : "border-t border-[var(--bt-line)]"}`}>
+      <dt className="w-16 shrink-0 pt-px text-[12.5px] font-extrabold text-[var(--bt-acc)]">
+        {label}
+      </dt>
+      <dd className="flex min-w-0 flex-1 flex-col gap-1.5">
+        {rows.map(({ part, name }) => (
+          <span key={`${part}-${name}`} className="flex gap-2 text-[13.5px] text-[var(--bt-ink)]">
+            {part && <span className="w-7 shrink-0 text-[var(--bt-faint)]">{part}</span>}
+            <span className="min-w-0 break-words tracking-[-0.01em]">{name}</span>
+          </span>
+        ))}
+      </dd>
+    </div>
+  );
 }
 
 export function NextWeekServing({
@@ -35,63 +75,61 @@ export function NextWeekServing({
   }
 
   return (
-    <section className="border-t border-stone-200 bg-white px-5 py-10 sm:px-8">
-      <h2 className="text-2xl font-bold text-stone-950">다음 주 섬김</h2>
+    <section className="scroll-mt-20 snap-start bg-[var(--bt-bg)] px-4 pb-10 transition-colors duration-300 motion-reduce:transition-none sm:px-6">
+      <SectionHeading>다음 주 섬김</SectionHeading>
 
-      {prayers.length > 0 && (
-        <div className="mt-7">
-          <h3 className="text-lg font-bold text-liturgy-brand">기도</h3>
-          <dl className="mt-3 divide-y divide-stone-200 rounded-xl border border-stone-200">
-            {prayers.map(({ label, name }) => (
-              <div key={label} className="grid grid-cols-[4rem_minmax(0,1fr)] gap-3 px-4 py-3">
-                <dt className="text-sm font-semibold text-stone-500">{label}</dt>
-                <dd className="break-words text-base text-stone-800">{name}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
+      <dl className="rounded-2xl border border-[var(--bt-line)] bg-[var(--bt-card)] px-4 py-1">
+        <ServingGroup
+          label="기도"
+          rows={prayers.map(({ label, name }) => ({ part: label, name }))}
+          first
+        />
+        <ServingGroup
+          label="헌금위원"
+          rows={offerings.map(({ label, name }) => ({ part: label, name }))}
+          first={prayers.length === 0}
+        />
+        <ServingGroup
+          label="안내위원"
+          rows={guideRows.map((guide) => ({
+            part: guide.part,
+            name: [
+              guide.indoor && `실내 ${guide.indoor}`,
+              guide.outdoor && `실외 ${guide.outdoor}`,
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          }))}
+          first={prayers.length === 0 && offerings.length === 0}
+        />
+      </dl>
+    </section>
+  );
+}
 
-      {offerings.length > 0 && (
-        <div className="mt-7">
-          <h3 className="text-lg font-bold text-liturgy-brand">헌금</h3>
-          <dl className="mt-3 divide-y divide-stone-200 rounded-xl border border-stone-200">
-            {offerings.map(({ label, name }) => (
-              <div key={label} className="grid grid-cols-[4rem_minmax(0,1fr)] gap-3 px-4 py-3">
-                <dt className="text-sm font-semibold text-stone-500">{label}</dt>
-                <dd className="break-words text-base text-stone-800">{name}</dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
+export function PrayerTopics({ prayers }: { prayers: string[] }): React.ReactNode {
+  const visible = prayers.map((text) => text.trim()).filter(nonEmpty);
+  if (visible.length === 0) return null;
 
-      {guideRows.length > 0 && (
-        <div className="mt-7">
-          <h3 className="text-lg font-bold text-liturgy-brand">안내위원</h3>
-          <div className="mt-3 space-y-3">
-            {guideRows.map((guide, index) => (
-              <article key={`${guide.part}-${index}`} className="rounded-xl border border-stone-200 px-4 py-4">
-                {guide.part && <h4 className="text-base font-bold text-stone-900">{guide.part}</h4>}
-                <dl className="mt-2 space-y-2">
-                  {guide.indoor && (
-                    <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-3">
-                      <dt className="text-sm font-semibold text-stone-500">실내</dt>
-                      <dd className="break-words text-base text-stone-800">{guide.indoor}</dd>
-                    </div>
-                  )}
-                  {guide.outdoor && (
-                    <div className="grid grid-cols-[4rem_minmax(0,1fr)] gap-3">
-                      <dt className="text-sm font-semibold text-stone-500">실외</dt>
-                      <dd className="break-words text-base text-stone-800">{guide.outdoor}</dd>
-                    </div>
-                  )}
-                </dl>
-              </article>
-            ))}
-          </div>
-        </div>
-      )}
+  return (
+    <section className="scroll-mt-20 snap-start bg-[var(--bt-bg)] px-4 pb-10 transition-colors duration-300 motion-reduce:transition-none sm:px-6">
+      <SectionHeading>기도제목</SectionHeading>
+
+      <ol className="rounded-2xl border border-[var(--bt-line)] bg-[var(--bt-card)] px-4 py-1.5">
+        {visible.map((text, index) => (
+          <li
+            key={`${text}-${index}`}
+            className={`flex gap-2.5 py-2.5 ${index === 0 ? "" : "border-t border-[var(--bt-line)]"}`}
+          >
+            <span className="mt-px shrink-0 text-xs font-extrabold tabular-nums text-[var(--bt-acc)]">
+              {index + 1}
+            </span>
+            <span className="min-w-0 break-words text-[13.5px] leading-[1.6] tracking-[-0.01em] text-[var(--bt-ink)]">
+              {text}
+            </span>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }
@@ -107,18 +145,26 @@ export function ChurchNews({ news }: { news: NewsItem[] }): React.ReactNode {
   if (visibleNews.length === 0) return null;
 
   return (
-    <section className="border-t border-stone-200 bg-church-cream px-5 py-10 sm:px-8">
-      <h2 className="text-2xl font-bold text-stone-950">교회소식</h2>
-      <div className="mt-6 divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
+    <section className="scroll-mt-20 snap-start bg-[var(--bt-bg)] px-4 pb-10 transition-colors duration-300 motion-reduce:transition-none sm:px-6">
+      <SectionHeading>교회소식</SectionHeading>
+
+      <div className="flex flex-col gap-2.5">
         {visibleNews.map((item, index) => (
-          <details key={`${item.title}-${index}`} open={index === 0} className="group px-4 py-1">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 py-3 text-base font-bold text-stone-900 marker:content-none">
+          <details
+            key={`${item.title}-${index}`}
+            open={index === 0}
+            className="group rounded-[15px] border border-[var(--bt-line)] bg-[var(--bt-card)] px-4"
+          >
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 py-3.5 text-[14.5px] font-extrabold tracking-[-0.025em] text-[var(--bt-ink)] marker:content-none">
               <span className="min-w-0 break-words">{item.title}</span>
-              <span aria-hidden="true" className="shrink-0 text-liturgy-brand group-open:rotate-45 motion-reduce:transition-none">
+              <span
+                aria-hidden="true"
+                className="shrink-0 text-[var(--bt-acc)] transition-transform group-open:rotate-45 motion-reduce:transition-none"
+              >
                 +
               </span>
             </summary>
-            <ul className="space-y-3 pb-5 pl-5 text-base leading-7 text-stone-700">
+            <ul className="flex flex-col gap-2 pb-4 pl-4 text-[13px] leading-[1.65] tracking-[-0.01em] text-[var(--bt-sub)]">
               {item.items.map((line, lineIndex) => (
                 <li key={`${line}-${lineIndex}`} className="list-disc whitespace-pre-wrap break-words">
                   {line}
@@ -132,23 +178,55 @@ export function ChurchNews({ news }: { news: NewsItem[] }): React.ReactNode {
   );
 }
 
+export function OfferingAccount({
+  account,
+}: {
+  account: OfferingAccountValue | null;
+}): React.ReactNode {
+  if (!account) return null;
+
+  return (
+    <section className="scroll-mt-20 snap-start bg-[var(--bt-bg)] px-4 pb-10 transition-colors duration-300 motion-reduce:transition-none sm:px-6">
+      <SectionHeading>온라인 헌금</SectionHeading>
+
+      <div className="rounded-2xl bg-[var(--bt-acc-soft)] px-[18px] py-4">
+        {account.note.trim() && (
+          <p className="mb-1 text-[13px] text-[var(--bt-sub)]">{account.note}</p>
+        )}
+        <p className="break-words text-[15px] font-extrabold tracking-[-0.02em] text-[var(--bt-ink)]">
+          {account.bank} {account.number} {account.holder}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export function BulletinFooterLinks(): React.ReactNode {
   return (
-    <nav aria-label="주보 바로가기" className="border-t border-stone-200 bg-white px-5 py-8 sm:px-8">
-      <div className="flex flex-wrap gap-3">
+    <nav
+      aria-label="주보 바로가기"
+      className="scroll-mt-20 snap-start bg-[var(--bt-bg)] px-4 pb-12 transition-colors duration-300 motion-reduce:transition-none sm:px-6"
+    >
+      <div className="flex flex-wrap gap-2.5">
         <Link
           href="/weekly"
-          className="inline-flex min-h-11 items-center rounded-full border border-liturgy-brand px-4 py-2 text-sm font-semibold text-liturgy-brand hover:bg-liturgy-brand-soft"
+          className="inline-flex min-h-11 items-center rounded-full bg-[var(--bt-acc-soft)] px-4 text-[13px] font-bold text-[var(--bt-acc)]"
         >
           종이 주보 보기
         </Link>
         <Link
           href="/sermons"
-          className="inline-flex min-h-11 items-center rounded-full border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-church-cream"
+          className="inline-flex min-h-11 items-center rounded-full border border-[var(--bt-line)] bg-[var(--bt-card)] px-4 text-[13px] font-bold text-[var(--bt-sub)]"
         >
           설교 영상 보기
         </Link>
       </div>
+
+      <p className="mt-7 text-center text-[11.5px] leading-[1.7] text-[var(--bt-faint)]">
+        명성비전교회 · 서울 동작구 사당로 16바길 9
+        <br />
+        02-534-0691
+      </p>
     </nav>
   );
 }

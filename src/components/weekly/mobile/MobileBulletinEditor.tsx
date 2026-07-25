@@ -83,7 +83,7 @@ export function MobileBulletinEditor({ value, weekly, resources, videos, onChang
             <label className="flex items-center gap-2 text-sm"><input type="radio" name="mobile-primary" checked={service.primary} onChange={() => setPrimary(service.id)} />기본 예배</label>
           </div>
           <div className="space-y-3 border-t pt-4">
-            <div className="flex items-center justify-between"><h3 className="font-medium text-gray-800">예배 순서</h3><button type="button" onClick={() => onChange(updateService(value, service.id, { items: [...service.items, { id: crypto.randomUUID(), label: "새 순서", summary: "", assignees: [], emphasized: false, visible: true, resourceId: null, externalUrl: null }] }))} className="text-sm text-primary-700">순서 추가</button></div>
+            <div className="flex items-center justify-between"><h3 className="font-medium text-gray-800">예배 순서</h3><button type="button" onClick={() => onChange(updateService(value, service.id, { items: [...service.items, { id: crypto.randomUUID(), label: "새 순서", summary: "", assignees: [], emphasized: false, standing: false, visible: true, resourceId: null, externalUrl: null }] }))} className="text-sm text-primary-700">순서 추가</button></div>
             {service.items.map((item, index) => <div key={item.id} className="grid gap-2 rounded-lg border border-gray-100 p-3 sm:grid-cols-[1fr_1fr_auto]">
               <label className="text-xs">순서명<input className="mt-1 w-full rounded border px-2 py-1.5 text-sm" value={item.label} onChange={(event) => onChange(updateItem(value, service.id, item.id, { label: event.target.value }))} /></label>
               <label className="text-xs">내용<input className="mt-1 w-full rounded border px-2 py-1.5 text-sm" value={item.summary} onChange={(event) => onChange(updateItem(value, service.id, item.id, { summary: event.target.value }))} /></label>
@@ -92,6 +92,7 @@ export function MobileBulletinEditor({ value, weekly, resources, videos, onChang
               <label className="text-xs">외부 URL<input type="url" className="mt-1 w-full rounded border px-2 py-1.5 text-sm" value={item.externalUrl ?? ""} onChange={(event) => onChange(updateItem(value, service.id, item.id, { externalUrl: event.target.value || null }))} /></label>
               <label className="text-xs">담당자<input className="mt-1 w-full rounded border px-2 py-1.5 text-sm" value={item.assignees.join(", ")} onChange={(event) => onChange(updateItem(value, service.id, item.id, { assignees: event.target.value.split(",").map((name) => name.trim()).filter(Boolean) }))} /></label>
               <label className="flex items-end gap-1 text-xs"><input type="checkbox" checked={item.emphasized} onChange={(event) => onChange(updateItem(value, service.id, item.id, { emphasized: event.target.checked }))} />강조</label>
+              <label className="flex items-end gap-1 text-xs"><input type="checkbox" checked={item.standing} onChange={(event) => onChange(updateItem(value, service.id, item.id, { standing: event.target.checked }))} />기립</label>
               <label className="flex items-end gap-1 text-xs"><input type="checkbox" checked={item.visible} onChange={(event) => onChange(updateItem(value, service.id, item.id, { visible: event.target.checked }))} />표시</label>
             </div>)}
           </div>

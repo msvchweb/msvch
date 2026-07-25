@@ -21,7 +21,7 @@ export default async function MobileWeeklyPage() {
 
   return (
     <Container className="py-6 sm:py-10">
-      <div className="mb-4 mx-auto w-full max-w-[800px]">
+      <div className="mb-4 mx-auto w-full max-w-[440px]">
         <Link href="/weekly" className="text-sm text-gray-500 hover:text-gray-900">
           ← 종이 주보
         </Link>

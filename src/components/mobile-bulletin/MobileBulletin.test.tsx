@@ -6,13 +6,19 @@ import { createEmptyWeeklyInput } from "@/lib/validation";
 import type { MobileService } from "@/types/mobile-bulletin";
 import type { Weekly } from "@/types/notice";
 
-const { loadRelationsMock } = vi.hoisted(() => ({
+const { loadRelationsMock, loadPrayersMock, loadAccountMock } = vi.hoisted(() => ({
   loadRelationsMock: vi.fn(async () => ({ resourcesById: {}, validVideoIds: [] })),
+  loadPrayersMock: vi.fn(async () => [] as string[]),
+  loadAccountMock: vi.fn(async () => null),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: vi.fn(async () => ({})) }));
 vi.mock("@/lib/mobile-bulletin-data", () => ({
   loadMobileBulletinRelations: loadRelationsMock,
+}));
+vi.mock("@/lib/bulletin-master", () => ({
+  loadCommunityPrayers: loadPrayersMock,
+  loadOfferingAccount: loadAccountMock,
 }));
 vi.mock("./MobileServiceExperience", () => ({
   MobileServiceExperience: ({ services }: { services: MobileService[] }) => (
@@ -35,7 +41,11 @@ const baseWeekly: Weekly = {
 
 describe("MobileBulletin", () => {
   afterEach(cleanup);
-  beforeEach(() => loadRelationsMock.mockClear());
+  beforeEach(() => {
+    loadRelationsMock.mockClear();
+    loadPrayersMock.mockClear();
+    loadAccountMock.mockClear();
+  });
 
   it("renders valid saved mobile services", async () => {
     render(await MobileBulletin({

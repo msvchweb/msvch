@@ -29,7 +29,7 @@ const services: MobileService[] = [
     leader: "",
     liveUrl: "https://www.youtube.com/live/live123",
     videoId: "past123",
-    items: [{ id: "creed", label: "신앙고백", summary: "사도신경", assignees: [], emphasized: false, visible: true, resourceId: APOSTLES_CREED_RESOURCE_ID, externalUrl: null }],
+    items: [{ id: "creed", label: "신앙고백", summary: "사도신경", assignees: [], emphasized: false, standing: false, visible: true, resourceId: APOSTLES_CREED_RESOURCE_ID, externalUrl: null }],
   },
   {
     id: "wed",
@@ -206,5 +206,20 @@ it("rejects duplicate IDs, multiple primary services, bad URLs, and reversed tim
         "종료 시각은 시작 시각 이후여야 합니다",
       ]),
     );
+  }
+});
+
+it("defaults standing to false for order items saved before the field existed", () => {
+  const legacy = structuredClone(services) as unknown as Array<{
+    items: Array<Record<string, unknown>>;
+  }>;
+  for (const service of legacy) {
+    for (const item of service.items) delete item.standing;
+  }
+
+  const result = MobileServicesSchema.safeParse(legacy);
+  expect(result.success).toBe(true);
+  if (result.success) {
+    expect(result.data.flatMap((service) => service.items).every((item) => item.standing === false)).toBe(true);
   }
 });

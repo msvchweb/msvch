@@ -15,8 +15,8 @@ const weekly = {
 const services: MobileService[] = [{
   id: "sun", type: "sunday", label: "주일예배", startsAt: "2026-07-26T08:00:00+09:00", endsAt: "2026-07-26T13:30:00+09:00", primary: true, visible: true, leader: "", liveUrl: null, videoId: null,
   items: [
-    { id: "hymn", label: "찬송", summary: "21장", assignees: [], emphasized: false, visible: true, resourceId: null, externalUrl: null },
-    { id: "offering", label: "봉헌", summary: "", assignees: [], emphasized: false, visible: true, resourceId: null, externalUrl: null },
+    { id: "hymn", label: "찬송", summary: "21장", assignees: [], emphasized: false, standing: false, visible: true, resourceId: null, externalUrl: null },
+    { id: "offering", label: "봉헌", summary: "", assignees: [], emphasized: false, standing: false, visible: true, resourceId: null, externalUrl: null },
   ],
 }];
 

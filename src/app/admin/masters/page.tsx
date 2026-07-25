@@ -27,6 +27,11 @@ const sections = [
     desc: "주보 2페이지 '교회공동체 기도제목' 목록 (최대 7줄)",
   },
   {
+    href: "/admin/masters/offering-account",
+    title: "온라인 헌금 계좌",
+    desc: "모바일 주보 '온라인 헌금' 안내에 표시되는 은행·계좌번호·예금주",
+  },
+  {
     href: "/admin/masters/worship-resources",
     title: "예배자료",
     desc: "성경·찬송가·신앙고백 본문과 출처를 관리합니다.",

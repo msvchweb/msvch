@@ -1,8 +1,14 @@
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render as baseRender, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { APOSTLES_CREED_RESOURCE_ID } from "@/lib/mobile-bulletin";
 import type { MobileService, WorshipResource } from "@/types/mobile-bulletin";
+import { BulletinThemeShell } from "./BulletinThemeShell";
 import { MobileServiceExperience } from "./MobileServiceExperience";
+
+// MobileServiceExperience 는 테마 토글을 shell 컨텍스트에서 받으므로 항상 감싸서 렌더한다.
+function render(ui: React.ReactNode) {
+  return baseRender(<BulletinThemeShell>{ui}</BulletinThemeShell>);
+}
 
 const services: MobileService[] = [
   {
@@ -23,6 +29,7 @@ const services: MobileService[] = [
         summary: "사도신경",
         assignees: [],
         emphasized: false,
+        standing: false,
         visible: true,
         resourceId: APOSTLES_CREED_RESOURCE_ID,
         externalUrl: null,
@@ -47,6 +54,7 @@ const services: MobileService[] = [
         summary: "요한복음 3:16",
         assignees: ["담임목사"],
         emphasized: true,
+        standing: false,
         visible: true,
         resourceId: null,
         externalUrl: null,

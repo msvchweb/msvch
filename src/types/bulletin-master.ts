@@ -20,6 +20,14 @@ export interface TopicOfYearValue {
   year: number;
 }
 
+/** church_settings.offering_account 의 value */
+export interface OfferingAccountValue {
+  bank: string;
+  number: string;
+  holder: string;
+  note: string;
+}
+
 export interface MokjangEntryRow {
   id: number;
   name: string;

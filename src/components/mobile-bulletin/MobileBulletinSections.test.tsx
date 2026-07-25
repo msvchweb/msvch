@@ -1,6 +1,6 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import { ChurchNews, NextWeekServing } from "./MobileBulletinSections";
+import { ChurchNews, NextWeekServing, PrayerTopics } from "./MobileBulletinSections";
 
 afterEach(cleanup);
 
@@ -14,6 +14,7 @@ describe("MobileBulletinSections", () => {
           guides={[]}
         />
         <ChurchNews news={[]} />
+        <PrayerTopics prayers={["", "   "]} />
       </>,
     );
     expect(
@@ -22,6 +23,16 @@ describe("MobileBulletinSections", () => {
     expect(
       screen.queryByRole("heading", { name: "교회소식" }),
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "기도제목" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("numbers the community prayer topics", () => {
+    render(<PrayerTopics prayers={["복음의 열매를 맺게 하소서", "  ", "믿음의 가정이 되게 하소서"]} />);
+    const items = screen.getAllByRole("listitem");
+    expect(items).toHaveLength(2);
+    expect(items[1]).toHaveTextContent("2믿음의 가정이 되게 하소서");
   });
 
   it("opens the first non-empty news group", () => {
