@@ -48,6 +48,14 @@ export default function RootLayout({
       data-season={day.season}
       data-liturgy-week={day.week ?? undefined}
     >
+      <head>
+        {/*
+         * Pretendard 자체호스팅 — CSP 가 font-src 'self' 라 CDN 은 차단된다.
+         * dynamic subset: 92개 unicode-range 청크 중 페이지가 실제로 쓰는 것만 내려받는다.
+         * font-family 'Pretendard Variable' 은 globals.css 의 --font-sans 첫 항목과 일치.
+         */}
+        <link rel="stylesheet" href="/fonts/pretendard.css" />
+      </head>
       <body className="flex min-h-full flex-col font-sans">
         <ServiceWorkerRegister />
         <RootFurniture
