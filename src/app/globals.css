@@ -106,7 +106,8 @@
 }
 
 /* ─── 모바일 주보 팔레트 — /weekly/mobile 한정 라이트·다크 ───
-   절기 액센트(--color-liturgy-brand)는 그대로 쓰고 표면색만 전환한다. */
+   docs/handoff-bulletin/bulletin-app.jsx 의 THEMES 값 그대로. 변경 금지.
+   주보 표면은 절기색을 따르지 않고 핸드오프 고정 팔레트를 쓴다. */
 [data-bulletin-theme] {
   --bt-shell: #eef1f6;
   --bt-bg: #f6f8fb;
@@ -116,9 +117,10 @@
   --bt-sub: rgba(21, 27, 38, 0.56);
   --bt-faint: rgba(21, 27, 38, 0.4);
   --bt-line: rgba(21, 27, 38, 0.09);
-  /* 절기 액센트를 주보 표면에 맞춰 다시 노출한다. */
-  --bt-acc: var(--color-liturgy-brand);
-  --bt-acc-soft: var(--color-liturgy-brand-soft);
+  --bt-acc: #3b6cf0;
+  --bt-acc-soft: rgba(59, 108, 240, 0.1);
+  /* 고정 하단 예배 선택바 — 반투명 위에 blur(18px) */
+  --bt-bar: rgba(246, 248, 251, 0.86);
 }
 
 [data-bulletin-theme="dark"] {
@@ -130,10 +132,9 @@
   --bt-sub: rgba(238, 242, 248, 0.56);
   --bt-faint: rgba(238, 242, 248, 0.4);
   --bt-line: rgba(255, 255, 255, 0.08);
-  /* 절기색 원본은 어두운 표면에서 대비가 부족하다. 액센트는 밝게 올리고
-     soft 는 밝은 파스텔 대신 액센트의 반투명 워시로 바꾼다. */
-  --bt-acc: color-mix(in srgb, var(--color-liturgy-brand) 52%, white);
-  --bt-acc-soft: color-mix(in srgb, var(--color-liturgy-brand) 24%, transparent);
+  --bt-acc: #5b8def;
+  --bt-acc-soft: rgba(91, 141, 239, 0.16);
+  --bt-bar: rgba(15, 22, 34, 0.86);
 }
 
 /* 모바일 주보 세로 섹션 스냅 — 문서 스크롤러에 걸어야 동작한다.

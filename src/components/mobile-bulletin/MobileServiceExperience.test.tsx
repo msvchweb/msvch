@@ -87,7 +87,35 @@ const baseProps = {
   initialNowIso: "2026-07-25T23:00:00Z",
 };
 
-afterEach(cleanup);
+/**
+ * 예배 자동 선택은 실제 시각에 의존한다. 픽스처가 2026-07-26 주간에 묶여 있으므로
+ * 주일예배를 전제로 하는 검사는 시계를 고정하지 않으면 실행 날짜에 따라 깨진다.
+ */
+function atSundayService(assert: () => void): void {
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date(baseProps.initialNowIso));
+  try {
+    assert();
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
+afterEach(() => {
+  cleanup();
+  localStorage.clear();
+});
+
+describe("BulletinThemeShell", () => {
+  it("uses stored dark mode and writes msvch_theme when toggled", () => {
+    localStorage.setItem("msvch_theme", "dark");
+    render(<MobileServiceExperience {...baseProps} />);
+
+    fireEvent.click(screen.getByLabelText("밝은 화면으로 전환"));
+    expect(localStorage.getItem("msvch_theme")).toBe("light");
+    expect(screen.getByLabelText("어두운 화면으로 전환")).toBeInTheDocument();
+  });
+});
 
 describe("MobileServiceExperience", () => {
   it("selects the active service and marks it LIVE", () => {
@@ -182,31 +210,35 @@ describe("MobileServiceExperience", () => {
   });
 
   it("opens and closes the linked creed in a named dialog", () => {
-    render(
-      <MobileServiceExperience
-        {...baseProps}
-        resourcesById={{ [creed.id]: creed }}
-      />,
-    );
-    const trigger = screen.getByRole("button", { name: "사도신경 내용 보기" });
-    fireEvent.click(trigger);
-    expect(screen.getByRole("dialog", { name: "사도신경" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
-    expect(screen.queryByRole("dialog", { name: "사도신경" })).not.toBeInTheDocument();
-    expect(trigger).toHaveFocus();
+    atSundayService(() => {
+      render(
+        <MobileServiceExperience
+          {...baseProps}
+          resourcesById={{ [creed.id]: creed }}
+        />,
+      );
+      const trigger = screen.getByRole("button", { name: "사도신경 전문 보기" });
+      fireEvent.click(trigger);
+      expect(screen.getByRole("dialog", { name: "사도신경" })).toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+      expect(screen.queryByRole("dialog", { name: "사도신경" })).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+    });
   });
 
   it("does not expose an inactive linked resource", () => {
-    render(
-      <MobileServiceExperience
-        {...baseProps}
-        resourcesById={{ [creed.id]: { ...creed, is_active: false } }}
-      />,
-    );
-    expect(
-      screen.queryByRole("button", { name: "사도신경 내용 보기" }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("사도신경")).toBeInTheDocument();
+    atSundayService(() => {
+      render(
+        <MobileServiceExperience
+          {...baseProps}
+          resourcesById={{ [creed.id]: { ...creed, is_active: false } }}
+        />,
+      );
+      expect(
+        screen.queryByRole("button", { name: "사도신경 전문 보기" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText("사도신경")).toBeInTheDocument();
+    });
   });
 
   it("does not expose an unsafe resource URL", () => {
@@ -214,16 +246,18 @@ describe("MobileServiceExperience", () => {
       ...creed,
       external_url: "http://example.com/resource",
     };
-    render(
-      <MobileServiceExperience
-        {...baseProps}
-        resourcesById={{ [unsafeCreed.id]: unsafeCreed }}
-      />,
-    );
+    atSundayService(() => {
+      render(
+        <MobileServiceExperience
+          {...baseProps}
+          resourcesById={{ [unsafeCreed.id]: unsafeCreed }}
+        />,
+      );
 
-    fireEvent.click(screen.getByRole("button", { name: "사도신경 내용 보기" }));
-    expect(
-      screen.queryByRole("link", { name: "원문 링크 열기" }),
-    ).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "사도신경 전문 보기" }));
+      expect(
+        screen.queryByRole("link", { name: "원문 링크 열기" }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

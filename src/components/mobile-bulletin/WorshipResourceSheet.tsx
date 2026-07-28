@@ -3,9 +3,12 @@
 import { useId, useRef } from "react";
 import type { WorshipResource } from "@/types/mobile-bulletin";
 
+/** 접근성 이름. 뱃지 라벨과 같은 낱말을 써서 보이는 글자와 읽히는 글자를 맞춘다. */
 function resourceActionLabel(kind: WorshipResource["kind"]): string {
   if (kind === "scripture") return "본문 보기";
-  if (kind === "hymn") return "찬송가 보기";
+  if (kind === "hymn") return "가사 보기";
+  if (kind === "creed") return "전문 보기";
+  if (kind === "link") return "열기";
   return "내용 보기";
 }
 
