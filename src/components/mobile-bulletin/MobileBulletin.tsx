@@ -17,7 +17,7 @@ import type { Weekly } from "@/types/notice";
 
 function PreparedState() {
   return (
-    <main className="mx-auto w-full max-w-[440px]">
+    <main className="mx-auto w-full max-w-[430px]">
       <BulletinThemeShell>
         <div className="bg-[var(--bt-bg)] px-5 pb-4 pt-16 text-center">
           <h1 className="text-2xl font-extrabold tracking-[-0.03em] text-[var(--bt-ink)]">
@@ -54,10 +54,12 @@ export async function MobileBulletin({ weekly }: { weekly: Weekly | null }) {
     : new Date();
   const day = getLiturgicalDay(liturgicalDate);
 
+  // 하단 고정 예배 선택바가 마지막 섹션을 가리지 않도록 그 높이만큼 비워 둔다.
+  // 전역 탭바 몫은 RootFurniture 의 main 이 pb-14 lg:pb-0 으로 이미 확보한다.
   return (
     <main
       data-season={day.season}
-      className="mx-auto w-full max-w-[440px] overflow-clip rounded-[24px]"
+      className="mx-auto w-full max-w-[430px] overflow-clip rounded-[24px] pb-[78px] lg:pb-[calc(64px+max(14px,env(safe-area-inset-bottom)))]"
     >
       <BulletinThemeShell snap>
         <MobileServiceExperience
@@ -69,12 +71,12 @@ export async function MobileBulletin({ weekly }: { weekly: Weekly | null }) {
           validVideoIds={relations.validVideoIds}
           initialNowIso={new Date().toISOString()}
         />
+        <ChurchNews news={weekly.news} />
         <NextWeekServing
           prayer={weekly.next_week_prayer}
           offering={weekly.offering_members}
           guides={weekly.guide_committee}
         />
-        <ChurchNews news={weekly.news} />
         <PrayerTopics prayers={communityPrayers} />
         <OfferingAccount account={offeringAccount} />
         <BulletinFooterLinks />

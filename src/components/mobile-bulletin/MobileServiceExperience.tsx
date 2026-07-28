@@ -231,7 +231,10 @@ export function MobileServiceExperience({
               key={selectedService.id}
               className="animate-[bulletin-slide-in_.34s_cubic-bezier(.2,.7,.3,1)] motion-reduce:animate-none"
             >
-              <div className="scroll-mt-20 snap-start">
+              {/* 히어로에는 snap-start 를 걸지 않는다. 첫 스냅 지점이 되면 문서가
+                  scrollY 0 에 머무르지 못하고 끌려 내려가, 바로 위의 주보 헤더(테마 토글·
+                  종이 주보 링크)가 영영 화면 밖에 남는다. */}
+              <div className="scroll-mt-20">
                 <div className="relative flex min-h-[190px] flex-col justify-end overflow-hidden rounded-[20px] bg-[linear-gradient(150deg,var(--bt-acc),var(--bt-card)_130%)] p-[18px] text-white">
                   <span
                     aria-hidden="true"
@@ -395,10 +398,12 @@ export function MobileServiceExperience({
 
           {/* 고정 하단 예배 선택바. 상단 탭과 같은 상태를 쓰되 역할은 보조 내비게이션이라
               role="tab" 을 중복시키지 않는다. transform 을 쓰는 애니메이션 래퍼 바깥에
-              둬야 position: fixed 가 뷰포트 기준으로 잡힌다. */}
+              둬야 position: fixed 가 뷰포트 기준으로 잡힌다.
+              lg 미만에서는 전역 하단 탭바(BottomTabBar, 57px, lg:hidden)가 화면 맨 아래를
+              차지하므로 그 위에 얹고, lg 이상에서만 바닥에 붙는다. */}
           <nav
             aria-label="예배 빠른 선택"
-            className="fixed inset-x-0 bottom-0 z-30 mx-auto flex w-full max-w-[430px] border-t border-[var(--bt-line)] bg-[var(--bt-bar)] pb-[max(14px,env(safe-area-inset-bottom))] backdrop-blur-[18px]"
+            className="fixed inset-x-0 bottom-[57px] z-30 mx-auto flex w-full max-w-[430px] border-t border-[var(--bt-line)] bg-[var(--bt-bar)] pb-3.5 backdrop-blur-[18px] lg:bottom-0 lg:pb-[max(14px,env(safe-area-inset-bottom))]"
           >
             {visibleServices.map((service) => {
               const current = service.id === selectedService.id;
