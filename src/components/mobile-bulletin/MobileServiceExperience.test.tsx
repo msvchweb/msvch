@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render as baseRender, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render as baseRender, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { APOSTLES_CREED_RESOURCE_ID } from "@/lib/mobile-bulletin";
 import type { MobileService, WorshipResource } from "@/types/mobile-bulletin";
@@ -207,6 +207,39 @@ describe("MobileServiceExperience", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it("switches the gradient hero from the fixed service navigator", () => {
+    render(<MobileServiceExperience {...baseProps} />);
+    const navigator = screen.getByRole("navigation", { name: "예배 빠른 선택" });
+    fireEvent.click(within(navigator).getByRole("button", { name: "수요" }));
+    expect(screen.getByRole("heading", { name: "수요예배" })).toBeInTheDocument();
+  });
+
+  it("labels the fixed navigator with short service names and marks the current one", () => {
+    render(<MobileServiceExperience {...baseProps} />);
+    const navigator = screen.getByRole("navigation", { name: "예배 빠른 선택" });
+    const sunday = screen.getByRole("button", { name: "주일" });
+    const wednesday = screen.getByRole("button", { name: "수요" });
+    expect(navigator).toContainElement(sunday);
+    expect(navigator).toContainElement(wednesday);
+
+    fireEvent.click(wednesday);
+    expect(wednesday).toHaveAttribute("aria-current", "true");
+    expect(sunday).not.toHaveAttribute("aria-current");
+  });
+
+  it("keeps an accessible resource trigger inside an order card", () => {
+    atSundayService(() => {
+      render(
+        <MobileServiceExperience
+          {...baseProps}
+          resourcesById={{ [creed.id]: creed }}
+        />,
+      );
+      const trigger = screen.getByRole("button", { name: /사도신경.*전문 보기/ });
+      expect(trigger.closest("li")).toHaveTextContent("신앙고백");
+    });
   });
 
   it("opens and closes the linked creed in a named dialog", () => {

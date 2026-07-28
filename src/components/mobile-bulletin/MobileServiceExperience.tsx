@@ -31,6 +31,12 @@ function safeExternalUrl(raw: string | null): string | null {
   }
 }
 
+/** 하단 선택바는 폭이 좁다. "주일예배" → "주일" 처럼 뒤의 "예배"만 덜어낸다. */
+function shortServiceLabel(label: string): string {
+  const trimmed = label.trim();
+  return trimmed.replace(/예배$/, "").trim() || trimmed;
+}
+
 export function MobileServiceExperience({
   title,
   date,
@@ -226,7 +232,7 @@ export function MobileServiceExperience({
               className="animate-[bulletin-slide-in_.34s_cubic-bezier(.2,.7,.3,1)] motion-reduce:animate-none"
             >
               <div className="scroll-mt-20 snap-start">
-                <div className="relative flex min-h-[190px] flex-col justify-end overflow-hidden rounded-[20px] bg-[var(--bt-acc)] bg-[linear-gradient(150deg,var(--color-liturgy-brand),var(--color-liturgy-brand-strong)_130%)] p-[18px] text-white">
+                <div className="relative flex min-h-[190px] flex-col justify-end overflow-hidden rounded-[20px] bg-[linear-gradient(150deg,var(--bt-acc),var(--bt-card)_130%)] p-[18px] text-white">
                   <span
                     aria-hidden="true"
                     className="absolute inset-0 bg-[radial-gradient(120%_90%_at_80%_0%,rgba(255,255,255,0.18),transparent_60%)]"
@@ -386,6 +392,37 @@ export function MobileServiceExperience({
               </div>
             </div>
           </section>
+
+          {/* 고정 하단 예배 선택바. 상단 탭과 같은 상태를 쓰되 역할은 보조 내비게이션이라
+              role="tab" 을 중복시키지 않는다. transform 을 쓰는 애니메이션 래퍼 바깥에
+              둬야 position: fixed 가 뷰포트 기준으로 잡힌다. */}
+          <nav
+            aria-label="예배 빠른 선택"
+            className="fixed inset-x-0 bottom-0 z-30 mx-auto flex w-full max-w-[430px] border-t border-[var(--bt-line)] bg-[var(--bt-bar)] pb-[max(14px,env(safe-area-inset-bottom))] backdrop-blur-[18px]"
+          >
+            {visibleServices.map((service) => {
+              const current = service.id === selectedService.id;
+              return (
+                <button
+                  key={service.id}
+                  type="button"
+                  onClick={() => selectService(service.id)}
+                  aria-current={current ? "true" : undefined}
+                  className={`flex min-h-16 flex-1 flex-col items-center justify-center gap-[5px] text-[11px] font-bold transition-colors motion-reduce:transition-none ${
+                    current ? "text-[var(--bt-acc)]" : "text-[var(--bt-faint)]"
+                  }`}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={`size-1.5 rounded-full transition-colors motion-reduce:transition-none ${
+                      current ? "bg-[var(--bt-acc)]" : "bg-transparent"
+                    }`}
+                  />
+                  {shortServiceLabel(service.label)}
+                </button>
+              );
+            })}
+          </nav>
         </>
       )}
     </article>
