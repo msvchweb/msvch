@@ -21,6 +21,8 @@ import {
   extractWeeklyFromHwpx,
   GeminiUnavailableError,
 } from "@/lib/weekly-import-extractor";
+import { getObject } from "@/lib/r2/client";
+import { weeklyImportKey } from "@/lib/r2/keys";
 
 export const maxDuration = 60;
 
@@ -99,18 +101,19 @@ export async function POST(
     );
   }
 
-  // 변환된 .hwpx 경로 — `imports/{importId}.hwpx` (Actions runner 가 업로드한 위치)
-  const hwpxPath = `imports/${importId}.hwpx`;
+  // 변환된 .hwpx 는 Actions runner 가 같은 규칙의 key 로 올려둔다.
+  const hwpxPath = weeklyImportKey(importId, "hwpx");
 
-  const { data: blob, error: dlErr } = await supabase.storage
-    .from("weeklies")
-    .download(hwpxPath);
-  if (dlErr || !blob) {
+  let buffer: Buffer;
+  try {
+    buffer = Buffer.from(await getObject(hwpxPath));
+  } catch (e) {
+    const reason = e instanceof Error ? e.message : "missing";
     await supabase
       .from("weekly_imports")
       .update({
         status: "failed",
-        error_message: `변환된 .hwpx 를 찾지 못했습니다: ${dlErr?.message ?? "missing"}`,
+        error_message: `변환된 .hwpx 를 찾지 못했습니다: ${reason}`,
       })
       .eq("id", importId);
     return NextResponse.json<ErrorResponse>(
@@ -118,9 +121,6 @@ export async function POST(
       { status: 500 },
     );
   }
-
-  const arrayBuf = await blob.arrayBuffer();
-  const buffer = Buffer.from(arrayBuf);
   if (!isZipMagic(buffer)) {
     await supabase
       .from("weekly_imports")

@@ -2,7 +2,9 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { PosterCategory, PosterRatio } from "@/lib/poster-prompts";
+import { deleteFromR2, uploadToR2 } from "@/lib/r2/upload-client";
 
+/** R2 prefix. 이름은 Supabase 버킷명을 그대로 승계한다. */
 export const POSTER_IMAGE_BUCKET = "poster-images";
 const MAX_STORAGE_BYTES = 10 * 1024 * 1024;
 const STORAGE_SAFETY_BYTES = 9.5 * 1024 * 1024;
@@ -155,41 +157,48 @@ export async function savePosterVersion({
 
   const prepared = await prepareImageForStorage(blob);
   const dimensions = await getImageDimensions(prepared.blob);
+  // Supabase 시절엔 `upsert: false` 가 같은 versionNo 로 두 번 저장되는 사고를
+  // 에러로 잡아줬다. R2 PUT 은 무조건 덮어쓰므로, 난수 suffix 로 키가 겹치지
+  // 않게 만들어 조용한 덮어쓰기를 막는다. `v001-` 접두는 가독성용.
   const versionLabel = `v${String(versionNo).padStart(3, "0")}`;
-  const imagePath = `posters/${targetPosterId}/versions/${versionLabel}.${prepared.extension}`;
+  const uniqueLabel = `${versionLabel}-${crypto.randomUUID().slice(0, 6)}`;
   const thumb = await createPosterThumbnail(prepared.blob);
-  const thumbPath = `posters/${targetPosterId}/thumbs/${versionLabel}.webp`;
 
-  const uploadedPaths: string[] = [];
+  const uploadedKeys: string[] = [];
   let insertedVersionId: string | null = null;
 
   try {
-    const imageUpload = await supabase.storage
-      .from(POSTER_IMAGE_BUCKET)
-      .upload(imagePath, prepared.blob, {
-        contentType: prepared.contentType,
-        upsert: false,
-      });
-    if (imageUpload.error) throw imageUpload.error;
-    uploadedPaths.push(imagePath);
+    const image = await uploadToR2({
+      file: prepared.blob,
+      prefix: POSTER_IMAGE_BUCKET,
+      scope: ["posters", targetPosterId, "versions"],
+      filename: `poster.${prepared.extension}`,
+      basename: uniqueLabel,
+    });
+    uploadedKeys.push(image.key);
 
     let thumbnailUrl: string | null = null;
     let thumbnailStoragePath: string | null = null;
     if (thumb) {
-      const thumbUpload = await supabase.storage
-        .from(POSTER_IMAGE_BUCKET)
-        .upload(thumbPath, thumb, {
-          contentType: "image/webp",
-          upsert: false,
+      // 썸네일 실패는 치명적이지 않다 — 본 이미지는 이미 올라갔으므로 계속 진행.
+      try {
+        const uploadedThumb = await uploadToR2({
+          file: thumb,
+          prefix: POSTER_IMAGE_BUCKET,
+          scope: ["posters", targetPosterId, "thumbs"],
+          filename: "thumb.webp",
+          basename: uniqueLabel,
         });
-      if (!thumbUpload.error) {
-        uploadedPaths.push(thumbPath);
-        thumbnailStoragePath = thumbPath;
-        thumbnailUrl = supabase.storage.from(POSTER_IMAGE_BUCKET).getPublicUrl(thumbPath).data.publicUrl;
+        uploadedKeys.push(uploadedThumb.key);
+        thumbnailStoragePath = uploadedThumb.key;
+        thumbnailUrl = uploadedThumb.publicUrl;
+      } catch {
+        // 썸네일 없이 진행.
       }
     }
 
-    const imageUrl = supabase.storage.from(POSTER_IMAGE_BUCKET).getPublicUrl(imagePath).data.publicUrl;
+    const imageUrl = image.publicUrl;
+    const imagePath = image.key;
 
     if (!posterId) {
       const { error: posterError } = await supabase.from("posters").insert({
@@ -272,9 +281,9 @@ export async function savePosterVersion({
         // Best-effort cleanup only.
       }
     }
-    if (uploadedPaths.length > 0) {
+    if (uploadedKeys.length > 0) {
       try {
-        await supabase.storage.from(POSTER_IMAGE_BUCKET).remove(uploadedPaths);
+        await deleteFromR2({ keys: uploadedKeys });
       } catch {
         // Best-effort cleanup only.
       }

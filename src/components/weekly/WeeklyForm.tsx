@@ -15,9 +15,8 @@ import {
   MAX_BLOG_IMAGE_SIZE,
   MAX_WEEKLY_PHOTOS,
   validateFile,
-  safeExtension,
 } from "@/lib/validation";
-import { createClient } from "@/lib/supabase/client";
+import { uploadToR2 } from "@/lib/r2/upload-client";
 import { compressImage } from "@/lib/image-compress";
 import { EventExtractionModal } from "@/components/admin/event-extraction/EventExtractionModal";
 import { WeeklyImportModal } from "@/components/admin/weekly-import/WeeklyImportModal";
@@ -47,9 +46,8 @@ import {
   buildDawnReadings,
 } from "./form/constants";
 
-/** 이미지형 주보 사진 업로드 — 절대 상한(브라우저 OOM 방지) 및 버킷/경로 컨벤션 */
+/** 이미지형 주보 사진 업로드 — 절대 상한(브라우저 OOM 방지) */
 const PHOTO_HARD_MAX = 50 * 1024 * 1024; // 50MB 절대 상한
-const WEEKLY_BUCKET = "weeklies";
 
 interface Props {
   initial: WeeklyContentInput;
@@ -252,7 +250,6 @@ export function WeeklyForm({
   const dateRef = useRef<HTMLInputElement>(null);
 
   // ── 이미지형 주보 사진 업로드 (마이그 040) ─────────────────
-  const supabase = useMemo(() => createClient(), []);
   const [photoUploading, setPhotoUploading] = useState(false);
   // 신규 작성 시 weeklyId 가 아직 없으므로, 마운트 시 1회 생성한 UUID 를 업로드 디렉토리로 사용
   const [draftId] = useState(() => crypto.randomUUID());
@@ -287,17 +284,17 @@ export function WeeklyForm({
           }
         }
 
-        const ext = safeExtension(toUpload.name, ALLOWED_IMAGE_EXTENSIONS);
-        const path = `photos/${draftId}/${crypto.randomUUID()}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from(WEEKLY_BUCKET)
-          .upload(path, toUpload, { contentType: toUpload.type });
-        if (upErr) {
-          alert(`${file.name}: ${upErr.message}`);
+        try {
+          const uploaded = await uploadToR2({
+            file: toUpload,
+            prefix: "weeklies",
+            scope: ["photos", draftId],
+          });
+          newUrls.push(uploaded.publicUrl);
+        } catch (e) {
+          alert(`${file.name}: ${e instanceof Error ? e.message : "업로드 실패"}`);
           continue;
         }
-        const { data } = supabase.storage.from(WEEKLY_BUCKET).getPublicUrl(path);
-        newUrls.push(data.publicUrl);
       }
       if (newUrls.length > 0) {
         setForm((prev) => ({

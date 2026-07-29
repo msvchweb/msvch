@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { X, Loader2, Check, AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { uploadToR2 } from "@/lib/r2/upload-client";
 import {
   DEFAULT_TEXT_SETTINGS,
   FINAL_DIMENSIONS,
@@ -122,17 +123,21 @@ export function NoticeDraftModal({
       if (!mainBlob || !thumbBlob) throw new Error("이미지 생성 실패");
 
       // 2. Storage 업로드
-      const mainPath = `admin-hero/poster-${Date.now()}-main.png`;
-      const thumbPath = `admin-hero/poster-${Date.now()}-thumb.png`;
-
-      const uploadMain = await supabase.storage.from("blog-images").upload(mainPath, mainBlob);
-      const uploadThumb = await supabase.storage.from("blog-images").upload(thumbPath, thumbBlob);
-      
-      if (uploadMain.error) throw uploadMain.error;
-      if (uploadThumb.error) throw uploadThumb.error;
-
-      const mainUrl = supabase.storage.from("blog-images").getPublicUrl(mainPath).data.publicUrl;
-      const thumbUrl = supabase.storage.from("blog-images").getPublicUrl(thumbPath).data.publicUrl;
+      const stamp = Date.now();
+      const { publicUrl: mainUrl } = await uploadToR2({
+        file: mainBlob,
+        prefix: "blog-images",
+        scope: ["admin-hero"],
+        filename: "poster.png",
+        basename: `poster-${stamp}-main`,
+      });
+      const { publicUrl: thumbUrl } = await uploadToR2({
+        file: thumbBlob,
+        prefix: "blog-images",
+        scope: ["admin-hero"],
+        filename: "poster.png",
+        basename: `poster-${stamp}-thumb`,
+      });
 
       // 3. 공지사항 DB 등록
       const { error: dbError } = await supabase.from("notices").insert({

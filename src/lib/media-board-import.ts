@@ -16,10 +16,12 @@ import {
 import { MAX_BLOG_IMAGE_SIZE } from "@/lib/validation";
 import type { HwpxBlock, HwpxBlockDoc } from "@/lib/hwpx-parser";
 import type { MediaImportResult } from "@/types/media-board";
+import { putObject } from "@/lib/r2/client";
+import { buildObjectKey, publicUrlForKey } from "@/lib/r2/keys";
 
 export { GeminiUnavailableError };
 
-const STORAGE_BUCKET = "board-images";
+const STORAGE_PREFIX = "board-images" as const;
 
 /** 파일 시그니처(매직 바이트)로 이미지 mime/확장자 추정. board-images 허용 타입만. */
 function detectImage(
@@ -137,20 +139,27 @@ async function uploadImages(
       continue;
     }
 
-    const path = `${boardId}/${userId}/${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}.${detected.ext}`;
-    const { error: upErr } = await supabase.storage
-      .from(STORAGE_BUCKET)
-      .upload(path, entry.data, { contentType: detected.mimeType });
-    if (upErr) {
-      warnings.push(`이미지 업로드 실패: ${upErr.message}`);
+    let url: string;
+    try {
+      const key = buildObjectKey({
+        prefix: STORAGE_PREFIX,
+        scope: [boardId, userId],
+        filename: `image.${detected.ext}`,
+        contentType: detected.mimeType,
+        size: entry.data.length,
+      });
+      await putObject({
+        key,
+        body: new Uint8Array(entry.data),
+        contentType: detected.mimeType,
+      });
+      url = publicUrlForKey(key);
+    } catch (e) {
+      warnings.push(
+        `이미지 업로드 실패: ${e instanceof Error ? e.message : "알 수 없는 오류"}`,
+      );
       continue;
     }
-    const { data: pub } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(path);
-    const url = pub.publicUrl;
     orderedUrls.push(url);
     for (const key of entry.keys) {
       urlByBinItem.set(key, url);

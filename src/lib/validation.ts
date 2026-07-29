@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { STORAGE_PREFIXES } from "@/types/storage";
 
 const KST_TIMESTAMP_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00$/;
 const YOUTUBE_LIVE_HOSTS = new Set([
@@ -143,9 +144,69 @@ export const MAX_UPLOAD_FILES = 30;
 /** 이미지형 주보 — 사진 첨부 최대 장수 (폼/스키마 공유, 마이그 040) */
 export const MAX_WEEKLY_PHOTOS = 20;
 
-/** weeklies 버킷 public URL 만 허용 — 외부 URL 끼워넣기 차단 */
-export const WEEKLY_PHOTO_URL_FRAGMENT =
-  "/storage/v1/object/public/weeklies/";
+// ──────────────────────────────────────────────
+//  이미지 URL 화이트리스트 (외부 URL 끼워넣기 차단)
+// ──────────────────────────────────────────────
+
+/**
+ * 마이그레이션 기간에는 R2 와 기존 Supabase URL 을 **둘 다** 허용한다.
+ * 기존 데이터 이전·검증이 끝나면 legacy 항목을 제거한다.
+ * (PLAN-r2-storage-migration.md Phase 7 / S7-3)
+ */
+const LEGACY_WEEKLY_URL_FRAGMENT = "/storage/v1/object/public/weeklies/";
+const LEGACY_BOARD_IMAGE_URL_FRAGMENT = "/storage/v1/object/public/board-images/";
+
+/**
+ * R2 쪽은 fragment 포함 여부가 아니라 **CDN base 로 시작하는지**를 본다.
+ * `/cdn/weeklies/` 같은 짧은 조각을 includes 로 보면
+ * `https://evil.example/cdn/weeklies/x.jpg` 도 통과해버리기 때문.
+ */
+function cdnPrefixFor(sub: string): string {
+  const base = process.env.NEXT_PUBLIC_CDN_BASE_URL?.replace(/\/$/, "") ?? "";
+  return base ? `${base}/${sub}/` : "";
+}
+
+export function isAllowedWeeklyPhotoUrl(url: string): boolean {
+  const cdn = cdnPrefixFor("weeklies");
+  if (cdn && url.startsWith(cdn)) return true;
+  return url.includes(LEGACY_WEEKLY_URL_FRAGMENT);
+}
+
+export function isAllowedBoardImageUrl(url: string): boolean {
+  const cdn = cdnPrefixFor("board-images");
+  if (cdn && url.startsWith(cdn)) return true;
+  return url.includes(LEGACY_BOARD_IMAGE_URL_FRAGMENT);
+}
+
+// ──────────────────────────────────────────────
+//  R2 스토리지 업로드
+// ──────────────────────────────────────────────
+
+/**
+ * `POST /api/storage/upload-url` 요청 스키마.
+ *
+ * 값의 실질 검증(크기 상한·MIME·확장자·경로 세그먼트)은 `lib/r2/keys.ts` 의
+ * `buildObjectKey` 가 prefix 별 규칙으로 다시 수행한다. 여기서는 모양만 본다.
+ */
+export const StorageUploadUrlSchema = z.object({
+  prefix: z.enum(STORAGE_PREFIXES),
+  scope: z.array(z.string().min(1).max(64)).max(4).optional(),
+  filename: z.string().min(1).max(255),
+  contentType: z.string().min(1).max(100),
+  size: z.number().int().positive(),
+  basename: z.string().min(1).max(64).optional(),
+});
+
+/** `DELETE /api/storage/object` 요청 스키마. keys / urls 중 하나 이상 필요. */
+export const StorageDeleteSchema = z
+  .object({
+    keys: z.array(z.string().min(1).max(512)).max(50).optional(),
+    urls: z.array(z.string().url().max(1024)).max(50).optional(),
+  })
+  .refine(
+    (v) => (v.keys?.length ?? 0) + (v.urls?.length ?? 0) > 0,
+    "삭제할 대상이 없습니다.",
+  );
 
 // ──────────────────────────────────────────────
 //  파일 검증
@@ -407,10 +468,7 @@ export const WeeklyContentSchema = z.object({
       z
         .string()
         .url()
-        .refine(
-          (u) => u.includes(WEEKLY_PHOTO_URL_FRAGMENT),
-          "허용되지 않은 이미지 URL",
-        ),
+        .refine(isAllowedWeeklyPhotoUrl, "허용되지 않은 이미지 URL"),
     )
     .max(MAX_WEEKLY_PHOTOS, `사진은 최대 ${MAX_WEEKLY_PHOTOS}장`)
     .default([]),
@@ -690,10 +748,6 @@ export const BoardMembersReplaceSchema = z.object({
   profileIds: z.array(z.string().uuid()).max(500),
 });
 
-/** board-images Storage public URL 만 허용 — 외부 URL 끼워넣기 차단 */
-const BOARD_IMAGE_URL_FRAGMENT =
-  "/storage/v1/object/public/board-images/";
-
 export const BoardPostSchema = z.object({
   title: z.string().min(1, "제목을 입력하세요").max(150, "제목은 150자까지"),
   // 회의록(표/이미지 마커 포함) 대응으로 30000 자 — 마이그 039 board_posts_content_check 와 동기화.
@@ -706,10 +760,7 @@ export const BoardPostSchema = z.object({
       z
         .string()
         .url()
-        .refine(
-          (u) => u.includes(BOARD_IMAGE_URL_FRAGMENT),
-          "허용되지 않은 이미지 URL",
-        ),
+        .refine(isAllowedBoardImageUrl, "허용되지 않은 이미지 URL"),
     )
     .max(10, "이미지는 최대 10장")
     .default([]),

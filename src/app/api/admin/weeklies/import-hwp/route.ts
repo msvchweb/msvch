@@ -18,6 +18,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin, AuthError } from "@/lib/admin-auth";
 import { hasAdminAccess } from "@/lib/role-utils";
+import { putObject } from "@/lib/r2/client";
+import { NO_STORE_CACHE_CONTROL, weeklyImportKey } from "@/lib/r2/keys";
 
 export const maxDuration = 30;
 
@@ -88,7 +90,7 @@ export async function POST(
     const fileName = file.name.slice(0, 300);
 
     const importId = crypto.randomUUID();
-    const storagePath = `imports/${importId}.hwp`;
+    const storagePath = weeklyImportKey(importId, "hwp");
 
     const { error: insertErr } = await supabase
       .from("weekly_imports")
@@ -108,19 +110,21 @@ export async function POST(
       );
     }
 
-    const { error: storageErr } = await supabase.storage
-      .from("weeklies")
-      .upload(storagePath, buffer, {
+    try {
+      await putObject({
+        key: storagePath,
+        body: new Uint8Array(buffer),
         contentType: "application/x-hwp",
-        upsert: true,
+        cacheControl: NO_STORE_CACHE_CONTROL,
       });
-    if (storageErr) {
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : "알 수 없는 오류";
       await supabase
         .from("weekly_imports")
-        .update({ status: "failed", error_message: `storage: ${storageErr.message}` })
+        .update({ status: "failed", error_message: `storage: ${reason}` })
         .eq("id", importId);
       return NextResponse.json<ErrorResponse>(
-        { error: `Storage 업로드 실패: ${storageErr.message}` },
+        { error: `Storage 업로드 실패: ${reason}` },
         { status: 500 },
       );
     }

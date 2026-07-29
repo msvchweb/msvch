@@ -1510,11 +1510,98 @@ API 라우트(`/api/admin/*`)는 위 페이지 매트릭스와 **별개**로 `re
   - `admin` — 컨텐츠 최상위 관리자, 모든 컨텐츠 삭제
   - `master` — admin 권한 + 회원 role 변경 단독 권한
 
+## 스토리지 (Cloudflare R2)
+
+이미지·영상은 Supabase Storage 가 아니라 **Cloudflare R2** 에 저장한다.
+공개 읽기는 `next.config.ts` 의 rewrite 를 통해 `https://www.msvch.org/cdn/<key>` 로 서비스된다 —
+R2 origin 은 `R2_PUBLIC_ORIGIN` ENV 뒤에 숨어 있으므로 DB 에는 교회 도메인만 저장된다.
+
+### 공용 타입
+
+```ts
+type StoragePrefix =
+  | "gallery" | "weeklies" | "blog-images"
+  | "board-images" | "poster-images" | "shorts";
+```
+
+### 업로드 흐름
+
+```
+① POST /api/storage/upload-url  → presigned PUT URL 발급
+② PUT  <uploadUrl>              → 파일 본문 (R2 직행, Vercel 함수 미경유)
+③ 기존 저장 API 에 publicUrl 전달
+```
+
+### POST `/api/storage/upload-url`
+
+브라우저가 R2 로 직접 PUT 할 presigned URL 을 발급.
+
+- **인증**: 필수
+- **인증 방식**: 쿠키(웹) **OR** `Authorization: Bearer <access_token>`(모바일 앱)
+- **권한**: prefix 별로 다름 (아래 표)
+- **캐시**: 없음 (`dynamic: "force-dynamic"`)
+
+| prefix | 요구 권한 | 원본 Storage RLS |
+|---|---|---|
+| `gallery` / `weeklies` / `blog-images` / `poster-images` / `shorts` | staff/admin/master | `is_staff()` |
+| `board-images` | 로그인 + (admin/master **또는** 아무 게시판의 멤버) | 마이그 025 |
+
+```ts
+interface UploadUrlRequest {
+  prefix: StoragePrefix;
+  scope?: string[];      // prefix 아래 경로 세그먼트. 각 항목 `^[A-Za-z0-9_-]{1,64}$`
+  filename: string;      // 확장자 판별용. 최종 key 에는 미사용
+  contentType: string;
+  size: number;          // 바이트. prefix 별 상한과 대조
+  basename?: string;     // 파일명 본체 고정이 필요할 때만 (예: 포스터 `v001`)
+}
+
+interface UploadUrlResponse {
+  key: string;            // 예: "gallery/{albumId}/1785290080-a1b2c3.jpg"
+  uploadUrl: string;      // presigned PUT URL (10분 만료)
+  publicUrl: string;      // DB 에 저장할 값. https://www.msvch.org/cdn/<key>
+  headers: Record<string, string>;  // ② PUT 시 그대로 실어야 함 (서명에 포함)
+  expiresInSeconds: number;
+}
+```
+
+- **응답 shape**: `{ ok: true, data: UploadUrlResponse }` / `{ ok: false, error }`
+- **key 는 서버가 생성한다.** 클라이언트가 준 경로를 그대로 쓰지 않으므로 traversal 이 불가능
+- **`headers` 는 반드시 그대로 보내야 한다.** Cache-Control 이 서명에 포함되어 있어 값이 다르면 R2 가 403 을 반환 (CDN 캐싱 보장 목적)
+
+**예시**:
+```
+POST /api/storage/upload-url
+{ "prefix":"gallery", "scope":["<albumId>"], "filename":"photo.jpg",
+  "contentType":"image/jpeg", "size":842113 }
+```
+
+### DELETE `/api/storage/object`
+
+R2 객체 삭제. 한 번에 최대 50개.
+
+- **인증**: 필수 (업로드와 동일)
+- **권한**: key 의 최상위 세그먼트에서 prefix 를 뽑아 **prefix 별로** 검사. 하나라도 권한이 없으면 아무것도 지우지 않고 403
+
+```ts
+interface DeleteObjectsRequest {
+  keys?: string[];   // 버킷 내 key
+  urls?: string[];   // 공개 URL. 서버가 key 로 변환 (CDN base 밖의 URL 은 무시)
+}
+
+interface DeleteObjectsResponse {
+  deleted: string[];
+}
+```
+
+---
+
 ## 외부 서비스
 
 | 서비스 | 용도 | 환경변수 |
 |--------|------|----------|
-| Supabase | DB + Auth + Storage | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| Supabase | DB + Auth (Storage 는 R2 로 이전) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+| Cloudflare R2 | 이미지·영상 스토리지 (S3 호환 API, SigV4 자체 구현) | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_ORIGIN`, `NEXT_PUBLIC_CDN_BASE_URL` |
 | YouTube Data API v3 | 설교 영상 목록 | `YOUTUBE_API_KEY` |
 | Google Gemini | AI 설교 요약 + 쇼츠 하이라이트 | `GEMINI_API_KEY` |
 | Next.js ISR | 캐시 무효화 | `REVALIDATE_SECRET` |

@@ -11,6 +11,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/api";
 import { timingSafeEqual } from "crypto";
+import { deleteObject } from "@/lib/r2/client";
+import { weeklyImportKey } from "@/lib/r2/keys";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -76,20 +78,23 @@ export async function GET(
   }[];
 
   // 1) Storage 정리 — 원본 + (있다면) 변환된 .hwpx 모두
-  const paths: string[] = [];
+  const keys: string[] = [];
   for (const r of oldRows) {
-    if (r.file_path) paths.push(r.file_path);
+    if (r.file_path) keys.push(r.file_path);
     if (r.source_format === "hwp") {
       // 변환된 .hwpx 가 같은 폴더에 있을 수 있음
-      paths.push(`imports/${r.id}.hwpx`);
+      keys.push(weeklyImportKey(r.id, "hwpx"));
     }
   }
+  // R2 DeleteObject 는 없는 키에도 성공을 돌려주므로 개별 실패만 세면 된다.
   let storageRemoved = 0;
-  if (paths.length > 0) {
-    const { data: removed } = await supabase.storage
-      .from("weeklies")
-      .remove(paths);
-    storageRemoved = removed?.length ?? 0;
+  for (const key of keys) {
+    try {
+      await deleteObject(key);
+      storageRemoved++;
+    } catch (e) {
+      console.error("[cleanup-weekly-imports] R2 삭제 실패", key, e);
+    }
   }
 
   // 2) DB 행 삭제

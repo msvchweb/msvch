@@ -4,11 +4,11 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { ImagePlus, X, Loader2, FileUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { deleteFromR2, uploadToR2 } from "@/lib/r2/upload-client";
 import {
   ALLOWED_IMAGE_EXTENSIONS,
   MAX_BLOG_IMAGE_SIZE,
   validateFile,
-  safeExtension,
   BoardPostSchema,
 } from "@/lib/validation";
 import { compressImage } from "@/lib/image-compress";
@@ -22,7 +22,6 @@ import type {
 
 const HARD_MAX = 50 * 1024 * 1024; // 50MB 절대 상한 (브라우저 OOM 방지)
 const MAX_IMAGES = 10;
-const STORAGE_BUCKET = "board-images";
 
 export function MediaPostForm({
   boardId,
@@ -80,19 +79,17 @@ export function MediaPostForm({
           }
         }
 
-        const ext = safeExtension(toUpload.name, ALLOWED_IMAGE_EXTENSIONS);
-        const path = `${boardId}/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-        const { error: upErr } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(path, toUpload, { contentType: toUpload.type });
-        if (upErr) {
-          alert(`${file.name}: ${upErr.message}`);
+        try {
+          const uploaded = await uploadToR2({
+            file: toUpload,
+            prefix: "board-images",
+            scope: [boardId, user.id],
+          });
+          newUrls.push(uploaded.publicUrl);
+        } catch (e) {
+          alert(`${file.name}: ${e instanceof Error ? e.message : "업로드 실패"}`);
           continue;
         }
-        const { data } = supabase.storage
-          .from(STORAGE_BUCKET)
-          .getPublicUrl(path);
-        newUrls.push(data.publicUrl);
       }
       if (newUrls.length > 0) {
         setImages((prev) => [...prev, ...newUrls]);
@@ -139,16 +136,9 @@ export function MediaPostForm({
   async function removeImage(idx: number) {
     const url = images[idx];
     setImages((prev) => prev.filter((_, i) => i !== idx));
-    try {
-      const u = new URL(url);
-      const segments = u.pathname.split(`/${STORAGE_BUCKET}/`);
-      const path = segments[1];
-      if (path) {
-        await supabase.storage.from(STORAGE_BUCKET).remove([path]);
-      }
-    } catch {
-      /* ignore — 삭제 실패해도 글 작성에는 영향 없음 */
-    }
+    await deleteFromR2({ urls: [url] }).catch(() => {
+      /* 삭제 실패해도 글 작성에는 영향 없음 */
+    });
   }
 
   async function submitPost(payload: {

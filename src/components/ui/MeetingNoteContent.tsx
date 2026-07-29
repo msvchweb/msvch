@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { ReactNode } from "react";
+import { isAllowedBoardImageUrl } from "@/lib/validation";
 
 /**
  * 미디어선교부 회의록 전용 마크다운 렌더러 (Layer 3(c)).
@@ -16,11 +17,9 @@ import type { ReactNode } from "react";
  *      이미지 src 는 board-images 버킷 URL 만 허용 — 외부/javascript: URL 차단.
  */
 
-const BOARD_IMAGE_URL_FRAGMENT = "/storage/v1/object/public/board-images/";
-
-function isAllowedImageUrl(url: string): boolean {
-  return url.includes(BOARD_IMAGE_URL_FRAGMENT);
-}
+// 화이트리스트는 validation.ts 한 곳에서만 관리한다 — 여기에 사본을 두면
+// 마이그레이션 종료 시 한쪽만 정리되어 정책이 어긋날 수 있다.
+const isAllowedImageUrl = isAllowedBoardImageUrl;
 
 /** **굵게** 인라인만 처리 — 나머지는 텍스트 노드. (XSS 안전) */
 function renderInline(text: string, keyPrefix: string): ReactNode[] {

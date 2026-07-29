@@ -12,6 +12,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { uploadToR2 } from "@/lib/r2/upload-client";
 import {
   FINAL_DIMENSIONS,
   drawCover,
@@ -248,16 +249,20 @@ Keep this as one complete Korean church book recommendation poster. Preserve the
       if (!mainBlob || !thumbBlob) throw new Error("최종 포스터 이미지를 만들지 못했습니다.");
 
       const stamp = Date.now();
-      const mainPath = `admin-hero/book-recommendation-${stamp}-main.png`;
-      const thumbPath = `admin-hero/book-recommendation-${stamp}-thumb.png`;
-
-      const uploadMain = await supabase.storage.from("blog-images").upload(mainPath, mainBlob);
-      if (uploadMain.error) throw uploadMain.error;
-      const uploadThumb = await supabase.storage.from("blog-images").upload(thumbPath, thumbBlob);
-      if (uploadThumb.error) throw uploadThumb.error;
-
-      const mainUrl = supabase.storage.from("blog-images").getPublicUrl(mainPath).data.publicUrl;
-      const thumbUrl = supabase.storage.from("blog-images").getPublicUrl(thumbPath).data.publicUrl;
+      const { publicUrl: mainUrl } = await uploadToR2({
+        file: mainBlob,
+        prefix: "blog-images",
+        scope: ["admin-hero"],
+        filename: "book-recommendation.png",
+        basename: `book-recommendation-${stamp}-main`,
+      });
+      const { publicUrl: thumbUrl } = await uploadToR2({
+        file: thumbBlob,
+        prefix: "blog-images",
+        scope: ["admin-hero"],
+        filename: "book-recommendation.png",
+        basename: `book-recommendation-${stamp}-thumb`,
+      });
 
       const { error: dbError } = await supabase.from("notices").insert({
         title: draft.noticeTitle,

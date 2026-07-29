@@ -6,13 +6,17 @@ import { createClient } from "@/lib/supabase/client";
 import { Upload, Trash2, Plus, Eye, EyeOff, ChevronDown, ChevronRight, AlertCircle, Pencil, Star } from "lucide-react";
 import {
   validateFile,
-  safeExtension,
   ALLOWED_IMAGE_EXTENSIONS,
   MAX_IMAGE_SIZE,
   MAX_UPLOAD_FILES,
   GalleryAlbumSchema,
   GalleryAlbumUpdateSchema,
 } from "@/lib/validation";
+import {
+  deleteFromR2,
+  uploadToR2,
+  type UploadToR2Result,
+} from "@/lib/r2/upload-client";
 import { compressImage } from "@/lib/image-compress";
 import { fetchAuthorRecordMap, type ContentAuthor } from "@/lib/content-authors";
 import { useMe, canDelete, canEdit } from "@/lib/use-me";
@@ -273,16 +277,12 @@ export default function AdminGalleryPage() {
 
     // 삭제 시점에 이미지 목록 확보 (lazy 로드 안 됐을 수 있음)
     const images = albumImages[albumId] ?? (await fetchAlbumImages(albumId));
-    const paths = images.map((img) => {
-      try {
-        const url = new URL(img.image_url);
-        return url.pathname.split("/gallery/")[1];
-      } catch {
-        return "";
-      }
-    }).filter(Boolean);
-    if (paths.length > 0) {
-      await supabase.storage.from("gallery").remove(paths);
+    const urls = images.map((img) => img.image_url).filter(Boolean);
+    if (urls.length > 0) {
+      // 스토리지 삭제가 실패해도 DB 삭제는 진행한다 (고아 파일 < 유령 앨범).
+      await deleteFromR2({ urls }).catch((e) => {
+        console.error("[gallery] R2 삭제 실패", e);
+      });
     }
 
     await supabase.from("gallery_albums").delete().eq("id", albumId);
@@ -365,27 +365,24 @@ export default function AdminGalleryPage() {
         }
       }
 
-      const ext = safeExtension(toUpload.name, ALLOWED_IMAGE_EXTENSIONS);
-      const path = `${albumId}/${Date.now()}-${i}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("gallery")
-        .upload(path, toUpload, { contentType: toUpload.type });
-
-      if (uploadError) {
-        failures.push(`${original.name}: 스토리지 업로드 실패 (${uploadError.message})`);
-        console.error("[gallery upload] storage fail", original.name, uploadError);
+      let uploaded: UploadToR2Result;
+      try {
+        uploaded = await uploadToR2({
+          file: toUpload,
+          prefix: "gallery",
+          scope: [albumId],
+        });
+      } catch (e) {
+        const reason = e instanceof Error ? e.message : "업로드 실패";
+        failures.push(`${original.name}: 스토리지 업로드 실패 (${reason})`);
+        console.error("[gallery upload] storage fail", original.name, e);
         setUploadProgress({ done: i + 1, total: validFiles.length });
         continue;
       }
 
-      const { data: urlData } = supabase.storage
-        .from("gallery")
-        .getPublicUrl(path);
-
       const { error: dbError } = await supabase.from("gallery_images").insert({
         album_id: albumId,
-        image_url: urlData.publicUrl,
+        image_url: uploaded.publicUrl,
         sort_order: existingCount + successCount,
       });
 
@@ -393,12 +390,12 @@ export default function AdminGalleryPage() {
         failures.push(`${original.name}: DB 저장 실패 (${dbError.message})`);
         console.error("[gallery upload] db fail", original.name, dbError);
         // 스토리지 고아 파일 정리
-        await supabase.storage.from("gallery").remove([path]).catch(() => {});
+        await deleteFromR2({ keys: [uploaded.key] }).catch(() => {});
         setUploadProgress({ done: i + 1, total: validFiles.length });
         continue;
       }
 
-      if (firstUploadedUrl === null) firstUploadedUrl = urlData.publicUrl;
+      if (firstUploadedUrl === null) firstUploadedUrl = uploaded.publicUrl;
       successCount++;
       setUploadProgress({ done: i + 1, total: validFiles.length });
     }
@@ -450,14 +447,10 @@ export default function AdminGalleryPage() {
   }
 
   async function deleteImage(imageId: string, imageUrl: string, albumId: string) {
-    try {
-      const path = new URL(imageUrl).pathname.split("/gallery/")[1];
-      if (path) {
-        await supabase.storage.from("gallery").remove([path]);
-      }
-    } catch {
-      /* URL 파싱 실패 — 무시하고 DB 삭제 진행 */
-    }
+    // 스토리지 삭제 실패는 무시하고 DB 삭제를 진행한다 (고아 파일 < 엑박 이미지).
+    await deleteFromR2({ urls: [imageUrl] }).catch((e) => {
+      console.error("[gallery] R2 삭제 실패", e);
+    });
     await supabase.from("gallery_images").delete().eq("id", imageId);
     await refreshAlbumImages(albumId);
   }

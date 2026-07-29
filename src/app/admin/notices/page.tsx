@@ -8,17 +8,16 @@ import { formatDate } from "@/lib/utils";
 import {
   NoticeSchema,
   validateFile,
-  safeExtension,
   ALLOWED_IMAGE_EXTENSIONS,
   MAX_BLOG_IMAGE_SIZE,
 } from "@/lib/validation";
+import { uploadToR2, type UploadToR2Result } from "@/lib/r2/upload-client";
 import { compressImage } from "@/lib/image-compress";
 import { fetchAuthorRecordMap, type ContentAuthor } from "@/lib/content-authors";
 import { useMe, canDelete } from "@/lib/use-me";
 import type { Notice } from "@/types/notice";
 
 const CATEGORIES = ["일반", "긴급", "행사"] as const;
-const HERO_STORAGE_BUCKET = "blog-images";
 const HERO_STORAGE_PREFIX = "admin-hero";
 /** 압축 전 절대 상한 — 브라우저 OOM 방지 */
 const HERO_HARD_MAX_BYTES = 50 * 1024 * 1024;
@@ -178,24 +177,20 @@ export default function AdminNoticesPage() {
         }
       }
 
-      const ext = safeExtension(toUpload.name, ALLOWED_IMAGE_EXTENSIONS);
-      const path = `${HERO_STORAGE_PREFIX}/${notice.id}/${Date.now()}.${ext}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from(HERO_STORAGE_BUCKET)
-        .upload(path, toUpload, { contentType: toUpload.type });
-
-      if (uploadError) {
-        alert(`업로드 실패: ${uploadError.message}`);
+      let uploaded: UploadToR2Result;
+      try {
+        uploaded = await uploadToR2({
+          file: toUpload,
+          prefix: "blog-images",
+          scope: [HERO_STORAGE_PREFIX, notice.id],
+        });
+      } catch (e) {
+        alert(`업로드 실패: ${e instanceof Error ? e.message : "알 수 없는 오류"}`);
         return;
       }
 
-      const { data: urlData } = supabase.storage
-        .from(HERO_STORAGE_BUCKET)
-        .getPublicUrl(path);
-
       const rest = notice.images.slice(1);
-      const newImages = [urlData.publicUrl, ...rest];
+      const newImages = [uploaded.publicUrl, ...rest];
 
       const { error: updateError } = await supabase
         .from("notices")

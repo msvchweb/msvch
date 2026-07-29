@@ -19,6 +19,8 @@ import {
   GeminiUnavailableError,
 } from "@/lib/weekly-import-extractor";
 import type { WeeklyImportResult } from "@/types/weekly-import";
+import { putObject } from "@/lib/r2/client";
+import { NO_STORE_CACHE_CONTROL, weeklyImportKey } from "@/lib/r2/keys";
 
 export const maxDuration = 60;
 
@@ -105,7 +107,7 @@ export async function POST(
 
     // ── weekly_imports 행 생성 (status='parsing') ─────────
     const importId = crypto.randomUUID();
-    const storagePath = `imports/${importId}.hwpx`;
+    const storagePath = weeklyImportKey(importId, "hwpx");
     const fileName = file.name.slice(0, 300);
 
     const { error: insertErr } = await supabase
@@ -126,21 +128,22 @@ export async function POST(
       );
     }
 
-    // ── Storage 업로드 ────────────────────────────────────
-    const { error: storageErr } = await supabase.storage
-      .from("weeklies")
-      .upload(storagePath, buffer, {
-        contentType:
-          "application/vnd.hancom.hwpx+zip",
-        upsert: true,
+    // ── R2 업로드 ─────────────────────────────────────────
+    try {
+      await putObject({
+        key: storagePath,
+        body: new Uint8Array(buffer),
+        contentType: "application/vnd.hancom.hwpx+zip",
+        cacheControl: NO_STORE_CACHE_CONTROL,
       });
-    if (storageErr) {
+    } catch (e) {
+      const reason = e instanceof Error ? e.message : "알 수 없는 오류";
       await supabase
         .from("weekly_imports")
-        .update({ status: "failed", error_message: `storage: ${storageErr.message}` })
+        .update({ status: "failed", error_message: `storage: ${reason}` })
         .eq("id", importId);
       return NextResponse.json<ErrorResponse>(
-        { error: `Storage 업로드 실패: ${storageErr.message}` },
+        { error: `Storage 업로드 실패: ${reason}` },
         { status: 500 },
       );
     }
