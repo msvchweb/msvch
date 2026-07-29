@@ -55,6 +55,7 @@ export function MobileServiceExperience({
     selectMobileServiceId(visibleServices, new Date(initialNowIso)),
   );
   const manualSelectionRef = useRef(false);
+  const rootRef = useRef<HTMLElement>(null);
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const idPrefix = useId().replaceAll(":", "");
   const { theme, toggle } = useBulletinTheme();
@@ -81,6 +82,11 @@ export function MobileServiceExperience({
   function selectService(serviceId: string) {
     manualSelectionRef.current = true;
     setSelectedId(serviceId);
+    // 핸드오프는 예배를 바꿀 때 스크롤러를 맨 위로 되돌린다. 그렇게 하지 않으면
+    // 교회소식·헌금처럼 아래쪽을 읽던 사용자가 하단 선택바로 예배를 바꿨을 때
+    // 새 예배의 히어로와 순서가 화면 밖에 있는 채로 내용만 갈린다.
+    // behavior 기본값(즉시 이동)이라 prefers-reduced-motion 과 충돌하지 않는다.
+    rootRef.current?.scrollIntoView({ block: "start" });
   }
 
   function handleTabKeyDown(
@@ -125,7 +131,10 @@ export function MobileServiceExperience({
 
   // overflow-x-clip: hidden 은 스크롤 컨테이너를 만들어 하위 스냅 영역을 뷰포트에서 떼어낸다.
   return (
-    <article className="overflow-x-clip bg-[var(--bt-bg)] text-[var(--bt-ink)] transition-colors duration-300 motion-reduce:transition-none">
+    <article
+      ref={rootRef}
+      className="scroll-mt-20 overflow-x-clip bg-[var(--bt-bg)] text-[var(--bt-ink)] transition-colors duration-300 motion-reduce:transition-none"
+    >
       <header className="px-4 pt-4 sm:px-6">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">

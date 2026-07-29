@@ -229,6 +229,54 @@ describe("MobileServiceExperience", () => {
     expect(sunday).not.toHaveAttribute("aria-current");
   });
 
+  it("returns the reading position to the top of the bulletin on every service switch", () => {
+    const scrolled: string[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
+      scrolled.push(this.tagName);
+    };
+
+    try {
+      render(<MobileServiceExperience {...baseProps} />);
+      const navigator = screen.getByRole("navigation", { name: "예배 빠른 선택" });
+
+      // 하단 고정 선택바
+      fireEvent.click(within(navigator).getByRole("button", { name: "수요" }));
+      expect(scrolled).toEqual(["ARTICLE"]);
+
+      // 상단 탭
+      fireEvent.click(screen.getByRole("tab", { name: "주일예배" }));
+      expect(scrolled).toEqual(["ARTICLE", "ARTICLE"]);
+
+      // 화살표 키
+      fireEvent.keyDown(screen.getByRole("tab", { name: "주일예배" }), {
+        key: "ArrowRight",
+      });
+      expect(scrolled).toEqual(["ARTICLE", "ARTICLE", "ARTICLE"]);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
+  it("does not move the reading position when no one picked a service", () => {
+    const scrolled: string[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function scrollIntoView(this: Element) {
+      scrolled.push(this.tagName);
+    };
+
+    try {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(baseProps.initialNowIso));
+      render(<MobileServiceExperience {...baseProps} />);
+      act(() => vi.advanceTimersByTime(60_000));
+      expect(scrolled).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+      Element.prototype.scrollIntoView = original;
+    }
+  });
+
   it("keeps an accessible resource trigger inside an order card", () => {
     atSundayService(() => {
       render(
