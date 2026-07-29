@@ -33,15 +33,6 @@ export default async function WeeklyPage() {
     <>
       <PageHeader title="주보" description="매주 주보를 확인하세요" />
       <Container>
-        <div className="mb-4 flex justify-end">
-          <Link
-            href="/weekly/mobile"
-            className="inline-flex min-h-11 items-center gap-2 rounded-full bg-liturgy-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-liturgy-brand/90 motion-reduce:transition-none"
-          >
-            <Smartphone aria-hidden="true" size={17} />
-            모바일 주보 보기
-          </Link>
-        </div>
         {!latest ? (
           <p className="py-12 text-center text-gray-400">
             주보가 준비 중입니다.
@@ -49,16 +40,27 @@ export default async function WeeklyPage() {
         ) : (
           <div className="space-y-6">
             <div>
-              <div className="mb-3">
-                <h2 className="text-base font-semibold text-gray-900 sm:text-lg">
-                  {latest.title}
-                </h2>
-                <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">
-                  {latest.date && formatDateKorean(latest.date)}
-                  {latest.volume && latest.issue
-                    ? ` · ${latest.volume}권 ${latest.issue}호`
-                    : ""}
-                </p>
+              {/* 모바일 주보 진입은 주보 제목 옆에 둔다.
+                  PC 웹에서는 종이 주보를 그대로 보므로 lg 이상에서 감춘다. */}
+              <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-base font-semibold text-gray-900 sm:text-lg">
+                    {latest.title}
+                  </h2>
+                  <p className="mt-0.5 text-xs text-gray-500 sm:text-sm">
+                    {latest.date && formatDateKorean(latest.date)}
+                    {latest.volume && latest.issue
+                      ? ` · ${latest.volume}권 ${latest.issue}호`
+                      : ""}
+                  </p>
+                </div>
+                <Link
+                  href="/weekly/mobile"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-liturgy-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-liturgy-brand/90 motion-reduce:transition-none lg:hidden"
+                >
+                  <Smartphone aria-hidden="true" size={17} />
+                  모바일 주보 보기
+                </Link>
               </div>
               <Bulletin weekly={latest} mode="web" master={master} />
             </div>
