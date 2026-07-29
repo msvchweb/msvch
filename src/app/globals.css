@@ -149,6 +149,17 @@ html:has([data-bulletin-snap]) {
   }
 }
 
+/* 모바일 주보의 고정 예배 선택바(57px 지점, 높이 78px)가 떠 있는 페이지에서는
+   챗봇 독을 그 위로 올린다. 안 그러면 오른쪽 끝 예배 버튼이 챗봇 버튼에 덮인다.
+   챗봇은 RootFurniture 가 그리는 전역 요소라 주보 트리 밖에 있어 CSS 변수 상속이
+   닿지 않는다. 그래서 스냅과 같은 :has() 방식으로 문서 차원에서 건다.
+   lg 이상은 선택바가 가운데 430px 안에만 있어 겹치지 않으므로 제외한다. */
+@media (max-width: 1023.98px) {
+  html:has(nav[data-bulletin-service-nav]) [data-chat-dock] {
+    bottom: calc(72px + 78px);
+  }
+}
+
 @keyframes bulletin-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.35; }

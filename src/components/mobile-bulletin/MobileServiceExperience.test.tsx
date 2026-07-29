@@ -229,6 +229,33 @@ describe("MobileServiceExperience", () => {
     expect(sunday).not.toHaveAttribute("aria-current");
   });
 
+  it("shortens 기도회 names the same way the handoff does", () => {
+    const named = (id: string, label: string): MobileService => ({
+      ...services[0],
+      id,
+      label,
+      items: [],
+    });
+    render(
+      <MobileServiceExperience
+        {...baseProps}
+        services={[
+          named("a", "주일예배"),
+          named("b", "오후예배"),
+          named("c", "금요기도회"),
+          named("d", "새벽기도회"),
+          named("e", "예배"),
+        ]}
+      />,
+    );
+    const navigator = screen.getByRole("navigation", { name: "예배 빠른 선택" });
+    expect(
+      within(navigator)
+        .getAllByRole("button")
+        .map((button) => button.textContent),
+    ).toEqual(["주일", "오후", "금요", "새벽", "예배"]);
+  });
+
   it("returns the reading position to the top of the bulletin on every service switch", () => {
     const scrolled: string[] = [];
     const original = Element.prototype.scrollIntoView;

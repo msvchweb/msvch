@@ -31,10 +31,13 @@ function safeExternalUrl(raw: string | null): string | null {
   }
 }
 
-/** 하단 선택바는 폭이 좁다. "주일예배" → "주일" 처럼 뒤의 "예배"만 덜어낸다. */
+/**
+ * 하단 선택바는 한 칸이 좁다. 핸드오프처럼 짧은 이름만 남긴다.
+ * "주일예배" → "주일", "금요기도회" → "금요", "새벽기도회" → "새벽".
+ */
 function shortServiceLabel(label: string): string {
   const trimmed = label.trim();
-  return trimmed.replace(/예배$/, "").trim() || trimmed;
+  return trimmed.replace(/(예배|기도회|기도|찬양)$/, "").trim() || trimmed;
 }
 
 export function MobileServiceExperience({
@@ -412,6 +415,7 @@ export function MobileServiceExperience({
               차지하므로 그 위에 얹고, lg 이상에서만 바닥에 붙는다. */}
           <nav
             aria-label="예배 빠른 선택"
+            data-bulletin-service-nav=""
             className="fixed inset-x-0 bottom-[57px] z-30 mx-auto flex w-full max-w-[430px] border-t border-[var(--bt-line)] bg-[var(--bt-bar)] pb-3.5 backdrop-blur-[18px] lg:bottom-0 lg:pb-[max(14px,env(safe-area-inset-bottom))]"
           >
             {visibleServices.map((service) => {

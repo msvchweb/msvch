@@ -103,7 +103,10 @@ export function ChatBot() {
     <>
       {/* 채팅창 */}
       {isOpen && (
-        <div className="fixed bottom-[72px] right-4 z-50 w-[calc(100vw-32px)] max-w-sm lg:bottom-6">
+        <div
+          data-chat-dock=""
+          className="fixed bottom-[72px] right-4 z-50 w-[calc(100vw-32px)] max-w-sm lg:bottom-6"
+        >
           <div className="flex h-[480px] flex-col overflow-hidden rounded-2xl shadow-2xl" style={{ background: "var(--color-surface, #fff)", border: "1px solid color-mix(in srgb, var(--color-primary-200, #c7d7f8) 60%, transparent)" }}>
             {/* 헤더 */}
             <div className="flex items-center justify-between px-4 py-3" style={{ background: "var(--color-primary-600, #3b5bdb)" }}>
@@ -293,6 +296,7 @@ export function ChatBot() {
       {/* 플로팅 버튼 */}
       <button
         onClick={() => setIsOpen((v) => !v)}
+        data-chat-dock=""
         className={`fixed bottom-[72px] right-4 z-50 h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition hover:scale-105 active:scale-95 lg:bottom-6 ${isOpen ? "hidden lg:flex" : "flex"}`}
         style={{ background: "var(--color-primary-600, #3b5bdb)" }}
         aria-label={isOpen ? "채팅 닫기" : "채팅 열기"}
