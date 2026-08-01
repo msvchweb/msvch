@@ -17,7 +17,7 @@ import {
   uploadToR2,
   type UploadToR2Result,
 } from "@/lib/r2/upload-client";
-import { compressImage } from "@/lib/image-compress";
+import { compressImage, createThumbnail } from "@/lib/image-compress";
 import { fetchAuthorRecordMap, type ContentAuthor } from "@/lib/content-authors";
 import { useMe, canDelete, canEdit } from "@/lib/use-me";
 import {
@@ -346,6 +346,8 @@ export default function AdminGalleryPage() {
     const failures: string[] = [...preflightFailures];
     let successCount = 0;
     let firstUploadedUrl: string | null = null;
+    // 썸네일 생성용 — 업로드에 성공한 첫 파일(압축 후)을 들고 있는다.
+    let firstUploadedFile: File | null = null;
 
     for (let i = 0; i < validFiles.length; i++) {
       const original = validFiles[i];
@@ -395,16 +397,20 @@ export default function AdminGalleryPage() {
         continue;
       }
 
-      if (firstUploadedUrl === null) firstUploadedUrl = uploaded.publicUrl;
+      if (firstUploadedUrl === null) {
+        firstUploadedUrl = uploaded.publicUrl;
+        firstUploadedFile = toUpload;
+      }
       successCount++;
       setUploadProgress({ done: i + 1, total: validFiles.length });
     }
 
     // 빈 앨범에 처음 업로드된 사진이 있으면 thumbnail 설정
-    if (existingCount === 0 && firstUploadedUrl) {
+    if (existingCount === 0 && firstUploadedFile) {
+      const thumbUrl = await uploadAlbumThumbnail(albumId, firstUploadedFile);
       await supabase
         .from("gallery_albums")
-        .update({ thumbnail_url: firstUploadedUrl })
+        .update({ thumbnail_url: thumbUrl ?? firstUploadedUrl })
         .eq("id", albumId);
     }
 
@@ -517,10 +523,50 @@ export default function AdminGalleryPage() {
     }
   }
 
+  /**
+   * 앨범 목록용 480px webp 썸네일을 만들어 R2 에 올리고 URL 을 돌려준다.
+   *
+   * key 에 타임스탬프를 넣는 이유: 업로드 객체는 `immutable, max-age=1년` 이라
+   * 같은 key 를 덮어쓰면 썸네일을 바꿔도 1년간 옛 이미지가 캐시된다.
+   *
+   * 실패하면 null — 호출부가 원본 URL 로 폴백한다.
+   */
+  async function uploadAlbumThumbnail(
+    albumId: string,
+    source: Blob,
+  ): Promise<string | null> {
+    const thumb = await createThumbnail(source);
+    if (!thumb) return null;
+    try {
+      const uploaded = await uploadToR2({
+        file: thumb,
+        prefix: "gallery",
+        scope: ["_thumbs"],
+        filename: "thumb.webp",
+        basename: `${albumId}-${Date.now()}`,
+      });
+      return uploaded.publicUrl;
+    } catch (e) {
+      console.error("[gallery] 썸네일 생성 실패", e);
+      return null;
+    }
+  }
+
   async function setAsThumbnail(albumId: string, imageUrl: string) {
+    // 원본을 받아 축소본을 새로 만든다. 실패하면 원본 URL 을 그대로 쓴다.
+    let thumbnailUrl = imageUrl;
+    try {
+      const res = await fetch(imageUrl);
+      if (res.ok) {
+        thumbnailUrl = (await uploadAlbumThumbnail(albumId, await res.blob())) ?? imageUrl;
+      }
+    } catch {
+      /* 네트워크 실패 — 원본 URL 로 폴백 */
+    }
+
     const { error } = await supabase
       .from("gallery_albums")
-      .update({ thumbnail_url: imageUrl })
+      .update({ thumbnail_url: thumbnailUrl })
       .eq("id", albumId);
     if (error) {
       alert(`썸네일 변경 실패: ${error.message}`);
@@ -528,7 +574,7 @@ export default function AdminGalleryPage() {
     }
     // 헤더 썸네일은 albums 상태에 들어 있으므로 in-place 갱신
     setAlbums((prev) =>
-      prev.map((a) => (a.id === albumId ? { ...a, thumbnail_url: imageUrl } : a)),
+      prev.map((a) => (a.id === albumId ? { ...a, thumbnail_url: thumbnailUrl } : a)),
     );
   }
 

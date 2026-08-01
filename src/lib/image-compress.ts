@@ -17,6 +17,36 @@ export interface CompressResult {
   ratio: number;
 }
 
+/**
+ * 목록용 썸네일 생성 (webp).
+ *
+ * Vercel 이미지 최적화를 끈 뒤로는 브라우저가 원본을 그대로 받는다.
+ * 앨범 목록이 평균 730KB 짜리 원본을 그대로 로드하지 않도록,
+ * 업로드 시점에 작은 썸네일을 따로 만들어 둔다.
+ *
+ * 실패하면 null — 호출부는 원본 URL 로 폴백한다 (썸네일은 있으면 좋은 것).
+ */
+export async function createThumbnail(
+  source: Blob,
+  maxEdge = 480,
+): Promise<Blob | null> {
+  try {
+    const img = await loadImage(source);
+    const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.width * scale));
+    canvas.height = Math.max(1, Math.round(img.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    return await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), "image/webp", 0.78);
+    });
+  } catch {
+    return null;
+  }
+}
+
 export async function compressImage(
   file: File,
   maxBytes: number,
@@ -42,7 +72,7 @@ export async function compressImage(
   );
 }
 
-function loadImage(file: File): Promise<HTMLImageElement> {
+function loadImage(file: Blob): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
