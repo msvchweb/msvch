@@ -253,14 +253,14 @@ Keep this as one complete Korean church book recommendation poster. Preserve the
         file: mainBlob,
         prefix: "blog-images",
         scope: ["admin-hero"],
-        filename: "book-recommendation.png",
+        filename: "book-recommendation.webp",
         basename: `book-recommendation-${stamp}-main`,
       });
       const { publicUrl: thumbUrl } = await uploadToR2({
         file: thumbBlob,
         prefix: "blog-images",
         scope: ["admin-hero"],
-        filename: "book-recommendation.png",
+        filename: "book-recommendation.webp",
         basename: `book-recommendation-${stamp}-thumb`,
       });
 
@@ -347,7 +347,8 @@ Keep this as one complete Korean church book recommendation poster. Preserve the
       ratio: targetRatio,
       bg: backgroundImg,
     });
-    return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/png"));
+    // 공지 히어로가 그대로 로드하므로 webp 로 뽑는다 (PNG 대비 90%+ 절감).
+    return new Promise((resolve) => canvas.toBlob((blob) => resolve(blob), "image/webp", 0.85));
   }
 
   const canGenerate = Boolean(book && draft && !loading);

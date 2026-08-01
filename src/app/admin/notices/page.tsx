@@ -12,7 +12,11 @@ import {
   MAX_BLOG_IMAGE_SIZE,
 } from "@/lib/validation";
 import { uploadToR2, type UploadToR2Result } from "@/lib/r2/upload-client";
-import { compressImage } from "@/lib/image-compress";
+import {
+  compressImage,
+  toWebImage,
+  CONTENT_IMAGE_PRESET,
+} from "@/lib/image-compress";
 import { fetchAuthorRecordMap, type ContentAuthor } from "@/lib/content-authors";
 import { useMe, canDelete } from "@/lib/use-me";
 import type { Notice } from "@/types/notice";
@@ -162,15 +166,19 @@ export default function AdminNoticesPage() {
 
     setUploadingId(notice.id);
     try {
-      // 5MB 초과면 자동 압축 (Canvas 기반 JPEG)
-      let toUpload = file;
-      if (file.size > MAX_BLOG_IMAGE_SIZE) {
+      // 홈 히어로 슬라이더가 이 파일을 그대로 로드한다(이미지 최적화 미사용).
+      // 항상 webp 로 줄여 저장한다 — 실측 1.8MB PNG → 154KB.
+      let toUpload: Blob = file;
+      let uploadName = file.name;
+      const web = await toWebImage(file, CONTENT_IMAGE_PRESET);
+      if (web) {
+        toUpload = web;
+        uploadName = `${file.name.replace(/\.[^.]+$/, "")}.webp`;
+      } else if (file.size > MAX_BLOG_IMAGE_SIZE) {
         try {
           const result = await compressImage(file, MAX_BLOG_IMAGE_SIZE);
           toUpload = result.file;
-          console.log(
-            `[hero] 압축 완료: ${(file.size / 1024 / 1024).toFixed(2)}MB → ${(result.file.size / 1024 / 1024).toFixed(2)}MB`,
-          );
+          uploadName = result.file.name;
         } catch (e) {
           alert(e instanceof Error ? e.message : "이미지 압축 실패");
           return;
@@ -181,6 +189,7 @@ export default function AdminNoticesPage() {
       try {
         uploaded = await uploadToR2({
           file: toUpload,
+          filename: uploadName,
           prefix: "blog-images",
           scope: [HERO_STORAGE_PREFIX, notice.id],
         });

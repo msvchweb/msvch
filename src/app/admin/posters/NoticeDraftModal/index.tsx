@@ -128,14 +128,14 @@ export function NoticeDraftModal({
         file: mainBlob,
         prefix: "blog-images",
         scope: ["admin-hero"],
-        filename: "poster.png",
+        filename: "poster.webp",
         basename: `poster-${stamp}-main`,
       });
       const { publicUrl: thumbUrl } = await uploadToR2({
         file: thumbBlob,
         prefix: "blog-images",
         scope: ["admin-hero"],
-        filename: "poster.png",
+        filename: "poster.webp",
         basename: `poster-${stamp}-thumb`,
       });
 
@@ -255,10 +255,14 @@ export function NoticeDraftModal({
 
 // ─── 헬퍼 ───────────────────────────────────────────────
 
+/**
+ * 공지 이미지는 홈 히어로 슬라이더가 그대로 로드한다(이미지 최적화 미사용).
+ * PNG 로 뽑으면 960x960 기준 1.8MB 라 webp 로 저장한다 (실측 154KB).
+ */
 function canvasToBlob(canvas: HTMLCanvasElement | null): Promise<Blob | null> {
   return new Promise((resolve) => {
     if (!canvas) return resolve(null);
-    canvas.toBlob((b) => resolve(b), "image/png");
+    canvas.toBlob((b) => resolve(b), "image/webp", 0.85);
   });
 }
 

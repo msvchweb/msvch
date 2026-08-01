@@ -18,33 +18,53 @@ export interface CompressResult {
 }
 
 /**
- * 목록용 썸네일 생성 (webp).
+ * 저장용 webp 변환.
  *
- * Vercel 이미지 최적화를 끈 뒤로는 브라우저가 원본을 그대로 받는다.
- * 앨범 목록이 평균 730KB 짜리 원본을 그대로 로드하지 않도록,
- * 업로드 시점에 작은 썸네일을 따로 만들어 둔다.
+ * Vercel 이미지 최적화를 끈 뒤로는 브라우저가 저장된 파일을 그대로 받는다.
+ * 그래서 **업로드 시점에 적정 크기로 만들어 두는 것**이 유일한 최적화 지점이다.
+ * (실측: 3.1MB JPEG → 2400px webp 381KB, 1.8MB PNG → webp 154KB)
  *
- * 실패하면 null — 호출부는 원본 URL 로 폴백한다 (썸네일은 있으면 좋은 것).
+ * 실패하면 null — 호출부는 원본으로 폴백한다. 변환은 있으면 좋은 것이지,
+ * 업로드 자체를 막아서는 안 된다.
  */
-export async function createThumbnail(
+export async function toWebImage(
   source: Blob,
-  maxEdge = 480,
+  options: { maxEdge: number; quality: number },
 ): Promise<Blob | null> {
   try {
     const img = await loadImage(source);
-    const scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+    const scale = Math.min(1, options.maxEdge / Math.max(img.width, img.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.max(1, Math.round(img.width * scale));
     canvas.height = Math.max(1, Math.round(img.height * scale));
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-    return await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((blob) => resolve(blob), "image/webp", 0.78);
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((b) => resolve(b), "image/webp", options.quality);
     });
+    // 변환 결과가 원본보다 크면(이미 잘 압축된 소형 이미지) 원본을 쓰는 게 낫다.
+    return blob && blob.size < source.size ? blob : null;
   } catch {
     return null;
   }
+}
+
+/**
+ * 주보 사진 — 글자가 있는 문서라 확대 판독이 가능해야 한다.
+ * 2400px 는 원본(3500px 급) 대비 88% 줄이면서 잔글씨가 읽히는 선.
+ */
+export const WEEKLY_PHOTO_PRESET = { maxEdge: 2400, quality: 0.85 } as const;
+
+/** 공지 히어로·본문 이미지 — 화면 표시용이라 1600px 로 충분. */
+export const CONTENT_IMAGE_PRESET = { maxEdge: 1600, quality: 0.82 } as const;
+
+/** 목록용 썸네일. */
+export async function createThumbnail(
+  source: Blob,
+  maxEdge = 480,
+): Promise<Blob | null> {
+  return toWebImage(source, { maxEdge, quality: 0.78 });
 }
 
 export async function compressImage(

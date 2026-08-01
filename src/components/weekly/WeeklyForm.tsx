@@ -17,7 +17,11 @@ import {
   validateFile,
 } from "@/lib/validation";
 import { uploadToR2 } from "@/lib/r2/upload-client";
-import { compressImage } from "@/lib/image-compress";
+import {
+  compressImage,
+  toWebImage,
+  WEEKLY_PHOTO_PRESET,
+} from "@/lib/image-compress";
 import { EventExtractionModal } from "@/components/admin/event-extraction/EventExtractionModal";
 import { WeeklyImportModal } from "@/components/admin/weekly-import/WeeklyImportModal";
 import { FormTabs, type FormTab } from "./form/FormTabs";
@@ -272,11 +276,20 @@ export function WeeklyForm({
           continue;
         }
 
-        let toUpload: File = file;
-        if (file.size > MAX_BLOG_IMAGE_SIZE) {
+        // 저장 시점이 유일한 최적화 지점이다 (Vercel 이미지 최적화를 쓰지 않음).
+        // 주보는 확대 판독이 되어야 하므로 2400px 를 유지한다.
+        let toUpload: Blob = file;
+        let uploadName = file.name;
+        const web = await toWebImage(file, WEEKLY_PHOTO_PRESET);
+        if (web) {
+          toUpload = web;
+          uploadName = `${file.name.replace(/\.[^.]+$/, "")}.webp`;
+        } else if (file.size > MAX_BLOG_IMAGE_SIZE) {
+          // webp 변환이 안 되는 브라우저·이미지 → 기존 JPEG 압축 경로로 폴백
           try {
             const result = await compressImage(file, MAX_BLOG_IMAGE_SIZE);
             toUpload = result.file;
+            uploadName = result.file.name;
           } catch (e) {
             const reason = e instanceof Error ? e.message : "압축 실패";
             alert(`${file.name}: ${reason}`);
@@ -287,6 +300,7 @@ export function WeeklyForm({
         try {
           const uploaded = await uploadToR2({
             file: toUpload,
+            filename: uploadName,
             prefix: "weeklies",
             scope: ["photos", draftId],
           });
