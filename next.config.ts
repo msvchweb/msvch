@@ -28,6 +28,28 @@ const nextConfig: NextConfig = {
     "/updates": ["./UPDATES.md"],
   },
   images: {
+    /**
+     * Vercel 이미지 최적화를 끈다.
+     *
+     * Hobby 플랜은 transformation 5,000건/월이고 **캐시 MISS/STALE 마다** 차감된다.
+     * minimumCacheTTL 기본값이 4시간이라 앨범 썸네일 103개 × 반응형 3폭이
+     * 하루에도 몇 번씩 재변환되면서 한도를 넘겼고, 초과 시 402 가 나와
+     * Supabase·R2 가릴 것 없이 모든 next/image 가 alt 텍스트만 남았다.
+     *
+     * 최적화를 끄면 브라우저가 원본을 직접 받는다. R2 객체는
+     * `immutable, max-age=1년` 이라 Vercel CDN 이 앞에서 캐시하므로
+     * 반복 조회 비용은 오히려 낮다.
+     *
+     * 남은 문제는 `gallery_albums.thumbnail_url` 이 앨범 첫 사진의 **원본**(평균 730KB)
+     * 을 가리킨다는 것 — 진짜 썸네일이 없다. 데이터 이전(Phase 6) 때 480px webp
+     * 썸네일을 생성해 교체하면 최적화기 없이도 목록이 가벼워진다.
+     */
+    unoptimized: true,
+    /**
+     * 최적화를 다시 켤 경우를 대비한 값. `unoptimized: true` 인 동안에는 동작하지 않는다.
+     * 기본값 4시간이면 재변환이 반복되므로, 되돌릴 때는 반드시 이 값이 함께 있어야 한다.
+     */
+    minimumCacheTTL: 31536000,
     remotePatterns: [
       { protocol: "https", hostname: "*.ytimg.com" },
       // 이전 기간 동안만 유지 — 기존 Supabase URL 이 DB 에서 모두 사라지면 제거한다.
