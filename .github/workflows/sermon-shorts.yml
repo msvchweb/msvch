@@ -40,7 +40,13 @@ jobs:
 
       - name: Install dependencies
         shell: powershell
-        run: npm ci
+      # npm ci 대신 npm install 을 쓰는 이유:
+      # @rolldown/binding-wasm32-wasi 가 @emnapi/core 를 정확히 1.11.1 로 고정 요구하는데,
+      # 개발 환경(Windows)에서는 이 wasm 대체 패키지를 설치하지 않아 npm 이 해당 하위 트리를
+      # lock 에 기록하지 않는다. 그 결과 lock 은 Linux 러너에서 npm ci 검증을 통과하지 못한다.
+      # (--os/--cpu 플래그, 전체 재생성 모두 시도했으나 Windows 에서는 재현 불가)
+      # 이 두 워크플로는 재현성보다 동작이 중요하므로 install 로 둔다.
+        run: npm install --no-audit --no-fund
 
       - name: Run shorts pipeline
         shell: powershell
