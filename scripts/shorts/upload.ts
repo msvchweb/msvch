@@ -1,5 +1,6 @@
 import { readFileSync } from "fs";
 import { supabase } from "./lib/supabase";
+import { putObject } from "../lib/r2";
 import type { HighlightSegment } from "./highlight";
 import type { ClipMetadata } from "./metadata";
 
@@ -20,24 +21,10 @@ export async function uploadClips(
     const h = highlights[i];
     const m = metadata[i];
 
-    // Storage 업로드
-    const storagePath = `${jobId}/clip_${i}.mp4`;
+    // R2 업로드 — key 규칙은 앱의 prefix 컨벤션(`shorts/…`)을 그대로 따른다.
+    const storageKey = `shorts/${jobId}/clip_${i}.mp4`;
     const fileBuffer = readFileSync(filePath);
-
-    const { error: uploadError } = await supabase.storage
-      .from("shorts")
-      .upload(storagePath, fileBuffer, {
-        contentType: "video/mp4",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      throw new Error(`Storage 업로드 실패: ${uploadError.message}`);
-    }
-
-    const { data: urlData } = supabase.storage
-      .from("shorts")
-      .getPublicUrl(storagePath);
+    const videoUrl = await putObject(storageKey, fileBuffer, "video/mp4");
 
     // DB 삽입
     const { data: clip, error: insertError } = await supabase
@@ -52,7 +39,7 @@ export async function uploadClips(
         transcript: h.reason,
         caption_yt: m.caption_yt,
         caption_ig: m.caption_ig,
-        video_url: urlData.publicUrl,
+        video_url: videoUrl,
         review_status: "pending",
       })
       .select("id")

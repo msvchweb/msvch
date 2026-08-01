@@ -10,10 +10,15 @@
 
 import { createClient } from "@supabase/supabase-js";
 import { parse as parseHtml } from "node-html-parser";
+import sharp from "sharp";
+import { objectExists, publicUrlForKey, putObject } from "./lib/r2";
 
 const BLOG_ID = "msvch01";
 const RSS_URL = `https://rss.blog.naver.com/${BLOG_ID}`;
-const STORAGE_BUCKET = "blog-images";
+const STORAGE_PREFIX = "blog-images";
+/** 공지 이미지는 화면 표시용이라 1600px 로 충분 (앱 CONTENT_IMAGE_PRESET 와 동일). */
+const CONTENT_IMAGE_WIDTH = 1600;
+const CONTENT_IMAGE_QUALITY = 82;
 const MAX_IMAGES_PER_POST = 10;
 
 const CATEGORY_NOTICE = "교회소식";
@@ -201,31 +206,47 @@ async function uploadImages(
       const res = await fetch(src, { headers: IMAGE_HEADERS });
       if (!res.ok) { console.warn(`    이미지 다운로드 실패 (${res.status}): ${src}`); continue; }
 
-      const mime = res.headers.get("content-type") ?? "image/jpeg";
-      const ext = mimeToExt(mime);
-      const storagePath = `${logNo}/${i + 1}.${ext}`;
+      const mime = (res.headers.get("content-type") ?? "image/jpeg").split(";")[0].trim();
+      const original = Buffer.from(await res.arrayBuffer());
 
-      const { data: existing } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .list(logNo, { search: `${i + 1}.${ext}` });
+      // 이 이미지들은 공지 본문·홈 히어로가 그대로 로드한다(이미지 최적화 미사용).
+      // 저장 시점이 유일한 최적화 지점이므로 webp 로 줄여 넣는다.
+      // GIF 는 애니메이션이 깨지므로 원본을 유지한다.
+      let body: Buffer = original;
+      let contentType = mime;
+      let ext = mimeToExt(mime);
+      if (mime !== "image/gif") {
+        try {
+          const webp = await sharp(original)
+            .resize({ width: CONTENT_IMAGE_WIDTH, withoutEnlargement: true })
+            .webp({ quality: CONTENT_IMAGE_QUALITY })
+            .toBuffer();
+          if (webp.length < original.length) {
+            body = webp;
+            contentType = "image/webp";
+            ext = "webp";
+          }
+        } catch (e) {
+          console.warn(`    webp 변환 실패, 원본 사용: ${String(e)}`);
+        }
+      }
 
-      if (existing?.length > 0) {
-        const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
-        urlMap.set(src, data.publicUrl);
+      const storageKey = `${STORAGE_PREFIX}/${logNo}/${i + 1}.${ext}`;
+
+      if (await objectExists(storageKey)) {
+        urlMap.set(src, publicUrlForKey(storageKey));
         console.log(`    이미지 ${i + 1} 이미 존재 (스킵)`);
         continue;
       }
 
-      const buffer = Buffer.from(await res.arrayBuffer());
-      const { error } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(storagePath, buffer, { contentType: mime.split(";")[0].trim(), upsert: false });
-
-      if (error) { console.warn(`    업로드 실패: ${error.message}`); continue; }
-
-      const { data } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
-      urlMap.set(src, data.publicUrl);
-      console.log(`    이미지 ${i + 1}/${imageUrls.length} 업로드 완료`);
+      const publicUrl = await putObject(storageKey, body, contentType);
+      urlMap.set(src, publicUrl);
+      console.log(
+        `    이미지 ${i + 1}/${imageUrls.length} 업로드 완료` +
+          (contentType === "image/webp"
+            ? ` (${(original.length / 1024).toFixed(0)}KB → ${(body.length / 1024).toFixed(0)}KB)`
+            : ""),
+      );
 
       await new Promise((r) => setTimeout(r, 300));
     } catch (err) {
