@@ -8,6 +8,17 @@ import type { NextConfig } from "next";
 const CDN_BASE_URL = process.env.NEXT_PUBLIC_CDN_BASE_URL ?? "";
 const cdnUrl = CDN_BASE_URL ? new URL(CDN_BASE_URL) : null;
 
+/**
+ * R2 S3 API 엔드포인트 — 브라우저가 presigned URL 로 **직접 PUT** 하는 대상이라
+ * CSP `connect-src` 에 반드시 들어가야 한다. 읽기(`/cdn/…`)는 same-origin 이라
+ * img-src 로 충분하지만, 쓰기는 이 호스트로 직접 나간다.
+ *
+ * 계정 ID 는 presigned URL 안에 이미 노출되므로 헤더에 실어도 새로 새는 정보가 없다.
+ */
+const r2ApiOrigin = process.env.R2_ACCOUNT_ID
+  ? `https://${process.env.R2_ACCOUNT_ID}.r2.cloudflarestorage.com`
+  : "";
+
 const nextConfig: NextConfig = {
   serverExternalPackages: ["puppeteer-core", "@sparticuz/chromium-min"],
   outputFileTracingIncludes: {
@@ -101,7 +112,7 @@ const nextConfig: NextConfig = {
               `media-src 'self' ${cdnUrl?.origin ?? ""} https://*.supabase.co`,
               // youtube-nocookie: 모바일 주보 영상. 재생 전까지 추적 쿠키를 심지 않는다.
               "frame-src https://www.youtube.com https://www.youtube-nocookie.com https://www.google.com",
-              "connect-src 'self' https://*.supabase.co https://generativelanguage.googleapis.com https://accounts.google.com https://kauth.kakao.com https://kapi.kakao.com",
+              `connect-src 'self' ${r2ApiOrigin} https://*.supabase.co https://generativelanguage.googleapis.com https://accounts.google.com https://kauth.kakao.com https://kapi.kakao.com`,
               "font-src 'self'",
             ].join("; "),
           },
