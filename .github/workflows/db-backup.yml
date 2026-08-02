@@ -1,0 +1,137 @@
+name: DB backup
+
+# Supabase 무료 플랜에는 자동 백업이 없다 (Pro 의 일일 백업 7일 보관이 사라짐).
+# 공식 권고대로 db dump 를 주기적으로 떠서 오프사이트(R2)에 보관한다.
+#
+# 주의 1. Free 의 direct connection 은 IPv6 전용이라 IPv4 인 GitHub 러너에서 연결되지 않는다.
+#         반드시 **session pooler**(aws-<region>.pooler.supabase.com:5432) 문자열을 쓴다.
+#         transaction pooler(6543)는 pg_dump 와 맞지 않으므로 사용 금지.
+# 주의 2. 덤프에는 교인 개인정보가 들어간다(profiles, new_family_registrations 등).
+#         공개 버킷(msvch-storage)이 아니라 **비공개 msvch-backups** 로만 올린다.
+# 주의 3. npm 의존성을 쓰지 않는다 — 다른 워크플로가 겪은 lock 문제를 아예 만나지 않도록.
+
+on:
+  schedule:
+    - cron: "0 18 * * 0" # UTC 일 18:00 = KST 월 03:00
+  workflow_dispatch:
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+env:
+  R2_ENDPOINT: https://${{ secrets.R2_ACCOUNT_ID }}.r2.cloudflarestorage.com
+  R2_BUCKET: msvch-backups
+  R2_CREDS: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}:${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Dump roles / schema / data
+        env:
+          DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          set -euo pipefail
+          mkdir -p dump
+          # 3종을 모두 떠야 복구가 된다 — db dump 기본값은 스키마만이다.
+          supabase db dump --db-url "$DB_URL" --role-only -f dump/roles.sql
+          supabase db dump --db-url "$DB_URL"             -f dump/schema.sql
+          supabase db dump --db-url "$DB_URL" --data-only -f dump/data.sql
+          ls -la dump
+
+      - name: Sanity check
+        run: |
+          set -euo pipefail
+          # 빈 덤프가 조용히 올라가면 "백업이 있다"는 착각만 남는다.
+          for f in roles schema data; do
+            size=$(stat -c%s "dump/$f.sql")
+            echo "$f.sql = $size bytes"
+            if [ "$size" -lt 1024 ]; then
+              echo "::error::dump/$f.sql 이 비정상적으로 작습니다 ($size bytes)"
+              exit 1
+            fi
+          done
+          grep -q "INSERT INTO\|COPY " dump/data.sql \
+            || { echo "::error::data.sql 에 행 데이터가 없습니다"; exit 1; }
+
+      - name: Compress and encrypt
+        env:
+          GPG_PASSPHRASE: ${{ secrets.BACKUP_GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          cd dump
+          gzip -9 roles.sql schema.sql data.sql
+          if [ -n "${GPG_PASSPHRASE:-}" ]; then
+            for f in *.gz; do
+              gpg --batch --yes --symmetric --cipher-algo AES256 \
+                  --passphrase "$GPG_PASSPHRASE" "$f"
+              rm "$f"
+            done
+            echo "암호화 적용됨 (.gpg)"
+          else
+            echo "::warning::BACKUP_GPG_PASSPHRASE 미설정 — 덤프가 암호화되지 않은 채 저장됩니다."
+          fi
+          ls -la
+
+      - name: Upload to R2
+        run: |
+          set -euo pipefail
+          DAY=$(date -u +%Y-%m-%d)
+          for f in dump/*; do
+            name=$(basename "$f")
+            curl -sS -f -X PUT \
+              --aws-sigv4 "aws:amz:auto:s3" --user "$R2_CREDS" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary "@$f" \
+              "$R2_ENDPOINT/$R2_BUCKET/db/weekly/$DAY/$name"
+            echo "  업로드 db/weekly/$DAY/$name"
+            # 매월 1일자는 수명주기 삭제가 닿지 않는 경로에도 남긴다.
+            if [ "$(date -u +%d)" = "01" ]; then
+              curl -sS -f -X PUT \
+                --aws-sigv4 "aws:amz:auto:s3" --user "$R2_CREDS" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@$f" \
+                "$R2_ENDPOINT/$R2_BUCKET/db/monthly/$DAY/$name"
+              echo "  업로드 db/monthly/$DAY/$name"
+            fi
+          done
+
+      - name: Verify uploaded objects are readable
+        run: |
+          set -euo pipefail
+          DAY=$(date -u +%Y-%m-%d)
+          for f in dump/*; do
+            name=$(basename "$f")
+            code=$(curl -s -o /dev/null -w '%{http_code}' -I \
+              --aws-sigv4 "aws:amz:auto:s3" --user "$R2_CREDS" \
+              "$R2_ENDPOINT/$R2_BUCKET/db/weekly/$DAY/$name")
+            [ "$code" = "200" ] || { echo "::error::$name 확인 실패 (HTTP $code)"; exit 1; }
+          done
+          echo "업로드 검증 완료"
+
+      # 백업은 실패해도 아무도 모르는 게 가장 위험하다.
+      # (실제로 naver-blog-sync 가 며칠간 조용히 실패한 전례가 있다)
+      - name: Notify on failure
+        if: failure()
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+        run: |
+          if [ -z "${RESEND_API_KEY:-}" ]; then
+            echo "RESEND_API_KEY 미설정 — 알림을 보내지 못했습니다."
+            exit 0
+          fi
+          curl -sS -X POST "https://api.resend.com/emails" \
+            -H "Authorization: Bearer $RESEND_API_KEY" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"from\": \"명성비전교회 <onboarding@resend.dev>\",
+              \"to\": \"msvch01@naver.com\",
+              \"subject\": \"[긴급] DB 백업 실패\",
+              \"html\": \"<h2>DB 백업이 실패했습니다</h2><p>Supabase 무료 플랜에는 자동 백업이 없어, 이 작업이 유일한 백업입니다.</p><p><a href='https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}'>실행 로그 보기</a></p>\"
+            }" || echo "알림 전송 실패"
