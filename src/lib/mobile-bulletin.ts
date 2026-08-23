@@ -7,6 +7,8 @@ export const LIVE_LEAD_MS = 15 * 60 * 1000;
 export const LIVE_TAIL_MS = 30 * 60 * 1000;
 
 const YOUTUBE_HOSTS = new Set(["youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be"]);
+/** 종이 주보에서 기립을 뜻하는 마커. HWP 템플릿이 쓰는 기호들. */
+const STANDING_MARKERS = new Set(["※", "*", "▲"]);
 const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{6,50}$/;
 const KST_DATE_FORMATTER = new Intl.DateTimeFormat("en-CA", {
   timeZone: "Asia/Seoul",
@@ -50,6 +52,17 @@ function distanceToStart(service: MobileService, now: Date): number {
 
 function uniqueIds(values: Array<string | null>): string[] {
   return [...new Set(values.filter((value): value is string => Boolean(value)))];
+}
+
+/**
+ * HWP 조판용 자간 공백을 없앤다.
+ * 공백으로 끊은 조각이 전부 1글자면 자간 padding 으로 보고 붙이고("성 경 봉 독" → "성경봉독"),
+ * 하나라도 2글자 이상이면 진짜 낱말 경계이므로 공백 하나로만 줄인다("봉헌  및  기도" → "봉헌 및 기도").
+ */
+export function normalizeBulletinText(value: string): string {
+  const tokens = value.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return "";
+  return tokens.every((token) => token.length === 1) ? tokens.join("") : tokens.join(" ");
 }
 
 export function extractYouTubeVideoId(raw: string | null): string | null {
@@ -102,10 +115,19 @@ export function createDefaultMobileServices(date: string): MobileService[] {
 }
 
 function legacyItem(item: WorshipItemRow, index: number): MobileServiceItem | null {
-  const label = item.label.trim();
+  const label = normalizeBulletinText(item.label);
   const summary = item.content.trim();
   if (!label && !summary) return null;
-  const mapped = makeItem(`sunday-item-${index + 1}`, label || "예배 순서", summary, item.assignees, item.emphasize);
+  const mapped = makeItem(
+    `sunday-item-${index + 1}`,
+    label || "예배 순서",
+    summary,
+    item.assignees.map(normalizeBulletinText).filter(Boolean),
+    item.emphasize,
+  );
+  // 종이 주보는 기립을 marker(※)로 표시한다. 모바일로 옮길 때 이 정보를 버리면
+  // 직원이 매주 손으로 다시 체크해야 한다.
+  mapped.standing = STANDING_MARKERS.has(item.marker.trim());
   if (`${label} ${summary}`.includes("신앙고백") || `${label} ${summary}`.includes("사도신경")) {
     mapped.resourceId = APOSTLES_CREED_RESOURCE_ID;
   }

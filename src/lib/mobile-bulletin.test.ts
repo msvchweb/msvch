@@ -9,6 +9,7 @@ import {
   extractYouTubeVideoId,
   isServiceLive,
   legacyWeeklyToMobileServices,
+  normalizeBulletinText,
   rebaseMobileServices,
   resolveMobileServices,
   selectMobileServiceId,
@@ -160,6 +161,42 @@ it("maps legacy Sunday and Wednesday content and links the creed", () => {
   const mapped = legacyWeeklyToMobileServices(legacyWeekly);
   expect(mapped.map((service) => service.type)).toEqual(["sunday", "wednesday"]);
   expect(mapped[0].items[0].resourceId).toBe(APOSTLES_CREED_RESOURCE_ID);
+});
+
+describe("normalizeBulletinText", () => {
+  it("joins HWP letter-spacing padding into one word", () => {
+    expect(normalizeBulletinText("성 경 봉 독")).toBe("성경봉독");
+    expect(normalizeBulletinText("기     원")).toBe("기원");
+    expect(normalizeBulletinText("신 앙 고 백")).toBe("신앙고백");
+    expect(normalizeBulletinText("다 함 께")).toBe("다함께");
+  });
+
+  it("keeps real word boundaries and collapses runs to one space", () => {
+    expect(normalizeBulletinText("봉헌  및  기도")).toBe("봉헌 및 기도");
+    expect(normalizeBulletinText("예배의 부름")).toBe("예배의 부름");
+    expect(normalizeBulletinText("  결단의 찬송  ")).toBe("결단의 찬송");
+  });
+
+  it("returns an empty string for blank input", () => {
+    expect(normalizeBulletinText("")).toBe("");
+    expect(normalizeBulletinText("   ")).toBe("");
+  });
+});
+
+it("carries the paper bulletin standing marker into the mobile order", () => {
+  const mapped = legacyWeeklyToMobileServices({
+    ...legacyWeekly,
+    worship_items: [
+      { marker: "※", label: "성 경 봉 독", content: "빌 3:12 - 14", assignees: ["다 함 께"], subRows: [], emphasize: false },
+      { marker: "", label: "찬    양", content: "모든 이름 위에", assignees: [], subRows: [], emphasize: false },
+    ],
+  });
+  expect(mapped[0].items[0]).toMatchObject({
+    label: "성경봉독",
+    standing: true,
+    assignees: ["다함께"],
+  });
+  expect(mapped[0].items[1]).toMatchObject({ label: "찬양", standing: false });
 });
 
 it("appends a legacy closing hymn when an earlier hymn is not the closing item", () => {

@@ -369,3 +369,78 @@ describe("MobileServiceExperience", () => {
     });
   });
 });
+
+describe("예배 순서 레이아웃", () => {
+  /** "예배 순서" 제목을 감싼 바깥 블록 (mt-6 scroll-mt-20 …) */
+  function orderBlock(): HTMLElement {
+    const heading = screen.getByRole("heading", { name: "예배 순서" });
+    return heading.parentElement!.parentElement!;
+  }
+
+  function withItem(item: Partial<MobileService["items"][number]>): MobileService[] {
+    return [{ ...services[0], items: [{ ...services[0].items[0], ...item }] }];
+  }
+
+  it("puts the assignee on the order name row and the summary on the next line", () => {
+    atSundayService(() => {
+      render(
+        <MobileServiceExperience
+          {...baseProps}
+          services={withItem({
+            label: "성 경 봉 독",
+            summary: "빌 3:12 - 14",
+            assignees: ["다 함 께"],
+            resourceId: null,
+          })}
+        />,
+      );
+
+      const label = screen.getByText("성경봉독");
+      const assignee = screen.getByText("다함께");
+      const summary = screen.getByText("빌 3:12 - 14");
+
+      // 순서명과 담당자는 같은 행 컨테이너 안에 있다.
+      expect(label.parentElement).toContainElement(assignee);
+      // 내용은 그 행 밖 — 아랫줄이다.
+      expect(label.parentElement).not.toContainElement(summary);
+    });
+  });
+
+  it("marks a standing item and shows the footnote", () => {
+    atSundayService(() => {
+      render(<MobileServiceExperience {...baseProps} services={withItem({ standing: true })} />);
+      expect(screen.getByText("▲ 표는 일어서 주시기 바랍니다")).toBeInTheDocument();
+      expect(screen.getByText("기립")).toBeInTheDocument();
+    });
+  });
+
+  it("omits the standing footnote when nothing stands", () => {
+    atSundayService(() => {
+      render(<MobileServiceExperience {...baseProps} />);
+      expect(
+        screen.queryByText("▲ 표는 일어서 주시기 바랍니다"),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it("pins the video and drops the order snap while a video plays", () => {
+    atSundayService(() => {
+      const { container } = render(<MobileServiceExperience {...baseProps} />);
+      const iframe = container.querySelector("iframe");
+      expect(iframe).not.toBeNull();
+      expect(iframe!.parentElement!.className).toContain("sticky");
+      expect(iframe!.getAttribute("allow")).toContain("fullscreen");
+      expect(orderBlock().className).not.toContain("snap-start");
+    });
+  });
+
+  it("keeps the order snap when no video is available", () => {
+    atSundayService(() => {
+      const { container } = render(
+        <MobileServiceExperience {...baseProps} services={[services[1]]} />,
+      );
+      expect(container.querySelector("iframe")).toBeNull();
+      expect(orderBlock().className).toContain("snap-start");
+    });
+  });
+});
