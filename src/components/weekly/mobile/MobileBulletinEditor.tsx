@@ -20,6 +20,15 @@ type Props = {
   warning?: string | null;
 };
 
+/** 관리자 화면에 노출되는 예배 종류 이름. 저장값은 영문 키 그대로다. */
+const SERVICE_TYPE_LABELS: Record<MobileServiceType, string> = {
+  sunday: "주일예배",
+  wednesday: "수요예배",
+  friday: "금요기도회",
+  other: "기타 예배",
+};
+const SERVICE_TYPES = Object.keys(SERVICE_TYPE_LABELS) as MobileServiceType[];
+
 function toWeekly(weekly: WeeklyContentInput) {
   return { ...weekly, id: "mobile-draft", created_at: new Date().toISOString(), date: weekly.date ?? null } as Parameters<typeof legacyWeeklyToMobileServices>[0];
 }
@@ -62,7 +71,7 @@ export function MobileBulletinEditor({ value, weekly, resources, videos, onChang
       </div>
       {warning && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{warning}</p>}
       <div className="flex flex-wrap gap-2">
-        {([['sunday', '주일예배 추가'], ['wednesday', '수요예배 추가'], ['friday', '금요기도회 추가'], ['other', '기타 예배 추가']] as const).map(([type, label]) => <button key={type} type="button" onClick={() => addService(type)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white">{label}</button>)}
+        {SERVICE_TYPES.map((type) => <button key={type} type="button" onClick={() => addService(type)} className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 hover:bg-white">{SERVICE_TYPE_LABELS[type]} 추가</button>)}
       </div>
       {value.length === 0 && <p className="rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500">등록된 모바일 예배가 없습니다.</p>}
       {value.map((service) => (
@@ -73,7 +82,7 @@ export function MobileBulletinEditor({ value, weekly, resources, videos, onChang
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="text-sm">예배 이름<input className="mt-1 w-full rounded border px-3 py-2" value={service.label} onChange={(event) => onChange(updateService(value, service.id, { label: event.target.value }))} /></label>
-            <label className="text-sm">종류<select className="mt-1 w-full rounded border px-3 py-2" value={service.type} onChange={(event) => onChange(updateService(value, service.id, { type: event.target.value as MobileServiceType }))}>{['sunday','wednesday','friday','other'].map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
+            <label className="text-sm">종류<select className="mt-1 w-full rounded border px-3 py-2" value={service.type} onChange={(event) => onChange(updateService(value, service.id, { type: event.target.value as MobileServiceType }))}>{SERVICE_TYPES.map((type) => <option key={type} value={type}>{SERVICE_TYPE_LABELS[type]}</option>)}</select></label>
             <label className="text-sm">인도자<input className="mt-1 w-full rounded border px-3 py-2" value={service.leader} onChange={(event) => onChange(updateService(value, service.id, { leader: event.target.value }))} /></label>
             <label className="text-sm">시작 시각<input type="datetime-local" className="mt-1 w-full rounded border px-3 py-2" value={toDateTimeLocal(service.startsAt)} onChange={(event) => onChange(updateService(value, service.id, { startsAt: fromDateTimeLocal(event.target.value) }))} /></label>
             <label className="text-sm">종료 시각<input type="datetime-local" className="mt-1 w-full rounded border px-3 py-2" value={toDateTimeLocal(service.endsAt)} onChange={(event) => onChange(updateService(value, service.id, { endsAt: fromDateTimeLocal(event.target.value) }))} /></label>

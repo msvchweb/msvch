@@ -110,7 +110,7 @@ const DEFAULT_DATA: BulletinBackData = {
     { label: "주일 1부", time: "오전 8시", place: "본 당", rightLabel: "영유치부", rightTime: "낮 12시", rightPlace: "본 관 1층" },
     { label: "주일 2부", time: "오전 10시", place: "본 당", rightLabel: "아동부", rightTime: "오전 10시", rightPlace: "교육관 2층" },
     { label: "주일 3부", time: "낮 12시", place: "본 당", rightLabel: "청소년부", rightTime: "낮 12시", rightPlace: "교육관 3층" },
-    { label: "주일 오후", time: "오후 2시30분", place: "본 당", rightLabel: "청년부", rightTime: "매월 첫째 주일\n오후 2시 30분", rightPlace: "본 당" },
+    { label: "주일 오후", time: "오후 2시30분", place: "본 당", rightLabel: "청년부", rightTime: "매월 첫째 주일\n오후 2시", rightPlace: "교육관 3층" },
     { label: "금요기도회", time: "저녁 8시30분", place: "본 당", rightLabel: "수요예배", rightTime: "저녁 7시 30분", rightPlace: "본 당" },
     { label: "새벽기도회", time: "오전 6시 (토·주일 없음)", place: "" },
   ],

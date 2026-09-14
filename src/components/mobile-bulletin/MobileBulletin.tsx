@@ -2,11 +2,11 @@ import { MobileServiceExperience } from "./MobileServiceExperience";
 import { BulletinThemeShell } from "./BulletinThemeShell";
 import {
   BulletinFooterLinks,
-  ChurchNews,
   NextWeekServing,
   OfferingAccount,
   PrayerTopics,
 } from "./MobileBulletinSections";
+import { ChurchNews } from "./ChurchNews";
 import { loadCommunityPrayers, loadOfferingAccount } from "@/lib/bulletin-master";
 import { loadMobileBulletinRelations } from "@/lib/mobile-bulletin-data";
 import { formatLiturgyLabel } from "@/lib/liturgical/format";
