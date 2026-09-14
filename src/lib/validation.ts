@@ -829,6 +829,14 @@ export const ExtractEventsResponseSchema = z.object({
     .default([]),
 });
 
+/**
+ * 주보 사진 → 캘린더 주간 자동 등록 — Gemini 응답 전체 형태.
+ * 기존 형태 + 사진에 인쇄된 주보 발행일(`bulletinDate`, 못 읽으면 null).
+ */
+export const PhotoExtractEventsResponseSchema = ExtractEventsResponseSchema.extend({
+  bulletinDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
+});
+
 /** POST /api/admin/calendar/batch — 클라이언트가 검수·편집 후 보내는 페이로드 1건 */
 export const EventBatchInsertItemSchema = z
   .object({

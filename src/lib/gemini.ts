@@ -9,7 +9,7 @@ interface GeminiResponse {
 }
 
 /** Gemini API 의 contents[].parts[] 항목. text 또는 inlineData(이미지) 만 사용. */
-type GeminiPart =
+export type GeminiPart =
   | { text: string }
   | { inlineData: { mimeType: string; data: string } };
 
@@ -120,6 +120,95 @@ export async function callGeminiWithFallbackMultimodal(
     })),
   ];
   return callWithRetryAndFallback(parts);
+}
+
+/** callGeminiSingleModel 이 HTTP 오류 응답을 받았을 때. status 로 일시 장애와 설정 오류를 구분한다. */
+export class GeminiHttpError extends Error {
+  readonly status: number;
+
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = "GeminiHttpError";
+    this.status = status;
+  }
+}
+
+/** callGeminiSingleModel 이 timeoutMs 안에 응답을 끝까지 받지 못했을 때. */
+export class GeminiTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "GeminiTimeoutError";
+  }
+}
+
+interface GeminiSingleModelResponse {
+  candidates?: {
+    content?: {
+      parts?: { text?: string }[];
+    };
+  }[];
+}
+
+/**
+ * 모델 1개를 1회만 호출 — 내부 재시도·모델 폴백 없음.
+ * 재시도는 호출자(작업 단위, 예: 주보 사진 → 일정 주간 동기화)가 담당한다.
+ *
+ * - 응답 텍스트는 candidates[0] 의 text 파트를 이어 붙인 값 (없으면 빈 문자열).
+ * - 예외 메시지에는 API 키가 들어간 요청 URL 을 넣지 않는다.
+ *
+ * @throws Error               GEMINI_API_KEY 미설정
+ * @throws GeminiHttpError     HTTP 오류 응답
+ * @throws GeminiTimeoutError  timeoutMs 초과 (응답 본문 읽기 포함)
+ * @throws TypeError           네트워크 오류 (fetch 실패)
+ */
+export async function callGeminiSingleModel(input: {
+  model: string;
+  parts: GeminiPart[];
+  timeoutMs: number;
+  responseMimeType?: "application/json";
+}): Promise<string> {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error("GEMINI_API_KEY가 설정되지 않았습니다.");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), input.timeoutMs);
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${apiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: input.parts }],
+          ...(input.responseMimeType
+            ? { generationConfig: { responseMimeType: input.responseMimeType } }
+            : {}),
+        }),
+        signal: controller.signal,
+      },
+    );
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new GeminiHttpError(
+        res.status,
+        `Gemini API 오류 (${input.model}): ${res.status} ${body.slice(0, 500)}`,
+      );
+    }
+
+    const data = (await res.json()) as GeminiSingleModelResponse;
+    const parts = data.candidates?.[0]?.content?.parts ?? [];
+    return parts.map((p) => p.text ?? "").join("");
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new GeminiTimeoutError(
+        `Gemini 응답 시간 초과 (${input.model}, ${input.timeoutMs}ms)`,
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function summarizeSermonFromVideo(

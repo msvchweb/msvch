@@ -23,10 +23,12 @@ interface ExtractResult {
   skipped: { sourceNewsIndex: number; reason: string }[];
 }
 
-/** anchorDate 의 KST 요일 한글 (일/월/.../토) */
-function dayOfWeekKo(dateStr: string): string {
-  const d = new Date(dateStr + "T00:00:00+09:00");
-  return KOREAN_DAYS[d.getDay()];
+/**
+ * YYYY-MM-DD 달력 날짜의 요일 한글 (일/월/.../토).
+ * UTC 자정으로 해석해 UTC 요일을 읽으므로 서버 시간대(Vercel 기본 UTC 포함)와 관계없이 같은 요일이 나온다.
+ */
+export function dayOfWeekKo(dateStr: string): string {
+  return KOREAN_DAYS[new Date(dateStr + "T00:00:00Z").getUTCDay()];
 }
 
 function flattenNews(news: NewsItem[]): string {
@@ -49,6 +51,30 @@ function flattenMeetings(meetings: MeetingRow[]): string {
     .join("\n");
 }
 
+/**
+ * 추출 규칙 1~8 블록 (`[추출 규칙]` 제목 포함, 끝 줄바꿈 없음).
+ * 텍스트 추출(buildPrompt)과 주보 사진 추출(weekly-photo-event-extractor)이 같은 문구를 쓴다.
+ * 문구를 바꾸면 두 프롬프트가 함께 바뀐다.
+ */
+export function buildEventExtractionRules(): string {
+  return `[추출 규칙]
+1. 일자(또는 일자 후보)가 본문에 명시된 항목만 일정 후보로 추출.
+   - "5/9(토) 오후 5시" → date=2026-05-09, startTime=17:00
+   - "오늘 3부예배 직후" → date=발행일, startTime=null
+   - "매주 화요일" → 발행일 이후 첫 화요일을 date 로, rruleHint="FREQ=WEEKLY;BYDAY=TU"
+2. 일자 정보가 전혀 없는 안내(예: "교회 인터넷 홈페이지 개편 진행 중")는 절대 추출 금지 — skipped 에 사유 기록.
+3. 한 항목 안에 여러 날짜가 있으면 각각 별개 후보로 분리.
+4. 동일 행사의 부속 정보(준비물·문의처)는 description 에 합쳐서 작성.
+5. 본문에 없는 정보를 만들어내지 마세요. 모르면 null.
+6. confidence:
+   - 절대 날짜 + 시간 + 장소 모두 명시 → 0.9 이상
+   - 시간 또는 장소 누락 → 0.7
+   - 일자 추정만 가능 → 0.5
+   - 자신 없음 → 0.3 (그래도 추출은 함, UI 가 경고 표시)
+7. sourceNewsIndex 는 [교회소식] 의 0-based 인덱스. 모임 안내·북한선교부 메모에서 뽑은 경우 null.
+8. sourceQuote 에는 본문에서 그대로 따온 단편 (50자 이내 권장).`;
+}
+
 function buildPrompt(input: ExtractInput): string {
   const { anchorDate, news, meetings, northKoreaNote } = input;
   const dow = dayOfWeekKo(anchorDate);
@@ -65,22 +91,7 @@ ${flattenNews(news)}
 [모임 안내 원문]
 ${flattenMeetings(meetings)}
 ${northKoreaNote ? `\n[북한선교부 메모]\n${northKoreaNote}\n` : ""}
-[추출 규칙]
-1. 일자(또는 일자 후보)가 본문에 명시된 항목만 일정 후보로 추출.
-   - "5/9(토) 오후 5시" → date=2026-05-09, startTime=17:00
-   - "오늘 3부예배 직후" → date=발행일, startTime=null
-   - "매주 화요일" → 발행일 이후 첫 화요일을 date 로, rruleHint="FREQ=WEEKLY;BYDAY=TU"
-2. 일자 정보가 전혀 없는 안내(예: "교회 인터넷 홈페이지 개편 진행 중")는 절대 추출 금지 — skipped 에 사유 기록.
-3. 한 항목 안에 여러 날짜가 있으면 각각 별개 후보로 분리.
-4. 동일 행사의 부속 정보(준비물·문의처)는 description 에 합쳐서 작성.
-5. 본문에 없는 정보를 만들어내지 마세요. 모르면 null.
-6. confidence:
-   - 절대 날짜 + 시간 + 장소 모두 명시 → 0.9 이상
-   - 시간 또는 장소 누락 → 0.7
-   - 일자 추정만 가능 → 0.5
-   - 자신 없음 → 0.3 (그래도 추출은 함, UI 가 경고 표시)
-7. sourceNewsIndex 는 [교회소식] 의 0-based 인덱스. 모임 안내·북한선교부 메모에서 뽑은 경우 null.
-8. sourceQuote 에는 본문에서 그대로 따온 단편 (50자 이내 권장).
+${buildEventExtractionRules()}
 
 [출력 형식]
 오직 다음 형태의 JSON 객체 하나만 출력. 마크다운 코드펜스 (\`\`\`) 절대 금지. 설명 문장 절대 금지.
@@ -106,7 +117,7 @@ ${northKoreaNote ? `\n[북한선교부 메모]\n${northKoreaNote}\n` : ""}
 }`;
 }
 
-function stripCodeFence(s: string): string {
+export function stripCodeFence(s: string): string {
   let out = s.trim();
   out = out.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
   // 모델이 "Here is the JSON:" 같은 머리말을 붙이는 경우 — JSON 시작 직전까지 잘라냄
@@ -119,7 +130,7 @@ function stripCodeFence(s: string): string {
  * 원문 sourceQuote 의 (요일) 표기와 추출된 date 의 실제 요일이 어긋나면
  * 모델이 연도를 잘못 추정한 신호 → confidence 강제 하향.
  */
-function adjustConfidenceByDayOfWeek(c: ExtractedEvent): ExtractedEvent {
+export function adjustConfidenceByDayOfWeek(c: ExtractedEvent): ExtractedEvent {
   if (!c.date || !c.sourceQuote) return c;
   const m = c.sourceQuote.match(/\(([일월화수목금토])\)/);
   if (!m) return c;
@@ -136,7 +147,7 @@ function adjustConfidenceByDayOfWeek(c: ExtractedEvent): ExtractedEvent {
  * - date 가 anchor 보다 14일 이상 과거 → 의심스럽지만 거부하지 않고 confidence 만 하향.
  * - date 가 anchor + 365일 초과 → 동일하게 하향.
  */
-function adjustConfidenceByDateRange(
+export function adjustConfidenceByDateRange(
   c: ExtractedEvent,
   anchorDate: string,
 ): ExtractedEvent {
