@@ -1,0 +1,28 @@
+name: Weekly event sync
+
+on:
+  schedule:
+    # UTC 01,04,07,10,13,16,19,22시 = KST 10,13,16,19,22,01,04,07시
+    # 토요일 22:00 KST(= 토 13:00 UTC) 포함, 이후 3시간마다 재시도 처리
+    - cron: "0 1-22/3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-event-sync
+  cancel-in-progress: false
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Call weekly event sync
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          curl -sS -f -X POST \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            --max-time 320 \
+            "$APP_URL/api/admin/cron/weekly-event-sync"
