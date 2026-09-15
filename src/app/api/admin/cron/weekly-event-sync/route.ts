@@ -22,8 +22,11 @@ import { extractEventsFromWeeklyPhotos } from "@/lib/weekly-photo-event-extracto
 import type { WeeklyEventSyncTickResult } from "@/types/weekly-event-sync";
 
 export const dynamic = "force-dynamic";
-// 작업 최대 3건 × Gemini 최대 90초 + 사진 다운로드
+// 작업 1건 최악 약 130초(사진 30초 + Gemini 90초 + DB). 3건이면 이 제한을 넘으므로
+// runWeeklyEventSyncTick 이 남은 시간(remainingMs)을 보고 끝낼 수 없는 작업은 시작하지 않는다.
 export const maxDuration = 300;
+/** maxDuration 에서 응답·로그 여유 15초를 뺀 처리 예산 */
+const TICK_TIME_BUDGET_MS = (maxDuration - 15) * 1000;
 
 function constantTimeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -37,6 +40,8 @@ function constantTimeEqual(a: string, b: string): boolean {
 export async function POST(
   request: NextRequest,
 ): Promise<NextResponse<WeeklyEventSyncTickResult | { error: string }>> {
+  const startedAtMs = Date.now();
+
   const provided =
     request.headers.get("x-cron-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
@@ -60,7 +65,8 @@ export async function POST(
     const result = await runWeeklyEventSyncTick({
       store: createSupabaseWeeklyEventSyncStore(supabase),
       extract: extractEventsFromWeeklyPhotos,
-      now: new Date(),
+      now: new Date(startedAtMs),
+      remainingMs: () => TICK_TIME_BUDGET_MS - (Date.now() - startedAtMs),
     });
     return NextResponse.json<WeeklyEventSyncTickResult>(result);
   } catch (err) {

@@ -166,10 +166,37 @@ function cdnPrefixFor(sub: string): string {
   return base ? `${base}/${sub}/` : "";
 }
 
+/** https 주소만 파싱한다. 형식이 틀리거나 https 가 아니면 null */
+function parseHttpsUrl(value: string): URL | null {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "https:" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 주보 사진 주소. 서버(주간 일정 동기화)가 이 주소를 직접 내려받으므로 호스트까지 확인한다.
+ * - https 이고 정규화 결과가 원문과 같아야 한다 (`../` 등으로 검사한 경로와 실제 요청 경로가 달라지는 것을 막음)
+ * - CDN: NEXT_PUBLIC_CDN_BASE_URL 과 같은 origin 이고 경로가 `<base 경로>/weeklies/` 로 시작
+ * - 옛 Supabase: NEXT_PUBLIC_SUPABASE_URL 과 같은 origin 이고 경로가 LEGACY_WEEKLY_URL_FRAGMENT 로 시작
+ */
 export function isAllowedWeeklyPhotoUrl(url: string): boolean {
-  const cdn = cdnPrefixFor("weeklies");
-  if (cdn && url.startsWith(cdn)) return true;
-  return url.includes(LEGACY_WEEKLY_URL_FRAGMENT);
+  const parsed = parseHttpsUrl(url);
+  if (!parsed || parsed.href !== url) return false;
+
+  const cdn = parseHttpsUrl(cdnPrefixFor("weeklies"));
+  if (cdn && parsed.origin === cdn.origin && parsed.pathname.startsWith(cdn.pathname)) {
+    return true;
+  }
+
+  const supabase = parseHttpsUrl(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "");
+  return (
+    supabase !== null &&
+    parsed.origin === supabase.origin &&
+    parsed.pathname.startsWith(LEGACY_WEEKLY_URL_FRAGMENT)
+  );
 }
 
 export function isAllowedBoardImageUrl(url: string): boolean {
