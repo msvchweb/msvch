@@ -154,7 +154,7 @@ interface GeminiSingleModelResponse {
  * 재시도는 호출자(작업 단위, 예: 주보 사진 → 일정 주간 동기화)가 담당한다.
  *
  * - 응답 텍스트는 candidates[0] 의 text 파트를 이어 붙인 값 (없으면 빈 문자열).
- * - 예외 메시지에는 API 키가 들어간 요청 URL 을 넣지 않는다.
+ * - API 키는 요청 URL 이 아니라 `x-goog-api-key` 헤더로 보낸다 (URL 은 로그·오류 원인에 남기 쉽다).
  *
  * @throws Error               GEMINI_API_KEY 미설정
  * @throws GeminiHttpError     HTTP 오류 응답
@@ -174,10 +174,10 @@ export async function callGeminiSingleModel(input: {
   const timer = setTimeout(() => controller.abort(), input.timeoutMs);
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(input.model)}:generateContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [{ parts: input.parts }],
           ...(input.responseMimeType

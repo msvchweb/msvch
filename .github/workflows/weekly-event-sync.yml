@@ -21,8 +21,17 @@ jobs:
           APP_URL: ${{ secrets.APP_URL }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          curl -sS -f -X POST \
+          set -euo pipefail
+          # curl -f 는 400 이상만 실패로 보고 리다이렉트(3xx)는 성공으로 끝낸다.
+          # 라우트가 실제로 처리했는지 알 수 있게 응답 코드가 200 인지 직접 확인한다.
+          status=$(curl -sS -o response.json -w '%{http_code}' -X POST \
             -H "Authorization: Bearer $CRON_SECRET" \
             -H "x-cron-secret: $CRON_SECRET" \
             --max-time 320 \
-            "$APP_URL/api/admin/cron/weekly-event-sync"
+            "$APP_URL/api/admin/cron/weekly-event-sync")
+          cat response.json
+          echo
+          if [ "$status" != "200" ]; then
+            echo "::error::weekly-event-sync 응답이 HTTP $status 입니다 (200 이 아님). APP_URL 이 리다이렉트 없는 최종 주소인지, CRON_SECRET 이 Vercel 과 같은지 확인하세요."
+            exit 1
+          fi

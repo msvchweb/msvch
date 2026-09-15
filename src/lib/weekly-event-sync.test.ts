@@ -20,6 +20,7 @@ import {
   dayOfWeekKo,
   extractEventsFromNews,
 } from "@/lib/news-event-extractor";
+import { isAllowedWeeklyPhotoUrl } from "@/lib/validation";
 import {
   classifyError,
   currentRunWeek,
@@ -27,9 +28,13 @@ import {
   hashPhotoImages,
   isDuplicateEvent,
   isRealIsoDate,
+  JOB_WORST_CASE_MS,
+  LAST_ERROR_MAX_LENGTH,
   normalizeEventTitle,
+  pickDueJobs,
   RETRY_DELAY_MS,
   runWeeklyEventSyncTick,
+  sanitizeErrorMessage,
   selectEventsToInsert,
   targetWeeklyRange,
   type DueJobQuery,
@@ -349,11 +354,23 @@ class MemoryStore implements WeeklyEventSyncStore {
   }
 
   async listDueJobs(query: DueJobQuery): Promise<SyncJobRow[]> {
-    return this.jobs
-      .filter((j) => this.isDue(j, query))
-      .sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0))
-      .slice(0, query.limit)
-      .map((j) => ({
+    const byKey =
+      (key: (j: MemoryJob) => string | null) =>
+      (a: MemoryJob, b: MemoryJob): number => {
+        const ka = key(a) ?? "";
+        const kb = key(b) ?? "";
+        return ka < kb ? -1 : ka > kb ? 1 : 0;
+      };
+    const due = this.jobs.filter((j) => this.isDue(j, query));
+    // Supabase 구현과 같은 순서: pending(created_at) → 재시도(next_retry_at) → 멈춘 running(started_at)
+    return pickDueJobs(
+      {
+        pending: due.filter((j) => j.status === "pending").sort(byKey((j) => j.created_at)),
+        retry: due.filter((j) => j.status === "retry_scheduled").sort(byKey((j) => j.next_retry_at)),
+        stale: due.filter((j) => j.status === "running").sort(byKey((j) => j.started_at)),
+      },
+      query.limit,
+    ).map((j) => ({
         id: j.id,
         run_week: j.run_week,
         weekly_id: j.weekly_id,
@@ -1004,16 +1021,16 @@ describe("작업 처리 — events 자동 등록", () => {
     ]);
   });
 
-  it("기준 날짜: 인쇄 발행일이 weekly.date 보다 우선하고, 다르면 date_mismatch=true", async () => {
+  it("기준 날짜: 참고 날짜와 14일 이내로 읽은 인쇄 발행일이 weekly.date 보다 우선하고, 다르면 date_mismatch=true", async () => {
     const store = new MemoryStore(RUN_START);
-    store.weeklies = [makeWeekly({ date: "2026-09-13" })];
+    store.weeklies = [makeWeekly({ date: "2026-09-06" })];
     const extract = vi.fn<WeeklyPhotoExtractor>(async () =>
       extraction({
-        bulletinDate: "2026-09-06",
+        bulletinDate: "2026-09-13",
         candidates: [
-          // 인쇄 발행일(9/6) 기준 369일 뒤 → 범위 보정으로 신뢰도 0.4 → 등록 안 함
-          // (weekly.date 9/13 기준이었다면 362일이라 보정되지 않았을 것)
-          makeCandidate({ title: "내년 가을 수련회", date: "2027-09-10" }),
+          // 날짜 범위 보정은 모델이 읽은 발행일(9/13)이 아니라 참고 날짜 weekly.date(9/6) 기준:
+          // 9/6 기준 367일 뒤 → 신뢰도 0.4 → 등록 안 함 (9/13 기준이었다면 360일이라 보정되지 않았을 것)
+          makeCandidate({ title: "내년 가을 수련회", date: "2027-09-08" }),
           makeCandidate({ title: "가을 수련회", date: "2026-09-19" }),
         ],
       }),
@@ -1021,15 +1038,38 @@ describe("작업 처리 — events 자동 등록", () => {
 
     await tick(store, extract, RUN_START);
 
+    expect(extract.mock.calls.map(([input]) => input.referenceDate)).toEqual(["2026-09-06"]);
     expect(store.jobs[0]).toMatchObject({
       status: "succeeded",
-      bulletin_date: "2026-09-06",
-      anchor_date: "2026-09-06",
+      bulletin_date: "2026-09-13",
+      anchor_date: "2026-09-13",
       date_mismatch: true,
     });
     expect(store.jobs[0].skipped).toEqual([
-      { title: "내년 가을 수련회", date: "2027-09-10", reason: "신뢰도 낮음" },
+      { title: "내년 가을 수련회", date: "2027-09-08", reason: "신뢰도 낮음" },
     ]);
+    expect(store.insertedRows().map((r) => r.title)).toEqual(["가을 수련회"]);
+  });
+
+  it.each([
+    { label: "14일 차이 → 인쇄 발행일을 기준으로 씀", bulletinDate: "2026-08-30", anchor: "2026-08-30" },
+    { label: "15일 차이 → 오독으로 보고 weekly.date 를 씀", bulletinDate: "2026-08-29", anchor: "2026-09-13" },
+    { label: "연도 오독(1년 차이) → weekly.date 를 씀", bulletinDate: "2025-09-13", anchor: "2026-09-13" },
+  ])("인쇄 발행일이 참고 날짜와 벌어진 정도: $label (date_mismatch 기록은 남김)", async ({ bulletinDate, anchor }) => {
+    const store = new MemoryStore(RUN_START);
+    store.weeklies = [makeWeekly({ date: "2026-09-13" })];
+    const extract = vi.fn<WeeklyPhotoExtractor>(async () =>
+      extraction({ bulletinDate, candidates: [makeCandidate()] }),
+    );
+
+    await tick(store, extract, RUN_START);
+
+    expect(store.jobs[0]).toMatchObject({
+      status: "succeeded",
+      bulletin_date: bulletinDate,
+      anchor_date: anchor,
+      date_mismatch: true,
+    });
     expect(store.insertedRows().map((r) => r.title)).toEqual(["가을 수련회"]);
   });
 
@@ -1295,6 +1335,161 @@ describe("주보 사진 추출 — 모델·사진·요청 형태", () => {
     expect(prompt).toContain("식당 봉사");
     expect(prompt).toContain('"bulletinDate": "YYYY-MM-DD or null"');
     expect(prompt).toContain(buildEventExtractionRules());
+  });
+
+  it("Gemini API 키는 요청 주소가 아니라 x-goog-api-key 헤더로 보낸다", async () => {
+    const calls = stubFetch((url) =>
+      url.includes(GEMINI_HOST) ? geminiTextResponse(EMPTY_RESPONSE) : imageResponse(),
+    );
+
+    await extractEventsFromWeeklyPhotos({ photoUrls: photoUrls("weekly-0913"), referenceDate: "2026-09-13" });
+
+    const [gemini] = geminiCalls(calls);
+    expect(gemini.url).not.toContain("key=");
+    expect(new Headers(gemini.init?.headers).get("x-goog-api-key")).toBe("test-key");
+  });
+
+  it("사진 다운로드는 리다이렉트를 따라가지 않고, 3xx 로 응답한 사진은 빼고 진행한다", async () => {
+    const calls = stubFetch((url) => {
+      if (url.includes(GEMINI_HOST)) return geminiTextResponse(EMPTY_RESPONSE);
+      if (url.endsWith("/p1.webp")) {
+        return new Response(null, { status: 302, headers: { location: "https://elsewhere.test/p1.webp" } });
+      }
+      return imageResponse();
+    });
+
+    await extractEventsFromWeeklyPhotos({ photoUrls: photoUrls("weekly-0913"), referenceDate: "2026-09-13" });
+
+    const photoCalls = calls.filter((c) => !c.url.includes(GEMINI_HOST));
+    expect(photoCalls.map((c) => c.init?.redirect)).toEqual(["manual", "manual"]);
+    // 프롬프트 1 + 리다이렉트가 아닌 사진 1장
+    expect(geminiRequestBody(geminiCalls(calls)[0]).contents[0].parts).toHaveLength(2);
+  });
+
+  it.each([
+    { label: "다른 호스트 주소에 옛 저장소 경로 조각이 들어 있음", url: "https://evil.test/x?y=/storage/v1/object/public/weeklies/a.png" },
+    { label: "다른 호스트의 옛 저장소 경로", url: "https://evil.test/storage/v1/object/public/weeklies/a.png" },
+    { label: "CDN 주소 뒤 ../ 로 다른 경로를 가리킴", url: `${CDN_BASE}/weeklies/../../api/health` },
+    { label: "https 가 아닌 CDN 주소", url: "http://cdn.test/weeklies/weekly-0913/p1.webp" },
+    { label: "https 가 아닌 내부 주소", url: "http://127.0.0.1:8080/storage/v1/object/public/weeklies/a.png" },
+  ])("사진 주소 허용 목록: $label → 거부", ({ url }) => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.test");
+    expect(isAllowedWeeklyPhotoUrl(url)).toBe(false);
+  });
+
+  it("사진 주소 허용 목록: CDN 주소와 우리 Supabase 프로젝트의 옛 저장소 주소는 허용", () => {
+    vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://supabase.test");
+    expect(isAllowedWeeklyPhotoUrl(`${CDN_BASE}/weeklies/weekly-0913/p1.webp`)).toBe(true);
+    expect(
+      isAllowedWeeklyPhotoUrl("https://supabase.test/storage/v1/object/public/weeklies/photos/draft-1/a.webp"),
+    ).toBe(true);
+  });
+});
+
+// ──────────────────────────────────────────────
+//  작업 처리 순서와 시간 예산 (리뷰 반영)
+// ──────────────────────────────────────────────
+
+describe("작업 처리 순서와 시간 예산", () => {
+  function dueJob(id: string, status: SyncJobRow["status"], createdAt: string): SyncJobRow {
+    return {
+      id,
+      run_week: "2026-09-12",
+      weekly_id: `weekly-${id}`,
+      photos_hash: "hash",
+      status,
+      attempts: 0,
+      started_at: null,
+      created_at: createdAt,
+    };
+  }
+
+  it("대기 작업을 먼저 고르고, 그다음 재시도·멈춘 작업 순으로 limit 건만 고른다", () => {
+    const picked = pickDueJobs(
+      {
+        pending: [dueJob("new", "pending", "2026-09-12T13:00:00.000Z")],
+        retry: [
+          dueJob("old-1", "retry_scheduled", "2026-09-05T13:00:00.000Z"),
+          dueJob("old-2", "retry_scheduled", "2026-09-05T13:00:01.000Z"),
+          dueJob("old-3", "retry_scheduled", "2026-09-05T13:00:02.000Z"),
+        ],
+        stale: [dueJob("stuck", "running", "2026-09-01T13:00:00.000Z")],
+      },
+      3,
+    );
+
+    expect(picked.map((j) => j.id)).toEqual(["new", "old-1", "old-2"]);
+  });
+
+  it("계속 실패하는 오래된 작업이 3건 있어도 새 주보 작업을 먼저 처리한다", async () => {
+    const store = new MemoryStore(RUN_START);
+    for (const weeklyId of ["old-a", "old-b", "old-c"]) {
+      store.addJob({
+        run_week: "2026-09-05",
+        weekly_id: weeklyId,
+        photos_hash: "old",
+        status: "retry_scheduled",
+        attempts: 5,
+        next_retry_at: addMs(RUN_START, -HOUR_MS).toISOString(),
+        created_at: addMs(RUN_START, -7 * DAY_MS).toISOString(),
+      });
+    }
+    store.weeklies = [makeWeekly()];
+    const extract = vi.fn<WeeklyPhotoExtractor>(async () => extraction({ candidates: [makeCandidate()] }));
+
+    const result = await tick(store, extract, RUN_START);
+
+    expect(result.createdJobs).toBe(1);
+    expect(result.processed[0]).toMatchObject({ weeklyId: "weekly-0913", status: "succeeded" });
+    expect(store.insertedRows().map((r) => r.title)).toEqual(["가을 수련회"]);
+  });
+
+  it("남은 처리 시간이 작업 1건의 최악 소요 시간보다 적으면 다음 작업을 시작하지 않는다", async () => {
+    const store = new MemoryStore(RUN_START);
+    store.weeklies = [
+      makeWeekly({ id: "weekly-a" }),
+      makeWeekly({ id: "weekly-b" }),
+      makeWeekly({ id: "weekly-c" }),
+    ];
+    const extract = vi.fn<WeeklyPhotoExtractor>(async () => extraction());
+    // 첫 작업 전: 넉넉함 / 둘째 전: 딱 1건 분량 / 셋째 전: 1ms 부족
+    const remaining = [JOB_WORST_CASE_MS * 2, JOB_WORST_CASE_MS, JOB_WORST_CASE_MS - 1];
+    const remainingMs = vi.fn(() => remaining.shift() ?? 0);
+
+    const result = await runWeeklyEventSyncTick({ store, extract, now: RUN_START, remainingMs });
+
+    expect(result.createdJobs).toBe(3);
+    expect(result.processed).toHaveLength(2);
+    expect(extract).toHaveBeenCalledTimes(2);
+    expect(remainingMs).toHaveBeenCalledTimes(3);
+    expect(store.jobs.map((j) => j.status)).toEqual(["succeeded", "succeeded", "pending"]);
+  });
+});
+
+// ──────────────────────────────────────────────
+//  오류 메시지 정리 (리뷰 반영)
+// ──────────────────────────────────────────────
+
+describe("오류 메시지 정리 (sanitizeErrorMessage)", () => {
+  it("요청 주소의 key= 값과 GEMINI_API_KEY 원문을 가린다", () => {
+    vi.stubEnv("GEMINI_API_KEY", "secret-key-123");
+
+    expect(
+      sanitizeErrorMessage("POST https://api.test/v1/models/m:generateContent?key=abc123&alt=json failed"),
+    ).toBe("POST https://api.test/v1/models/m:generateContent?key=[redacted]&alt=json failed");
+    expect(sanitizeErrorMessage("upstream echoed secret-key-123 twice: secret-key-123")).toBe(
+      "upstream echoed [redacted] twice: [redacted]",
+    );
+  });
+
+  it("2000자(코드 포인트)로 자르고 서로게이트 쌍을 깨지 않는다", () => {
+    vi.stubEnv("GEMINI_API_KEY", "");
+    const message = `${"가".repeat(LAST_ERROR_MAX_LENGTH - 1)}😀끝`;
+
+    const out = sanitizeErrorMessage(message);
+
+    expect(Array.from(out)).toHaveLength(LAST_ERROR_MAX_LENGTH);
+    expect(out.endsWith("😀")).toBe(true);
   });
 });
 

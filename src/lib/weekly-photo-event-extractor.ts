@@ -75,13 +75,15 @@ type PhotoFetchOutcome =
 /**
  * 사진 1장 다운로드.
  * - 5xx·타임아웃·네트워크 오류 → WeeklyEventSyncError("transient") (작업 전체를 다시 시도)
- * - 4xx·이미지 아님·용량 초과 → 이 사진만 제외 ({ ok: false })
+ * - 3xx(리다이렉트)·4xx·이미지 아님·용량 초과 → 이 사진만 제외 ({ ok: false })
  */
 async function fetchOnePhoto(url: string): Promise<PhotoFetchOutcome> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PHOTO_FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: controller.signal });
+    // 리다이렉트는 따라가지 않는다 — 허용 목록을 통과한 주소가 다른 호스트로 넘어가는 것을 막는다.
+    // 3xx 응답은 아래 !res.ok 에서 이 사진만 제외된다.
+    const res = await fetch(url, { signal: controller.signal, redirect: "manual" });
     if (res.status >= 500) {
       throw new WeeklyEventSyncError(
         "transient",

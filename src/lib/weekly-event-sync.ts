@@ -7,6 +7,7 @@
  *   1. now 가 [토 22:00 KST, +24시간) 안이고 그 주 실행 기록을 이번 호출이 새로 넣었을 때만
  *      대상 주보마다 작업을 만든다 (weekly_id + 사진 해시가 같은 작업이 있으면 만들지 않음)
  *   2. 처리할 작업을 최대 3건 골라 조건부 UPDATE 로 선점한 뒤 1건씩 처리
+ *      (남은 처리 시간이 작업 1건의 최악 소요 시간보다 적으면 다음 작업은 다음 호출로 넘긴다)
  *
  * 작업 1건 — 만료 확인 → 주보 다시 읽기 → 사진 추출 → 기준 날짜 → 신뢰도 보정
  *   → 등록 여부(날짜·지난 일정·신뢰도·중복) → events INSERT → 결과 저장
@@ -22,6 +23,8 @@ import {
   adjustConfidenceByDayOfWeek,
 } from "@/lib/news-event-extractor";
 import {
+  GEMINI_EVENT_SYNC_TIMEOUT_MS,
+  PHOTO_FETCH_TIMEOUT_MS,
   WeeklyEventSyncError,
   type WeeklyPhotoExtractInput,
   type WeeklyPhotoExtractResult,
@@ -53,10 +56,18 @@ export const JOB_EXPIRY_MS = 14 * DAY_MS;
 /** running 인 채로 이 시간이 지나면 중간에 멈춘 작업으로 보고 다시 처리 */
 export const STALE_RUNNING_MS = 15 * MINUTE_MS;
 export const MAX_JOBS_PER_TICK = 3;
+/**
+ * 작업 1건의 최악 소요 시간 — 사진 다운로드 30초 + Gemini 90초 + DB 여유 10초.
+ * 남은 처리 시간이 이보다 적으면 다음 작업을 시작하지 않는다 (라우트 maxDuration 안에서 끝내기 위해).
+ */
+export const JOB_WORST_CASE_MS =
+  PHOTO_FETCH_TIMEOUT_MS + GEMINI_EVENT_SYNC_TIMEOUT_MS + 10 * 1000;
 /** transient 가 아닌 실패(invalid_response·photo_fetch·config)는 이 횟수째에 failed */
 export const MAX_NON_TRANSIENT_ATTEMPTS = 3;
 /** 기존 검수 모달의 자동 체크 기준과 동일 */
 export const MIN_AUTO_INSERT_CONFIDENCE = 0.6;
+/** 사진에서 읽은 발행일이 참고 날짜와 이보다 더 벌어지면 연도·월 오독으로 보고 기준 날짜로 쓰지 않는다 */
+export const MAX_BULLETIN_DATE_DRIFT_DAYS = 14;
 export const LAST_ERROR_MAX_LENGTH = 2000;
 
 /** 일시 장애로 보고 횟수 제한 없이 다시 시도하는 Gemini HTTP 상태 */
@@ -71,6 +82,13 @@ export function addDaysToDate(date: string, days: number): string {
   const d = new Date(`${date}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
+}
+
+/** 두 YYYY-MM-DD 날짜 사이의 일수 (a − b) */
+export function daysBetweenDates(a: string, b: string): number {
+  return Math.round(
+    (Date.parse(`${a}T00:00:00Z`) - Date.parse(`${b}T00:00:00Z`)) / DAY_MS,
+  );
 }
 
 /** 시각의 KST 날짜 (YYYY-MM-DD) */
@@ -406,6 +424,18 @@ export type EventInsertResult =
   | { ok: true; id: string }
   | { ok: false; error: string };
 
+/**
+ * 처리할 작업 고르기 — 대기(pending) 작업 → 재시도 시각이 된 작업 → 멈춘 running 작업 순으로 limit 건.
+ * 계속 실패하는 오래된 작업이 매 호출의 자리를 모두 차지해 새 주보 작업이 밀리는 것을 막는다.
+ * 각 그룹은 호출자가 정렬해서 넘긴다 (pending: created_at, 재시도: next_retry_at, running: started_at).
+ */
+export function pickDueJobs(
+  groups: { pending: SyncJobRow[]; retry: SyncJobRow[]; stale: SyncJobRow[] },
+  limit: number,
+): SyncJobRow[] {
+  return [...groups.pending, ...groups.retry, ...groups.stale].slice(0, limit);
+}
+
 export interface WeeklyEventSyncStore {
   /** INSERT ... ON CONFLICT DO NOTHING. 이번 호출이 넣었으면 true */
   insertRunIfAbsent(runWeek: string): Promise<boolean>;
@@ -413,7 +443,7 @@ export interface WeeklyEventSyncStore {
   listTargetWeeklies(range: TargetWeeklyRange): Promise<SyncWeeklyRow[]>;
   /** (weekly_id, photos_hash) 충돌은 건너뛴다. 새로 만든 작업 수 */
   insertJobsIfAbsent(rows: NewSyncJobRow[]): Promise<number>;
-  /** pending / 재시도 시각이 된 retry_scheduled / 멈춘 running — created_at 오름차순 */
+  /** pickDueJobs 순서 — pending(created_at) → 재시도 시각이 된 retry_scheduled(next_retry_at) → 멈춘 running(started_at) */
   listDueJobs(query: DueJobQuery): Promise<SyncJobRow[]>;
   /** 목록 조회 때의 상태 조건을 건 조건부 UPDATE. 갱신된 행이 있으면 true */
   claimJob(job: SyncJobRow, query: DueJobQuery): Promise<boolean>;
@@ -500,29 +530,26 @@ export function createSupabaseWeeklyEventSyncStore(
         jobs()
           .eq("status", "retry_scheduled")
           .lte("next_retry_at", query.nowIso)
-          .order("created_at", { ascending: true })
+          .order("next_retry_at", { ascending: true })
           .limit(query.limit),
         jobs()
           .eq("status", "running")
           .lt("started_at", query.staleBeforeIso)
-          .order("created_at", { ascending: true })
+          .order("started_at", { ascending: true })
           .limit(query.limit),
       ]);
       if (pending.error) throw dbError("작업 조회", pending.error.message);
       if (retry.error) throw dbError("작업 조회", retry.error.message);
       if (stale.error) throw dbError("작업 조회", stale.error.message);
 
-      const rows = [
-        ...(pending.data ?? []),
-        ...(retry.data ?? []),
-        ...(stale.data ?? []),
-      ] as SyncJobRow[];
-      return rows
-        .sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
-        )
-        .slice(0, query.limit);
+      return pickDueJobs(
+        {
+          pending: (pending.data ?? []) as SyncJobRow[],
+          retry: (retry.data ?? []) as SyncJobRow[],
+          stale: (stale.data ?? []) as SyncJobRow[],
+        },
+        query.limit,
+      );
     },
 
     async claimJob(job, query) {
@@ -604,6 +631,11 @@ export interface WeeklyEventSyncDeps {
   store: WeeklyEventSyncStore;
   extract: WeeklyPhotoExtractor;
   now: Date;
+  /**
+   * 남은 처리 시간(ms). 있으면 JOB_WORST_CASE_MS 보다 적게 남았을 때 다음 작업을 시작하지 않는다.
+   * 라우트는 maxDuration 기준 예산을 넘긴다. 없으면 시간 제한 없이 처리한다.
+   */
+  remainingMs?: () => number;
 }
 
 interface JobSuccess {
@@ -652,6 +684,8 @@ export async function runWeeklyEventSyncTick(
 
   const processed: WeeklyEventSyncJobResult[] = [];
   for (const job of dueJobs) {
+    // 한 건을 끝낼 시간이 남지 않았으면 선점하지 않고 다음 호출로 넘긴다 (중간에 끊기면 결과가 저장되지 않음)
+    if (deps.remainingMs && deps.remainingMs() < JOB_WORST_CASE_MS) break;
     if (!(await store.claimJob(job, query))) continue;
     processed.push(await processJob(deps, job));
   }
@@ -754,24 +788,34 @@ async function attemptJob(
     throw new WeeklyEventSyncError("superseded", "주보 사진이 바뀌었습니다.");
   }
 
-  // weekly.date 가 없을 때의 기준: 실행 주 토요일 다음 날(주일)
+  // 참고 날짜: weekly.date, 없으면 실행 주 토요일 다음 날(주일)
   const sundayAfterRun = addDaysToDate(job.run_week, 1);
+  const referenceDate = weekly.date ?? sundayAfterRun;
   const extraction = await extract({
     photoUrls: weekly.photo_images,
-    referenceDate: weekly.date ?? sundayAfterRun,
+    referenceDate,
   });
 
+  // 사진에서 읽은 발행일 — 달력에 있는 날짜만 기록한다 (bulletin_date)
   const bulletinDate =
     extraction.bulletinDate !== null && isRealIsoDate(extraction.bulletinDate)
       ? extraction.bulletinDate
       : null;
-  const anchorDate = bulletinDate ?? weekly.date ?? sundayAfterRun;
+  // 기준 날짜 — 읽은 발행일이 참고 날짜와 14일 이내일 때만 쓴다.
+  // 더 벌어지면 연도·월 오독으로 보고 참고 날짜를 쓴다 (date_mismatch 로 흔적은 남긴다).
+  const anchorDate =
+    bulletinDate !== null &&
+    Math.abs(daysBetweenDates(bulletinDate, referenceDate)) <=
+      MAX_BULLETIN_DATE_DRIFT_DAYS
+      ? bulletinDate
+      : referenceDate;
   const dateMismatch =
     bulletinDate !== null && weekly.date !== null && bulletinDate !== weekly.date;
 
+  // 날짜 범위 보정은 모델이 읽은 발행일이 아니라 참고 날짜 기준 — 모델 오독을 같은 오독으로 검사하지 않기 위해
   const candidates = extraction.candidates
     .map((c) => adjustConfidenceByDayOfWeek(c))
-    .map((c) => adjustConfidenceByDateRange(c, anchorDate));
+    .map((c) => adjustConfidenceByDateRange(c, referenceDate));
 
   // 달력에 없는 날짜(예: 2026-09-31)가 섞이면 DB date 조회 전체가 실패하므로 조회에 넣지 않는다.
   // 그런 후보는 selectEventsToInsert 가 "날짜 오류"로 건너뛰어 INSERT 에도 가지 않는다.
