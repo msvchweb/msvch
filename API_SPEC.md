@@ -1361,6 +1361,49 @@ Vercel Cron — 매일 04:00 KST (UTC 19:00). 7일 초과한 weekly_imports 행�
 
 ---
 
+### POST `/api/admin/cron/weekly-event-sync`
+
+주보 사진 → 캘린더 주간 자동 등록 (마이그레이션 20260914171032). 사진 주보의 "교회소식" 일정을 Gemini 로 읽어 검수 없이 `events` 에 넣는다 (알림 꺼짐).
+
+- **호출 주체**: GitHub Actions `.github/workflows/weekly-event-sync.yml` — `vercel.json` 이 아님. 응답이 HTTP 200 이 아니면 워크플로 실행을 실패로 표시
+- **스케줄**: 3시간마다 `0 1-22/3 * * *` UTC (KST 10·13·16·19·22·01·04·07시). 새 작업은 토요일 22:00 KST 부터 24시간 안의 첫 호출만 만든다
+- **인증**: `x-cron-secret` 헤더 OR `Authorization: Bearer <CRON_SECRET>` (`crypto.timingSafeEqual` 비교). 쿠키 사용 안 함
+- **최대 실행 시간**: 300초 (`maxDuration = 300`). 처리 예산 285초 — 남은 시간이 작업 1건의 최악 소요 시간(130초)보다 적으면 다음 작업을 시작하지 않는다
+- **요청 본문**: 없음
+- **동작**:
+  1. 주간 창 안의 첫 호출이면 `weekly_event_sync_runs` 에 그 주 토요일을 기록하고, 대상 주보(공개 + `photo_images` 있음 + 날짜 범위 안)마다 `weekly_event_sync_jobs` 작업을 만든다 (`UNIQUE (weekly_id, photos_hash)`)
+  2. 처리할 작업을 최대 3건 고른다 — 대기(pending) → 재시도 시각이 된 `retry_scheduled`(`next_retry_at` 순) → 15분 넘게 멈춘 `running`(`started_at` 순). 조건부 UPDATE 로 선점
+  3. 작업 1건: 주보 다시 읽기 → 사진 최대 4장 (`isAllowedWeeklyPhotoUrl` 통과, 리다이렉트 안 따라감) → Gemini 한 모델 (`GEMINI_EVENT_SYNC_MODEL`, 기본 `gemini-3.8-flash`, 폴백 없음, JSON 응답) → `PhotoExtractEventsResponseSchema` → 기준 날짜(인쇄 발행일이 참고 날짜와 14일 이내면 인쇄 발행일) → 요일·날짜 범위 보정 → 필터·중복 → `events` INSERT (`notify=false`, `extracted_by_ai=true`, `source_weekly_id`, `created_by=null`)
+  4. 실패 처리: `transient`(Gemini 429·500·502·503·504, 타임아웃, 네트워크, 사진 서버 5xx, DB) 는 2시간 50분 뒤 재시도(14일 만료만) / `invalid_response`·`photo_fetch`·`config` 는 3회째 실패 / `superseded`·`expired` 는 즉시 실패
+- **응답 (200)** — `WeeklyEventSyncTickResult` (`src/types/weekly-event-sync.ts`):
+
+```ts
+{
+  now: string;                    // ISO 8601
+  createdRunWeek: string | null;  // 이번 호출이 만든 주간 실행의 토요일 (YYYY-MM-DD)
+  createdJobs: number;
+  processed: {
+    jobId: string;
+    weeklyId: string;
+    status: "pending" | "running" | "succeeded" | "retry_scheduled" | "failed";
+    attempts: number;
+    insertedCount: number;
+    skippedCount: number;
+    nextRetryAt: string | null;   // ISO 8601
+    errorKind: "transient" | "invalid_response" | "photo_fetch" | "config" | "superseded" | "expired" | null;
+    errorMessage: string | null;  // API 키 제거, 2000자 이내
+  }[];
+}
+```
+
+- **에러**:
+  - `401` — 시크릿 불일치 또는 서버에 `CRON_SECRET` 없음
+  - `500` — Supabase env 누락 / 틱 처리 중 DB 오류 (`{ error }`)
+
+- **수동 트리거**: GitHub 저장소 Actions 탭 → "Weekly event sync" → Run workflow. 토 22:00 ~ 일 22:00 KST 밖이면 새 작업은 만들지 않고 `{"now":"…","createdRunWeek":null,"createdJobs":0,"processed":[]}` 처럼 재시도 대상만 처리한다.
+
+---
+
 ## 입력 검증
 
 모든 API 라우트의 입력 검증은 `src/lib/validation.ts`에 정의된 Zod 스키마로 수행.
@@ -1603,11 +1646,12 @@ interface DeleteObjectsResponse {
 | Supabase | DB + Auth (Storage 는 R2 로 이전) | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
 | Cloudflare R2 | 이미지·영상 스토리지 (S3 호환 API, SigV4 자체 구현) | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_ORIGIN`, `NEXT_PUBLIC_CDN_BASE_URL` |
 | YouTube Data API v3 | 설교 영상 목록 | `YOUTUBE_API_KEY` |
-| Google Gemini | AI 설교 요약 + 쇼츠 하이라이트 | `GEMINI_API_KEY` |
+| Google Gemini | AI 설교 요약 + 쇼츠 하이라이트 + 주보 사진 일정 주간 동기화(단일 모델, 폴백 없음, 키는 `x-goog-api-key` 헤더) | `GEMINI_API_KEY`, `GEMINI_EVENT_SYNC_MODEL`(선택, 기본 `gemini-3.8-flash`) |
 | Next.js ISR | 캐시 무효화 | `REVALIDATE_SECRET` |
 | Google Maps Embed | 찾아오시는 길 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` |
 | Google Calendar API v3 | 1회 마이그레이션 스크립트(`scripts/migrate-google-calendar.ts`)에서만 사용 — 일상 트래픽 의존 없음 | `GOOGLE_CALENDAR_ID`, `GOOGLE_CALENDAR_API_KEY` (마이그레이션 후 제거 권장) |
 | GitHub Actions | 쇼츠 생성 파이프라인 | `GITHUB_PAT` |
 | Vercel Cron | (1) 일정 알림톡 D-1 발송 `/api/admin/cron/alimtalk-events` 매일 06:00 KST · (2) 설교 영상 동기화 `/api/admin/cron/sync-sermons` 매일 15:00 KST · (3) 주보 import 7일 정리 `/api/admin/cron/cleanup-weekly-imports` 매일 04:00 KST | `CRON_SECRET` |
 | GitHub Actions (LibreOffice headless) | `.hwp → .hwpx` 변환 — `/api/admin/weeklies/import-hwp` 가 워크플로우(`.github/workflows/hwp-convert.yml`) 를 dispatch. runner 가 변환 후 `/api/admin/weeklies/import-hwp-finalize` 호출 | `GITHUB_PAT`, `APP_URL` (Actions secret), `CRON_SECRET` |
+| GitHub Actions (예약) | 주보 사진 일정 주간 동기화 — `.github/workflows/weekly-event-sync.yml` 이 3시간마다 `/api/admin/cron/weekly-event-sync` 호출 (응답 200 이 아니면 실패 표시). 공개 저장소라 60일간 활동이 없으면 예약이 자동으로 꺼짐 | `APP_URL`, `CRON_SECRET` (Actions secret) |
 | 카카오 비즈니스 알림톡 (중계사 — NHN Cloud / Aligo / Solapi 등) | 일정 알림톡 발송 — 비즈 승인 후 환경변수 채우면 동작 | `KAKAO_BIZ_API_KEY`, `KAKAO_BIZ_SENDER_KEY`, `KAKAO_BIZ_API_URL` |

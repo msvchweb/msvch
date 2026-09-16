@@ -14,7 +14,7 @@
 | UI | React 19.2 (Server + Client Components) |
 | 스타일 | Tailwind CSS v4 (@theme) |
 | DB / Auth / Storage | Supabase (PostgreSQL + RLS + OAuth) |
-| AI | Google Gemini 2.5 Flash |
+| AI | Google Gemini 2.5 Flash · 3.8 Flash (주보 사진 일정 동기화) |
 | 배포 | Vercel (GitHub 자동 배포 + Cron) |
 | 언어 | TypeScript |
 
@@ -28,8 +28,8 @@
 - **관리자 시스템** (`/admin`): 권한 4계층(`member` / `staff` / `admin` / `master`). 사이드바·하단탭바·메뉴페이지·대시보드 카드가 모두 `src/lib/admin-permissions.ts` 의 단일 매트릭스를 참조.
 - **주보 시스템**: 5탭 + 마스터 폼, 4페이지 실시간 미리보기, A5 인쇄 모드, 공개 웹뷰(우클릭/복사/단축키 차단 + 워터마크).
 - **소모임 게시판**: ad-hoc 멤버 모델, 모바일 호환 cursor 페이지네이션.
-- **AI 도구**: 설교 요약, 포스터 프롬프트 빌더, 주보 교회소식 → 일정 자동 추출(검수 모달).
-- **자동화**: YouTube 동기화 cron, 일정 D-1 알림톡 cron(중계사 승인 대기), GitHub Actions 쇼츠 파이프라인.
+- **AI 도구**: 설교 요약, 포스터 프롬프트 빌더, 주보 교회소식 → 일정 자동 추출(검수 모달), 사진 주보 교회소식 → 캘린더 주간 자동 등록(토 22시, 검수 없음·알림 꺼짐).
+- **자동화**: YouTube 동기화 cron, 일정 D-1 알림톡 cron(중계사 승인 대기), GitHub Actions 쇼츠 파이프라인, GitHub Actions 주보 사진 일정 주간 동기화(3시간 간격 호출).
 - **절기색**: 대한예수교장로회(통합) 5색 체계가 사이트 전반에 자동 반영 (계산식, DB 변경 0).
 
 ---
@@ -52,10 +52,11 @@ npm run lint       # eslint
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key (브라우저/RLS) |
 | `SUPABASE_SERVICE_ROLE_KEY` | service_role (서버 전용 — 익명 INSERT 라우트 등) |
 | `YOUTUBE_API_KEY` | 설교 영상 동기화 cron |
-| `GEMINI_API_KEY` | 챗봇·설교 요약·포스터 프롬프트·일정 AI 추출 |
+| `GEMINI_API_KEY` | 챗봇·설교 요약·포스터 프롬프트·일정 AI 추출·주보 사진 일정 동기화 |
+| `GEMINI_EVENT_SYNC_MODEL` | (선택) 주보 사진 일정 동기화 모델 — 기본 `gemini-3.8-flash` |
 | `NEXT_PUBLIC_GOOGLE_MAPS_KEY` | 찾아오시는 길 임베드 |
 | `REVALIDATE_SECRET` | ISR 온디맨드 무효화 |
-| `CRON_SECRET` | Vercel Cron 인증 |
+| `CRON_SECRET` | Vercel Cron·GitHub Actions 예약 호출 인증 (GitHub Secret 과 같은 값) |
 | `GITHUB_PAT` | 쇼츠 생성 트리거 (GitHub Actions) |
 | `KAKAO_BIZ_*` | (선택) 카카오 비즈 알림톡 — 미설정 시 noop |
 
@@ -69,6 +70,8 @@ npm run lint       # eslint
 |---|---|---|---|
 | `/api/admin/cron/alimtalk-events` | `0 21 * * *` | 06:00 | D-1 일정 알림톡 발송 |
 | `/api/admin/cron/sync-sermons` | `0 6 * * *` | 15:00 | YouTube → `sermon_videos` upsert |
+
+주보 사진 일정 주간 동기화(`POST /api/admin/cron/weekly-event-sync`)는 `vercel.json` 이 아니라 GitHub Actions(`.github/workflows/weekly-event-sync.yml`, `0 1-22/3 * * *`)가 3시간마다 호출한다. 공개 저장소라 60일간 활동이 없으면 GitHub 가 예약 워크플로를 자동으로 끄므로, 조용한 기간 뒤에는 Actions 탭에서 켜져 있는지 확인한다.
 
 ---
 
