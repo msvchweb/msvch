@@ -461,7 +461,7 @@ interface GalleryImage {
 | `created_by` | `uuid` | 작성자 user id (`auth.users.id` ON DELETE SET NULL) |
 | `source_weekly_id` | `uuid` | AI 추출 시 어느 weeklies row 에서 뽑혔는지 (마이그 034). ON DELETE SET NULL |
 | `source_news_index` | `integer` | weeklies.news 의 0-based 인덱스 (마이그 034). CHECK `0 <= < 50` |
-| `extracted_by_ai` | `boolean NOT NULL DEFAULT false` | AI 추출 후 staff 검수를 거쳐 INSERT 된 일정 (마이그 034) |
+| `extracted_by_ai` | `boolean NOT NULL DEFAULT false` | AI 가 추출해 INSERT 한 일정 — 검수 모달(마이그 034) 또는 주보 사진 주간 자동 동기화(검수 없음, 마이그 20260914171032 에서 코멘트 갱신) |
 | `created_at` | `timestamptz DEFAULT now()` | |
 | `updated_at` | `timestamptz DEFAULT now()` | 자동 갱신 트리거 |
 
@@ -543,6 +543,58 @@ interface CalendarEvent {
 - INSERT/UPDATE/DELETE: 정책 없음 — service_role(cron 라우트) 만 가능
 
 **인덱스**: `idx_alimtalk_sent_event`, `idx_alimtalk_sent_at`
+
+---
+
+### `weekly_event_sync_runs`
+
+주보 사진 → 캘린더 주간 자동 등록의 주간 실행 기록 (마이그레이션 20260914171032). 토요일 22:00 KST 실행을 주당 한 번만 만들기 위한 잠금.
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `run_week` | `date` PK | 해당 주 토요일 (KST 날짜) |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | |
+
+**RLS 정책**:
+- SELECT: admin/master (`is_admin_or_master()`)
+- INSERT/UPDATE/DELETE: 정책 없음 — service_role(cron 라우트 `/api/admin/cron/weekly-event-sync`) 만 가능
+
+---
+
+### `weekly_event_sync_jobs`
+
+주보 1건당 작업 1건 — 상태·재시도·결과 기록 (마이그레이션 20260914171032).
+
+| 컬럼 | 타입 | 설명 |
+|------|------|------|
+| `id` | `uuid` PK | 자동 생성 |
+| `run_week` | `date NOT NULL` | `weekly_event_sync_runs.run_week` ON DELETE CASCADE |
+| `weekly_id` | `uuid NOT NULL` | `weeklies.id` ON DELETE CASCADE |
+| `photos_hash` | `text NOT NULL` | `sha256(photo_images.join("\n"))` — 사진이 바뀌면 달라짐 |
+| `status` | `text NOT NULL DEFAULT 'pending'` | `'pending'` \| `'running'` \| `'succeeded'` \| `'retry_scheduled'` \| `'failed'` |
+| `attempts` | `integer NOT NULL DEFAULT 0` | 실패 횟수 (CHECK `>= 0`) |
+| `next_retry_at` | `timestamptz` | 다음 재시도 시각 (실패 후 2시간 50분) |
+| `started_at` | `timestamptz` | 선점 시각 (15분 넘게 `running` 이면 다시 처리) |
+| `finished_at` | `timestamptz` | 성공·최종 실패 시각 |
+| `error_kind` | `text` | `'transient'` \| `'invalid_response'` \| `'photo_fetch'` \| `'config'` \| `'superseded'` \| `'expired'` |
+| `last_error` | `text` | 마지막 오류 메시지 (API 키 제거, CHECK `length <= 2000`) |
+| `model` | `text` | 사용한 Gemini 모델 |
+| `bulletin_date` | `date` | 사진에서 읽은 인쇄 발행일 |
+| `anchor_date` | `date` | 실제로 쓴 기준 날짜 (인쇄 발행일이 참고 날짜와 14일 넘게 차이 나면 참고 날짜) |
+| `date_mismatch` | `boolean NOT NULL DEFAULT false` | 인쇄 발행일과 `weeklies.date` 가 다름 |
+| `inserted_event_ids` | `uuid[] NOT NULL DEFAULT '{}'` | 이 작업이 INSERT 한 `events.id` — 되돌릴 때 이 목록으로 삭제 |
+| `skipped` | `jsonb NOT NULL DEFAULT '[]'` | 건너뛴 후보 `[{ title, date, reason }]` |
+| `created_at` | `timestamptz NOT NULL DEFAULT now()` | 14일 만료 기준 |
+| `updated_at` | `timestamptz NOT NULL DEFAULT now()` | 자동 갱신 트리거 (`weekly_event_sync_jobs_set_updated_at()`) |
+| **UNIQUE** | `(weekly_id, photos_hash)` | 같은 주보·같은 사진으로 작업을 다시 만들지 않음 |
+
+**RLS 정책**:
+- SELECT: admin/master (`is_admin_or_master()`)
+- INSERT/UPDATE/DELETE: 정책 없음 — service_role(cron 라우트) 만 가능
+
+**인덱스**: `idx_weekly_event_sync_jobs_due` (`status, next_retry_at`)
+
+**운영**: 최근 작업의 `status`·`error_kind`·`last_error`·`skipped`·`date_mismatch` 로 결과를 확인한다. 실패로 끝난 작업은 같은 사진으로 다시 만들어지지 않으므로, 다시 돌리려면 그 행을 지우고 다음 토요일 실행을 기다린다.
 
 ---
 
@@ -1049,3 +1101,4 @@ interface ShortsClip {
 | `037_align_rls_with_ui_matrix.sql` | UI 매트릭스(`src/lib/admin-permissions.ts`)와 RLS 일치. notices / weeklies(+storage) / weekly masters(church_settings·mokjang_entries·servants·support_sections·community_prayers) / events INSERT·UPDATE / event_subscribers SELECT / alimtalk_sent SELECT / chat_inquiries SELECT / new_family_registrations SELECT·UPDATE / storage 'blog-images' 의 staff 정책을 `is_admin_or_master()` 로 좁힘. 공개 SELECT, 작성자 본인 DELETE(021), anon INSERT(chat/new-family) 흐름은 보존 |
 | `038_weekly_imports.sql` | `weekly_imports` 테이블 — 주보 HWP/HWPX 자동 채우기 업로드·변환·파싱 추적. status enum 5개 (uploaded/converting/parsing/parsed/failed), source_format CHECK (hwp/hwpx), RLS admin/master 전용 (037 매트릭스 일치), `touch_weekly_imports_updated_at()` 트리거, retention/status 인덱스. Storage 는 기존 'weeklies' 버킷의 `imports/` 폴더 재사용. 7일 초과는 매일 04:00 KST cron 으로 정리 |
 | `045_poster_versions.sql` | 포스터 저장본 버전 이력 — poster_versions + posters.current_version_id. 다운로드한 최종본과 업로드 seed를 `poster-images` Storage에 저장하고 이어 수정 가능 |
+| `20260914171032_weekly_event_sync.sql` | 주보 사진 → 캘린더 주간 자동 등록 — `weekly_event_sync_runs`(주당 1회 잠금) + `weekly_event_sync_jobs`(주보별 작업·재시도·결과, `UNIQUE (weekly_id, photos_hash)`) + 재시도 조회 인덱스 + RLS `is_admin_or_master()` SELECT 만(쓰기는 service_role) + `updated_at` 트리거 + `events.extracted_by_ai` 코멘트 갱신 |
