@@ -103,3 +103,52 @@ it("replaces a confirmed expired container only when no publish was attempted", 
       .mock.calls.some(([, o]) => o?.method === "POST"),
   ).toBe(false);
 });
+it.each([401, 403])(
+  "can reconnect after initial container creation is rejected with %i",
+  async (status) => {
+    const { lease, context } = fixture();
+    vi.mocked(context.save).mockImplementation(async (value) => {
+      context.checkpoint = value;
+    });
+    vi.mocked(context.request).mockResolvedValueOnce(
+      new Response(null, { status }),
+    );
+    expect(await publishInstagram(lease, context)).toMatchObject({
+      status: "needs_attention",
+      code: "credentials_expired",
+    });
+    expect(context.checkpoint).toEqual({ phase: "not_started", recreated: 0 });
+    context.accessToken = "reconnected-token";
+    vi.mocked(context.request)
+      .mockReset()
+      .mockResolvedValueOnce(Response.json({ id: "container" }))
+      .mockResolvedValueOnce(Response.json({ status_code: "FINISHED" }))
+      .mockResolvedValueOnce(Response.json({ id: "media" }))
+      .mockResolvedValueOnce(
+        Response.json({
+          id: "media",
+          permalink: "https://www.instagram.com/reel/example/",
+        }),
+      );
+    expect(await publishInstagram(lease, context)).toMatchObject({
+      status: "published",
+    });
+    expect(context.request).toHaveBeenCalledTimes(4);
+  },
+);
+it("does not recreate an initial container whose response was lost", async () => {
+  const { lease, context } = fixture();
+  vi.mocked(context.save).mockImplementation(async (value) => {
+    context.checkpoint = value;
+  });
+  vi.mocked(context.request).mockRejectedValue(new Error("response lost"));
+  expect(await publishInstagram(lease, context)).toMatchObject({
+    code: "instagram_result_unknown",
+  });
+  expect(context.checkpoint?.phase).toBe("container_creating");
+  vi.mocked(context.request).mockClear();
+  expect(await publishInstagram(lease, context)).toMatchObject({
+    code: "instagram_container_result_unknown",
+  });
+  expect(context.request).not.toHaveBeenCalled();
+});

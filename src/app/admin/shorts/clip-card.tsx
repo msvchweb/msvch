@@ -62,8 +62,10 @@ export function ClipCard({
     busy ||
     generationActive ||
     !!clip.published_at ||
-    publications.some((p) =>
-      ["processing", "published", "needs_attention"].includes(p.status),
+    publications.some(
+      (p) =>
+        p.public_request_started ||
+        ["processing", "published", "needs_attention"].includes(p.status),
     );
   return (
     <div className="border-b border-gray-50 p-4 last:border-b-0 sm:p-5">
@@ -187,7 +189,7 @@ export function ClipCard({
             publications={publications}
             onAction={onAction}
             checkedAt={checkedAt}
-            disabled={disabled}
+            disabled={busy || generationActive}
           />
         </div>
         <div className="flex shrink-0 flex-col gap-2 text-xs">

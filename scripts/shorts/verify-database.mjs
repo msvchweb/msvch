@@ -201,7 +201,7 @@ try {
   assert.equal(
     (
       await a.query(
-        "select shorts_publication_checkpoint($1,$2,'encrypted-test-checkpoint') as ok",
+        "select shorts_publication_checkpoint($1,$2,'encrypted-test-checkpoint',true) as ok",
         [lease.id, recovered.lease_token],
       )
     ).rows[0].ok,
@@ -226,7 +226,7 @@ try {
   assert.equal(
     (
       await a.query(
-        'select shorts_finish_publication($1,$2,\'{"status":"needs_attention","code":"upload_result_unknown"}\') as ok',
+        'select shorts_finish_publication($1,$2,\'{"status":"retry_wait","code":"upload_result_unknown","definiteFailure":false}\') as ok',
         [lease.id, recovered.lease_token],
       )
     ).rows[0].ok,
@@ -235,6 +235,26 @@ try {
   await assert.rejects(
     a.query("select shorts_change_publication($1,'retry')", [lease.id]),
     /publication_requires_reconciliation/,
+  );
+  await assert.rejects(
+    b.query("select shorts_change_publication($1,'cancel')", [lease.id]),
+    /publication_requires_reconciliation/,
+  );
+  await assert.rejects(
+    a.query(
+      "select shorts_review_clip($1,'reject',1,'{\"category\":\"other\"}')",
+      [clip],
+    ),
+    /publication_in_flight/,
+  );
+  assert.deepEqual(
+    (
+      await a.query(
+        "select public_request_started,quota_date is not null as reserved from shorts_publications where id=$1",
+        [lease.id],
+      )
+    ).rows[0],
+    { public_request_started: true, reserved: true },
   );
   console.log(
     "Native lease recovery/checkpoint fencing + ambiguous result protection: PASS",

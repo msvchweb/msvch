@@ -78,3 +78,39 @@ it("allows an explicitly canceled reservation to be scheduled again for the same
     ).rows[0],
   ).toMatchObject({ status: "queued" });
 });
+it("still permits cancellation and editing when a retry has made no public request", async () => {
+  const id = "20000000-0000-4000-8000-000000000002";
+  await db.query(
+    "insert into shorts_clips(id,job_id,clip_index,start_sec,end_sec,transcript_status,media_check,video_url) values($1,'10000000-0000-4000-8000-000000000001',1,180,210,'verified','{\"valid\":true}','https://example.com/clip.mp4')",
+    [id],
+  );
+  await db.exec("update shorts_settings set publishing_enabled=true");
+  await db.query(
+    "select shorts_approve_schedule($1,1,array['youtube'],'2000-01-01T00:00:00Z',false)",
+    [id],
+  );
+  const p = (
+    await db.query<{ p: { id: string; lease_token: string } }>(
+      "select shorts_claim_publication(now(),'worker','live') as p",
+    )
+  ).rows[0].p;
+  await db.query(
+    'select shorts_finish_publication($1,$2,\'{"status":"retry_wait","code":"provider_processing"}\')',
+    [p.id, p.lease_token],
+  );
+  await db.query("select shorts_change_publication($1,'cancel')", [p.id]);
+  await db.query(
+    "select shorts_review_clip($1,'edit',1,'{\"title\":\"changed\"}')",
+    [id],
+  );
+  expect(
+    (
+      await db.query(
+        "select status,quota_date,public_request_started from shorts_publications where id=$1",
+        [p.id],
+      )
+    ).rows,
+  ).toEqual([
+    { status: "canceled", quota_date: null, public_request_started: false },
+  ]);
+});

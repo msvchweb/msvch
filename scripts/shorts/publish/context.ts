@@ -130,6 +130,8 @@ export async function createPublishContext(
         p_id: p.id,
         p_token: lease.leaseToken,
         p_checkpoint: encryptSecret(value, "checkpoint:" + p.id),
+        p_public_request_started:
+          !p.test_only && ["publishing", "published"].includes(value.phase),
       });
       if (error || data !== true) throw new Error("checkpoint_failed");
       ctx.checkpoint = value;

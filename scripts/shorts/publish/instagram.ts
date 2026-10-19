@@ -95,7 +95,8 @@ export async function publishInstagram(
         }),
       });
       if (!response.ok) {
-        if (response.status === 429) {
+        // Confirmed rejection is restartable after reconnect; response loss is not.
+        if ([401, 403, 429].includes(response.status)) {
           await save({ phase: "not_started", recreated: cp.recreated });
           return failure(response, true);
         }

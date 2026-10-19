@@ -24,6 +24,7 @@ create table public.shorts_publications(
   scheduled_at timestamptz not null,
   next_attempt_at timestamptz,
   attempt_count int not null default 0,
+  public_request_started boolean not null default false,
   quota_date date,
   lease_token uuid, lease_expires_at timestamptz, worker_run_id text,
   provider_id text, provider_url text, published_at timestamptz,
@@ -52,7 +53,8 @@ create function public.shorts_protect_clip() returns trigger language plpgsql se
 begin
   perform pg_advisory_xact_lock(hashtext('shorts_transition'));
   if new.content_version is distinct from old.content_version or new.review_status is distinct from old.review_status then
-    if exists(select 1 from public.shorts_publications where clip_id=old.id and status in ('processing','published','needs_attention'))
+    if exists(select 1 from public.shorts_publications where clip_id=old.id and
+      (status in ('processing','published','needs_attention') or public_request_started))
       then raise exception 'publication_in_flight'; end if;
     update public.shorts_publications set status='canceled',quota_date=null,updated_at=now()
       where clip_id=old.id and status in ('queued','retry_wait')
@@ -138,12 +140,14 @@ begin
   return true;
 end $$;
 
-create function public.shorts_publication_checkpoint(p_id uuid,p_token uuid,p_checkpoint text default null) returns boolean
+create function public.shorts_publication_checkpoint(p_id uuid,p_token uuid,p_checkpoint text default null,p_public_request_started boolean default false) returns boolean
 language plpgsql set search_path='' as $$
 begin
   perform 1 from public.shorts_publications where id=p_id and status='processing' and lease_token=p_token and lease_expires_at>now() for update;
   if not found then return false; end if;
-  update public.shorts_publications set lease_expires_at=now()+interval '20 minutes',updated_at=now() where id=p_id;
+  -- Persist before a public provider mutation. Heartbeats/retries cannot erase it.
+  update public.shorts_publications set lease_expires_at=now()+interval '20 minutes',
+    public_request_started=public_request_started or coalesce(p_public_request_started,false),updated_at=now() where id=p_id;
   if p_checkpoint is not null then
     insert into public.shorts_publish_private(publication_id,checkpoint_encrypted) values(p_id,p_checkpoint)
       on conflict(publication_id) do update set checkpoint_encrypted=excluded.checkpoint_encrypted,updated_at=now();
@@ -203,7 +207,7 @@ declare p public.shorts_publications;
 begin
   perform pg_advisory_xact_lock(hashtext('shorts_transition'));
   select * into strict p from public.shorts_publications where id=p_id for update;
-  if p_action='cancel' and p.status in ('queued','retry_wait') then
+  if p_action='cancel' and p.status in ('queued','retry_wait') and not p.public_request_started then
     update public.shorts_publications set status='canceled',quota_date=null,updated_at=now() where id=p_id; return true;
   elsif p_action='retry' and p.status in ('retry_wait','needs_attention') and p.error_code in
     ('rate_limited','provider_temporary','credentials_expired','credentials_missing','publishing_paused','quota_wait') then

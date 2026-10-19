@@ -7,7 +7,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, expect, it, vi } from "vitest";
 import { ClipCard } from "./clip-card";
-import type { ShortsClip } from "@/types/shorts";
+import type { ShortsClip, ShortsPublication } from "@/types/shorts";
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
@@ -101,4 +101,90 @@ it("submits the current approval version with an explicit KST-to-UTC reservation
       undefined,
     ),
   );
+});
+function publicationFixture(
+  patch: Partial<ShortsPublication>,
+): ShortsPublication {
+  return {
+    id: "p",
+    clip_id: "clip",
+    platform: "youtube",
+    content_version: 1,
+    test_only: false,
+    status: "published",
+    scheduled_at: "2026-10-19T00:00:00Z",
+    next_attempt_at: null,
+    attempt_count: 0,
+    public_request_started: false,
+    quota_date: "2026-10-19",
+    lease_token: null,
+    lease_expires_at: null,
+    worker_run_id: null,
+    provider_id: "video",
+    provider_url: "https://www.youtube.com/watch?v=video",
+    published_at: "2026-10-19T00:01:00Z",
+    error_code: null,
+    error_message: null,
+    created_at: "2026-10-19T00:00:00Z",
+    updated_at: "2026-10-19T00:01:00Z",
+    ...patch,
+  };
+}
+it("keeps published content locked while allowing the approved version's second platform", async () => {
+  const clip = clipFixture({
+    transcript_status: "verified",
+    media_check: { valid: true, warnings: [] },
+    review_status: "approved",
+    approved_version: 1,
+    published_at: "2026-10-19T00:01:00Z",
+  });
+  const action = vi.fn().mockResolvedValue(undefined);
+  render(
+    <ClipCard
+      clip={clip}
+      videoId="abcdefghijk"
+      onAction={action}
+      publications={[publicationFixture({})]}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "제목·캡션 수정" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "반려" })).toBeDisabled();
+  expect(screen.getByLabelText("YouTube", { exact: true })).toBeDisabled();
+  expect(screen.getByLabelText("Instagram")).not.toBeDisabled();
+  fireEvent.click(screen.getByLabelText("Instagram"));
+  fireEvent.change(screen.getByLabelText("예약 시각 KST"), {
+    target: { value: "2026-10-20T09:30" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "승인·게시 예약" }));
+  await waitFor(() =>
+    expect(action).toHaveBeenCalledWith(
+      "/api/shorts/clip/approve",
+      {
+        expectedVersion: 1,
+        platforms: ["instagram"],
+        scheduledAt: "2026-10-20T00:30:00.000Z",
+        testOnly: false,
+      },
+      undefined,
+    ),
+  );
+});
+it("locks editing and cancellation while a public request is awaiting confirmation", () => {
+  const publication = {
+    ...publicationFixture({ status: "retry_wait", published_at: null }),
+    public_request_started: true,
+  };
+  render(
+    <ClipCard
+      clip={clipFixture({ review_status: "approved" })}
+      videoId="abcdefghijk"
+      onAction={vi.fn()}
+      publications={[publication]}
+    />,
+  );
+  expect(screen.getByRole("button", { name: "제목·캡션 수정" })).toBeDisabled();
+  expect(
+    screen.queryByRole("button", { name: "예약 취소" }),
+  ).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "승인·게시 예약" })).toBeDisabled();
 });

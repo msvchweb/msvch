@@ -168,6 +168,7 @@ export interface ShortsPublication {
   scheduled_at: string;
   next_attempt_at: string | null;
   attempt_count: number;
+  public_request_started: boolean;
   quota_date: string | null;
   lease_token: string | null;
   lease_expires_at: string | null;

@@ -515,7 +515,7 @@ admin/master 전용. 본문 { expectedVersion, title, titleYt, captionYt, captio
 
 ### DELETE /api/shorts/publications/[publicationId]
 
-queued/retry_wait 예약을 취소한다. 200 { ok: true }. 처리 중·게시 완료 상태는 409. 취소한 예약은 같은 승인 버전으로 다시 예약할 수 있다.
+공개 요청을 아직 시작하지 않은 queued/retry_wait 예약을 취소한다. 200 { ok: true }. 처리 중·게시 완료·공개 요청 후 결과 확인 대기는 409. 취소한 예약은 같은 승인 버전으로 다시 예약할 수 있다.
 
 ### GET · PATCH /api/shorts/settings
 

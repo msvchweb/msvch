@@ -112,3 +112,62 @@ it("retains quota when a status query is rate-limited after publication may have
     definiteFailure: false,
   });
 });
+it.each([401, 403])(
+  "can reconnect after initial session creation is rejected with %i",
+  async (status) => {
+    const { lease, context } = youtubeFixture();
+    vi.mocked(context.save).mockImplementation(async (value) => {
+      context.checkpoint = value;
+    });
+    vi.mocked(context.request).mockResolvedValueOnce(
+      new Response(null, { status }),
+    );
+    expect(await publishYoutube(lease, context)).toMatchObject({
+      status: "needs_attention",
+      code: "credentials_expired",
+    });
+    expect(context.checkpoint).toEqual({ phase: "not_started" });
+    context.accessToken = "reconnected-token";
+    vi.mocked(context.request)
+      .mockReset()
+      .mockResolvedValueOnce(
+        new Response(null, {
+          headers: {
+            Location:
+              "https://www.googleapis.com/upload/youtube/v3/videos?upload_id=new",
+          },
+        }),
+      )
+      .mockResolvedValueOnce(Response.json({ id: "video" }))
+      .mockResolvedValueOnce(
+        Response.json({
+          items: [
+            {
+              snippet: { channelId: "channel" },
+              status: { privacyStatus: "private", uploadStatus: "processed" },
+            },
+          ],
+        }),
+      );
+    expect(await publishYoutube(lease, context)).toMatchObject({
+      status: "test_uploaded",
+    });
+    expect(context.request).toHaveBeenCalledTimes(3);
+  },
+);
+it("does not recreate an initial session whose response was lost", async () => {
+  const { lease, context } = youtubeFixture();
+  vi.mocked(context.save).mockImplementation(async (value) => {
+    context.checkpoint = value;
+  });
+  vi.mocked(context.request).mockRejectedValue(new Error("response lost"));
+  expect(await publishYoutube(lease, context)).toMatchObject({
+    code: "upload_result_unknown",
+  });
+  expect(context.checkpoint?.phase).toBe("session_creating");
+  vi.mocked(context.request).mockClear();
+  expect(await publishYoutube(lease, context)).toMatchObject({
+    code: "upload_result_unknown",
+  });
+  expect(context.request).not.toHaveBeenCalled();
+});

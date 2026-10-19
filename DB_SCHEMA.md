@@ -971,11 +971,13 @@ shorts_job_attempts는 id, job_id, attempt_no, status(queued/running/succeeded/f
 
 clip_id + platform + content_version + test_only UNIQUE. 플랫폼 상태는 queued/processing/retry_wait/needs_attention/test_uploaded/published/canceled다.
 
-scheduled_at, next_attempt_at, attempt_count, quota_date, lease_token, lease_expires_at, worker_run_id, provider_id, provider_url, published_at, error_code, error_message와 생성·수정 시각을 저장한다. test_only는 YouTube만 허용한다.
+scheduled_at, next_attempt_at, attempt_count, public_request_started, quota_date, lease_token, lease_expires_at, worker_run_id, provider_id, provider_url, published_at, error_code, error_message와 생성·수정 시각을 저장한다. test_only는 YouTube만 허용한다.
 
 획득은 승인 버전·예약 시각·운영 스위치·KST 일일 한도를 원자적으로 확인한다. lease는 20분이며 워커는 30초마다 갱신한다. 모든 checkpoint·완료 갱신은 leaseToken을 확인한다. 만료 lease는 이전 GitHub 실행의 종료를 확인하고 저장된 provider 상태를 대조한 뒤 복구한다.
 
 진행·게시·결과 불명확 행은 날짜별 한도에 포함한다. 자정 이후 공개 전환 직전 새 날짜 한도를 확인한다. 안전한 일시 오류는 2/10/30분 간격 최대 3회 재시도하며, 결과 불명확 오류는 자동 새 업로드를 하지 않는다. private 시험은 실제 게시 수와 job published 집계에서 제외한다.
+
+public_request_started는 공개 요청 전에 checkpoint와 원자적으로 저장하고 heartbeat·재시도가 지우지 않는 표시다. retry_wait 중이라도 이 값이 true면 수정·반려·취소를 금지해 결과 불확실 게시를 새 버전으로 중복 업로드하지 않는다.
 
 ### shorts_connections · shorts_publish_private
 

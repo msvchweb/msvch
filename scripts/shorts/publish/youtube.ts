@@ -84,7 +84,8 @@ export async function publishYoutube(
         },
       );
       if (!start.ok) {
-        if (start.status === 429) {
+        // A returned auth/rate rejection created no upload. A lost response stays ambiguous.
+        if ([401, 403, 429].includes(start.status)) {
           await save({ phase: "not_started" });
           return failure(start, true);
         }

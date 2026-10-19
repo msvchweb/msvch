@@ -39,9 +39,20 @@ export function PublicationPanel({
     [error, setError] = useState("");
   const blocked =
     disabled ||
-    publications.some((p) =>
-      ["processing", "published", "needs_attention"].includes(p.status),
+    publications.some(
+      (p) =>
+        ["processing", "needs_attention"].includes(p.status) ||
+        (p.public_request_started && p.status !== "published"),
     );
+  const available = (platform: ShortsPlatform) =>
+    !publications.some(
+      (p) =>
+        p.platform === platform &&
+        p.content_version === clip.content_version &&
+        p.test_only === testOnly &&
+        p.status !== "canceled",
+    );
+  const selected = platforms.filter(available);
   async function act(path: string, body?: unknown, method?: string) {
     setBusy(true);
     setError("");
@@ -54,14 +65,14 @@ export function PublicationPanel({
     }
   }
   function schedule() {
-    if (!when || !platforms.length) {
+    if (!when || !selected.length) {
       setError("게시 대상과 한국 시간 기준 예약 시각을 입력하세요.");
       return;
     }
     const scheduledAt = new Date(when + ":00+09:00").toISOString();
     void act("/api/shorts/" + clip.id + "/approve", {
       expectedVersion: clip.content_version,
-      platforms,
+      platforms: selected,
       scheduledAt,
       testOnly,
     });
@@ -77,9 +88,12 @@ export function PublicationPanel({
           <label key={platform}>
             <input
               type="checkbox"
-              checked={platforms.includes(platform)}
+              checked={selected.includes(platform)}
               disabled={
-                busy || blocked || (testOnly && platform === "instagram")
+                busy ||
+                blocked ||
+                !available(platform) ||
+                (testOnly && platform === "instagram")
               }
               onChange={(e) =>
                 setPlatforms((current) =>
@@ -119,6 +133,7 @@ export function PublicationPanel({
           disabled={
             busy ||
             blocked ||
+            !selected.length ||
             clip.transcript_status !== "verified" ||
             !clip.media_check?.valid
           }
@@ -164,21 +179,27 @@ export function PublicationPanel({
                 영상 보기
               </a>
             )}
-            {["queued", "retry_wait"].includes(p.status) && (
-              <button
-                disabled={busy}
-                onClick={() =>
-                  void act(
-                    "/api/shorts/publications/" + p.id,
-                    undefined,
-                    "DELETE",
-                  )
-                }
-                className="ml-2 text-red-600"
-              >
-                예약 취소
-              </button>
+            {p.public_request_started && p.status === "retry_wait" && (
+              <p className="text-amber-700">
+                게시 결과 확인 중 · 확인 전 수정·취소 불가
+              </p>
             )}
+            {["queued", "retry_wait"].includes(p.status) &&
+              !p.public_request_started && (
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void act(
+                      "/api/shorts/publications/" + p.id,
+                      undefined,
+                      "DELETE",
+                    )
+                  }
+                  className="ml-2 text-red-600"
+                >
+                  예약 취소
+                </button>
+              )}
             {["retry_wait", "needs_attention"].includes(p.status) && (
               <button
                 disabled={busy}

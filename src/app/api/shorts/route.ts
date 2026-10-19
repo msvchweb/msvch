@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
       ? await db
           .from("shorts_publications")
           .select(
-            "id,clip_id,platform,content_version,test_only,status,scheduled_at,next_attempt_at,attempt_count,provider_id,provider_url,published_at,error_code,created_at,updated_at",
+            "id,clip_id,platform,content_version,test_only,status,scheduled_at,next_attempt_at,attempt_count,public_request_started,provider_id,provider_url,published_at,error_code,created_at,updated_at",
           )
           .in(
             "clip_id",
