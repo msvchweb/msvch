@@ -1,13 +1,13 @@
 # 설교 쇼츠 운영 절차
 
-작성 2026-10-19. 로컬 구현과 실제 운영 확인을 구분한다. 초기 자동 제작·게시·배경음은 OFF.
+작성 2026-10-19, 로컬 배포 준비 점검 2026-10-20(KST). 로컬 구현과 실제 운영 확인을 구분한다. 초기 자동 제작·게시·배경음은 OFF.
 
 ## 현재 확인 상태
 
 - Windows 로컬 단위/DB 엔진/합성 렌더 검증 및 최종 코드 검토·중요 문제 수정 완료. 운영 DB 마이그레이션·배포·실제 게시 미실행.
 - 교회 PC 접근, 대상 채널 OAuth 연결, 실제 설교의 입 모양·자막 검수는 운영 전 확인 필요.
 - SQL/RLS는 PGlite와 별도 PostgreSQL 17.10에서 검증. 실제 다중 연결의 생성·게시 획득·일일 상한·검수 경합과 역할별 권한을 확인함.
-- npm ci는 Windows에서 설치 완료. Linux 설치 검증 전까지 Actions의 npm install 유지.
+- Windows Node 24.11.0/npm 11.6.1과 Linux Node 24.22.0/npm 11.19.1에서 npm ci·전체 테스트 206개·타입 검사 통과. 세 쇼츠 Actions는 검증된 lockfile을 사용하는 npm ci로 전환했다.
 - GitHub 스케줄은 15분 간격 점검이며 정각 발행을 보장하지 않는다.
 
 ## 교회 PC 설치
@@ -93,7 +93,7 @@
 - 활성화 이전·3분 이하·다른 채널·목록 밖·진행/예정 라이브·이미 생성한 원본·시스템이 게시한 쇼츠는 제외한다.
 - 자동 dispatch가 확정 실패한 작업은 실패 기록을 유지하고 관리자가 재시도한다. 이미 존재하는 작업을 주기 점검이 반복 초기화하지 않는다.
 - 업로드 전후에 교회 PC를 끈 상태로 예약 처리와 화면 상태 갱신이 계속되는지 실제 운영 시험을 한다.
-- Windows와 Linux lockfile 설치를 각각 확인하기 전까지 workflow의 npm install을 유지한다. Linux에서 npm ci가 확인되면 별도 변경으로 전환한다.
+- lockfile의 WASM 선택 의존성 두 항목 누락을 보완했다. 기존 패키지 버전은 유지하며 Windows와 Linux 설치 확인 후 세 쇼츠 workflow를 npm ci로 고정했다.
 
 ## 중단·부분 실패·결과 불명확
 
@@ -117,8 +117,19 @@
 - 최종 검토에서 결과 불확실 게시의 수정·취소, 최초 인증 거절 후 재연결, YouTube 게시 후 Instagram 추가 예약을 재현하고 회귀 테스트로 수정했다. 실제 context와 어댑터 결과를 격리 PostgreSQL 전이에 연결해 한도 보존까지 확인했다.
 - 보류한 경미한 문제: 다른 클립을 예약 없이 승인하면 작업 전체의 published 표시가 예약/완료 전이 때까지 갱신되지 않을 수 있다. 개별 클립 승인·게시 기록과 실제 업로드 제한은 별도로 유지된다.
 - 실제 FFmpeg 경로 검증: SHORTS_MEDIA_TEST=1을 설정하고 scripts/shorts/render.integration.test.ts 실행. 두 편집 경로의 코덱·해상도·48kHz AAC·길이를 확인한다. 실제 사람의 입 모양·발언 의미 검수는 별도로 필요하다.
-- 현재 미완료: 운영 DB 적용, Linux npm ci, 교회 PC 서비스·재부팅·네트워크·디스크 검증, Noto Sans CJK KR 설치, 실제 설교 검수, YouTube/Instagram OAuth와 실계정 게시, PC 종료 상태 예약 시험.
+- 현재 미완료: 원격 Supabase 시험 DB 검증·운영 DB 적용, 교회 PC 서비스·재부팅·네트워크·디스크 검증, Noto Sans CJK KR 설치, 실제 설교 검수, YouTube/Instagram OAuth와 실계정 게시, PC 종료 상태 예약 시험.
 - 자동 제작·게시·배경음은 실제 단계별 확인 전 OFF를 유지한다.
+
+### 2026-10-20 로컬 배포 준비 점검
+
+- 사용자 선택에 따라 원격 시험 DB 생성·변경과 운영 반영을 보류하고 로컬 검증만 진행했다. 현재 Supabase 커넥터의 프로젝트 목록에 교회 프로젝트가 없으며 CLI 로그인도 없다.
+- Ubuntu WSL2의 별도 홈 캐시 디렉터리에 공식 SHA-256을 확인한 Linux Node 24를 설치하고 커밋된 소스만 추출했다. 운영 .env나 자격증명을 복사하지 않았다.
+- 최초 npm ci는 @rolldown/binding-wasm32-wasi가 요구하는 @emnapi/core와 @emnapi/runtime 1.11.1의 중첩 lock 항목 누락으로 실패했다. 두 항목만 추가했으며 기존 의존성 버전 변경은 없다.
+- 보완 후 Windows/Linux 각각 npm ci·전체 테스트 206개·타입 검사를 통과했다. DB 회귀 테스트는 격리된 PostgreSQL 엔진에서 기존 클립 URL·선정 이유 보존, 권한, 경합 및 불확실 게시 보호를 검증한다. 실제 운영 데이터의 마이그레이션 후 비교는 아직 하지 않았다.
+- Windows npm ci는 선택 의존성의 기존 디렉터리 정리에서 EPERM 경고 1건을 남겼지만 종료 코드 0이며 설치 후 전체 회귀·타입 검사는 통과했다. Linux npm의 설치 스크립트 정책 경고와 기존 테스트의 Supabase 다중 클라이언트 경고는 로그에 보존했다.
+- 2026-10-19의 운영 기준 기록은 작업 14개/클립 14개와 ID·URL·기존 transcript의 fingerprint다. 전체 데이터 백업이 아니므로 실제 전환 직전에 새 백업과 기준값 조회가 필요하다.
+- GitHub 설정은 이름만 조회했다. 기존 제작용 Secrets는 등록되어 있다. 게시용 SHORTS_CREDENTIAL_ENCRYPTION_KEY, YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_CHANNEL_ID, INSTAGRAM_ACCOUNT_ID와 repository variable INSTAGRAM_API_VERSION은 아직 없다. 값의 유효성 시험·설정 변경은 하지 않았다.
+- 웹의 GITHUB_PAT 및 SHORTS_WORKFLOW_REF는 실제 배포 환경에서 별도 확인해야 한다. 현재 점검을 원격 시험 DB나 실계정 게시 검증 완료로 해석하지 않는다.
 
 ### 다중 연결 DB 검증 재실행
 

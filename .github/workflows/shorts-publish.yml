@@ -26,8 +26,8 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-      # Keep install until the regenerated lockfile has passed a Linux npm ci.
-      - run: npm install --no-audit --no-fund
+      # Lockfile verified with clean Node 24 installs on Windows and Linux.
+      - run: npm ci --no-audit --no-fund
       - name: Publish due approved versions
         env:
           SHORTS_MODE: ${{ github.event_name == 'schedule' && 'live' || inputs.mode }}

@@ -48,10 +48,10 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-      # Retain install until the lockfile has also passed npm ci on Linux.
+      # Lockfile verified with clean Node 24 installs on Windows and Linux.
       - name: Install dependencies
         shell: powershell
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Preflight
         shell: powershell
         run: node --import tsx scripts/shorts/preflight.ts
