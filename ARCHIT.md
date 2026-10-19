@@ -385,13 +385,27 @@ Admin UI (/admin/masters/*) ────────→ Supabase DB (church_sett
          ▼
     PNG 다운로드 (클라이언트 직접) — 외부 SNS/인쇄 사용
 
-GitHub Actions ←── scripts/shorts/run.ts (파이프라인)
-    │               ├── yt-dlp (다운로드 + 자막)
-    │               ├── Gemini (하이라이트 선정 + 메타데이터)
-    │               ├── FFmpeg (9:16 크롭 + 자막 번인)
-    │               └── Supabase (업로드 + DB 저장)
-    │
-    └── POST /api/shorts/trigger ← Admin UI "쇼츠 생성" 버튼
+쇼츠 제작·검수·게시:
+    Admin /api/shorts/trigger → job + queued attempt → sermon-shorts.yml
+        └── Windows self-hosted runner [shorts]
+             yt-dlp → Groq 전사(실패 시 YouTube 자동자막)
+             → 자막 구간 ID + Gemini 후보 평가 → FFmpeg/FFprobe
+             → 시도별 R2 immutable 영상 + Supabase 검수 데이터
+
+    Admin 검수·제목/캡션 수정 → 승인한 content_version + 플랫폼별 예약
+        └── shorts-publish.yml (ubuntu-latest, UTC 7/22/37/52분)
+             YouTube private resumable 업로드 → 처리 확인 → public 전환
+             Instagram 컨테이너 → 처리 확인 → 게시
+             암호화 checkpoint + leaseToken + KST 플랫폼별 일일 한도
+
+    shorts-maintenance.yml (별도 호스팅 실행)
+        ├── GitHub 종료 상태와 생성 시도 대조
+        └── 지정 설교 재생목록의 활성화 이후 영상만 자동 제작 요청
+
+    교회 PC는 제작을 담당하고 클라우드 워커는 승인된 예약 게시를 담당한다.
+    초기 auto_generate_enabled / publishing_enabled / bgm_enabled = false.
+    미검수 자동 게시 없음. GitHub 스케줄은 정각 발행을 보장하지 않는다.
+    설치·계정 연결·검증: RUNBOOK-shorts-automation.md
 
 새가족 등록 (마이그레이션 024 이후):
     공개 폼 /new-family ──→ POST /api/new-family
@@ -1068,7 +1082,8 @@ admin/boards/[id]/members 페이지
 | `/admin/inquiries` · `/admin/new-families` | **admin** | 문의·새가족 그룹 |
 | `/admin/gallery` · `/admin/boards` | staff | 갤러리·게시판 그룹 |
 | `/admin/posters` | staff | 포스터 |
-| `/admin/sermons` · `/admin/shorts` | staff | 설교·쇼츠 그룹 |
+| `/admin/sermons` | staff | 설교 그룹 |
+| `/admin/shorts` | **admin** | 쇼츠 제작·검수·게시 |
 | `/admin/members` | **master** | 회원관리 (role 변경 단독) |
 
 **적용 경계 (Defense in depth)**

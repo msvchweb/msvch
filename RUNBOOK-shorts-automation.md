@@ -1,0 +1,119 @@
+# 설교 쇼츠 운영 절차
+
+작성 2026-10-19. 로컬 구현과 실제 운영 확인을 구분한다. 초기 자동 제작·게시·배경음은 OFF.
+
+## 현재 확인 상태
+
+- Windows 로컬 단위/DB 엔진/합성 렌더 검증 완료, 최종 검토 진행 중. 운영 DB 마이그레이션·배포·실제 게시 미실행.
+- 교회 PC 접근, 대상 채널 OAuth 연결, 실제 설교의 입 모양·자막 검수는 운영 전 확인 필요.
+- SQL/RLS는 PGlite와 별도 PostgreSQL 17.10에서 검증. 실제 다중 연결의 생성·게시 획득·일일 상한·검수 경합과 역할별 권한을 확인함.
+- npm ci는 Windows에서 설치 완료. Linux 설치 검증 전까지 Actions의 npm install 유지.
+- GitHub 스케줄은 15분 간격 점검이며 정각 발행을 보장하지 않는다.
+
+## 교회 PC 설치
+
+1. Windows 버전, CPU/RAM, 여유 디스크(긴 원본 여러 편을 보관할 공간), 방송 겸용 여부, 운영 시간, 담당자, Windows 서비스 계정을 기록한다.
+2. GitHub 개인 계정 ymg0924로 msvchweb/msvch의 Settings → Actions → Runners에 접근한다. 2026-10-19에도 저장소 admin/조직 Owner가 확인됐으며 설치 시 재확인한다. 다른 Owner 비밀번호 복구는 선행 조건이 아니다.
+3. New self-hosted runner → Windows x64 안내의 다운로드·등록 명령을 실행한다. 등록 토큰은 일회성/단기이므로 문서에 저장하지 않는다. 라벨 shorts를 추가한다.
+4. 서비스로 설치하고 Windows 재부팅 뒤 로그온 전 Online을 확인한다. 두 PC를 함께 쓸 경우 교회 PC에 church 라벨을 추가하고 제작 워크플로의 runs-on에도 church를 추가한다.
+5. 해당 서비스 계정의 PATH에 Node 24, yt-dlp, FFmpeg와 ffprobe를 설정하고 Noto Sans CJK KR 글꼴을 모든 사용자용으로 설치한다. 작업 경로와 임시 경로 쓰기·외부 HTTPS 통신을 확인한다.
+6. 서비스 계정에서 node --import tsx scripts/shorts/preflight.ts --tools-only 실행. 실제 작업에서는 Actions Secrets가 주입된 전체 preflight가 실행된다.
+7. 개인 PC 러너를 끈 상태에서 관리자 화면에서 설교 한 편을 수동 제작한다. R2 미리보기, 실제 발언, 입 모양/자막, 길이, 수정 후 재승인을 확인한다.
+8. 의도적인 실패를 만든 뒤 해당 작업의 다시 제작만 실행한다. 다른 작업·기존 클립·과거 URL이 보존돼야 한다.
+
+## 로그인과 비밀 설정
+
+- GitHub: 러너 등록 때 관리자 계정 로그인 필요. 서비스 실행 중 브라우저 로그인 유지 불필요.
+- Google/YouTube: 계정 연결 때 교회 채널 권한이 있는 Google 계정 필요. 일반 Gmail 계정 로그인만으로 대상 채널 권한이 생기지는 않는다.
+- Instagram: 프로페셔널 계정과 Meta 앱의 게시 권한이 필요. 연결 방식은 Instagram Login.
+- Supabase, R2, Groq, Gemini: 기존 API 키를 Secrets로 주입하며 교회 PC에서 대시보드 상시 로그인 불필요.
+- 비밀값은 Git, 문서, 화면, 채팅에 복사하지 않는다. 키 존재 여부만 점검하고 실제 유효성은 해당 단계 시험으로 확인한다.
+- 제작 Secrets: NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, GEMINI_API_KEY, GROQ_API_KEY, R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET, NEXT_PUBLIC_CDN_BASE_URL.
+- 웹 제작 dispatch에는 GITHUB_PAT(Actions write)가 필요하다. SHORTS_WORKFLOW_REF는 기본 main이며 배포된 코드와 일치해야 한다.
+
+## 생성 복구
+
+- pending/queued 상태로 90분 이상 기다리면 PC/Actions 대기열을 확인한다. 오프라인만으로 실패 처리하지 않는다.
+- maintenance는 실제 GitHub 실행의 실패/취소/시간초과를 확인한 시도만 종료한다. 응답이 끊긴 dispatch를 무작정 다시 보내지 않는다.
+- 특정 작업 확인: node --import tsx scripts/repair-shorts-jobs.ts --jobId=UUID
+- failed 작업은 관리자 화면의 다시 제작. 승인된 클립이 있으면 전체 재생성하지 않는다.
+- 새 시도는 별도 임시 폴더와 R2 URL을 사용한다. 검수 포인터는 새 제작 성공 시에만 전환한다.
+- 임시 폴더는 서비스 계정 TEMP/shorts/jobId/attemptId. 자동으로 다른 시도의 폴더를 삭제하지 않는다. 종료 상태와 보존 필요를 확인한 뒤 운영자가 개별 폴더를 정리한다.
+- R2 키가 이미 존재하는데 DB 저장이 유실됐다면 새 시도로 재생성한다. 기존 immutable URL의 파일은 덮어쓰지 않는다.
+
+## 운영 활성화 순서
+
+수동 제작 → 교회 PC 운영 검증 → YouTube 비공개 시험 → 승인한 영상의 YouTube 게시 → Instagram 게시 → 설교 재생목록 자동 제작.
+각 단계는 실제 확인 후 활성화한다. BGM 사용 권한 확인 전 bgm_enabled=false, 미검수 자동 게시 auto_publish=false를 유지한다.
+
+## 스키마·배포 전환
+
+1. 운영 DB를 변경하기 전에 별도 시험 DB에서 두 마이그레이션을 순서대로 적용한다. 기존 샘플 ID·영상 URL·선정 이유가 보존되는지 확인한다.
+2. 서로 다른 두 DB 연결에서 같은 job의 shorts_create_attempt와 같은 publication의 shorts_claim_publication을 동시에 호출한다. 활성 시도·lease는 하나만 만들어져야 한다. RLS는 anon/member/staff/admin/master/service_role 각각 확인한다.
+3. 기본 회귀 테스트는 PGlite를 사용하며, 2026-10-19에는 별도 PostgreSQL 17.10의 실제 다중 연결 경합도 통과했다. 운영 이행 대상 Supabase 시험 DB 확인은 별도로 수행한다.
+4. 기존 제작을 잠시 중단하고 실행 중인 GitHub 작업이 종료된 뒤 운영 DB의 jobs/clips 수와 클립별 ID·URL을 보관한다. 조사 시점의 14개는 고정 운영값이 아니므로 전환 직전에 다시 조회한다.
+5. 20261018231828_shorts_generation_reliability.sql → 20261018233233_shorts_publications.sql과 웹 API를 같은 전환 작업으로 적용한다. 새 권한 정책에서는 구버전 API의 직접 쓰기가 차단되므로 구버전 웹과 장시간 혼용하지 않는다.
+6. 새 워크플로가 배포되는 main과 웹의 SHORTS_WORKFLOW_REF를 일치시킨다. 세 자동화 스위치는 OFF 상태에서 수동 생성부터 확인한다.
+7. 운영 문제 시 publishing_enabled와 auto_generate_enabled를 끄고 새 스키마와 호환되는 API 버전으로 복구한다. 파괴적 down migration이나 기존 클립 삭제로 되돌리지 않는다.
+
+## 게시 계정 연결
+
+공통으로 연결 CLI와 호스팅 게시 워커에 동일한 SHORTS_CREDENTIAL_ENCRYPTION_KEY(32바이트 난수의 base64)를 설정한다. 키 교체 시 기존 연결과 checkpoint를 다시 암호화할 수 없으면 복구할 수 없으므로 안전한 비밀 저장소에서 보관한다. 웹 클라이언트에는 전달하지 않는다.
+
+### YouTube
+
+- Google Cloud에서 YouTube Data API와 Desktop OAuth client를 준비한다. 대상 교회 채널에 접근 가능한 Google 계정으로 연결한다.
+- YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_CHANNEL_ID를 연결 환경과 게시 Actions Secrets에 등록한다. 조사한 기존 업로드 목록 기준 채널은 UCcJc6fm6McCxvpizoe3T4YQ이며 실제 채널 관리 화면에서 다시 대조한다.
+- 연결: node --env-file=.env.local --import tsx scripts/shorts/connect-youtube.ts
+- 도구가 출력한 Google 주소를 브라우저에서 열면 localhost callback을 받는다. state와 PKCE를 확인하며 youtube.force-ssl scope와 실제 채널을 대조한 뒤 offline 자격증명을 암호화 저장한다.
+- 동의 화면의 앱 상태·테스트 사용자·권한 검증 조건은 Google 콘솔 기준으로 설정한다. 토큰이 만료·철회되면 화면에 재연결 필요로 표시한다.
+- 관리자 화면에서 검증된 클립과 예약 시각을 선택하고 YouTube 비공개 시험으로 1건 예약한다. 게시 스위치를 켠 뒤 private-test workflow를 실행한다.
+- test_uploaded는 공개 게시 완료가 아니다. 실제 YouTube Studio의 private 상태와 내용·자막·싱크를 확인한다. 공개 시험은 게시할 클립을 live 예약으로 별도 승인한다.
+
+### Instagram
+
+- 프로페셔널(Business/Creator) 계정과 Instagram Login용 Meta 앱을 준비한다. Facebook Login으로 자동 전환하지 않는다.
+- INSTAGRAM_APP_ID, INSTAGRAM_APP_SECRET, INSTAGRAM_ACCOUNT_ID, INSTAGRAM_REDIRECT_URI, INSTAGRAM_API_VERSION을 연결 CLI 환경에 설정한다.
+- INSTAGRAM_REDIRECT_URI는 배포된 HTTPS 주소 /api/shorts/connections/instagram/callback으로 설정하고 Meta 앱에 정확히 같은 URI를 등록한다. 웹 배포가 먼저 필요하다.
+- INSTAGRAM_API_VERSION은 Meta 앱에서 지원·검증한 버전을 명시한다. 연결 시 /me의 계정 필드와 OAuth 응답의 부여된 permissions를 실제 계정에서 확인하며 실패하면 연결을 저장하지 않는다.
+- 연결: node --env-file=.env.local --import tsx scripts/shorts/connect-instagram.ts
+- 도구가 출력한 Instagram 주소를 열고 동의 후 callback 주소 전체를 로컬 도구에 붙여넣는다. 입력은 숨겨지며 서버·도구는 callback code/token을 로그로 출력하지 않는다.
+- 도구는 state, 대상 계정, 프로페셔널 유형, OAuth 응답에 실제로 부여된 instagram_business_basic 및 instagram_business_content_publish 권한을 확인하고 long-lived token을 암호화 저장한다.
+- 게시 워크플로에는 INSTAGRAM_ACCOUNT_ID Secret과 INSTAGRAM_API_VERSION repository variable을 설정한다. 앱 ID/Secret은 최초 연결에 사용하며 워커의 장기 토큰 갱신에는 주입하지 않는다.
+- private 릴스 시험이 있다고 가정하지 않는다. 컨테이너 처리·모킹 검증 후 실제 게시할 영상으로 공개 시험을 한다.
+
+[Google OAuth 문서](https://developers.google.com/identity/protocols/oauth2/native-app), [YouTube 재개 가능한 업로드](https://developers.google.com/youtube/data/guides/using_resumable_upload_protocol), [Meta 공식 Instagram Login 권한](https://www.postman.com/meta/instagram/folder/1z5vxzu/instagram-api-with-instagram-login).
+
+## 클라우드 실행과 새 설교 자동 제작
+
+- shorts-publish.yml: ubuntu-latest, 20분 제한, UTC 7/22/37/52분. 수동 dry-run/private-test/live 모드 지원. private-test는 시험 행만 처리하며 주기 live 실행은 시험 행을 건너뛴다.
+- shorts-maintenance.yml: 별도 호스팅 러너, GitHub Actions read/write와 YouTube 조회 권한으로 상태 대조·새 설교 검색을 수행한다.
+- 유지보수용 추가 Secret은 YOUTUBE_API_KEY와 YOUTUBE_CHANNEL_ID다. API 키는 채널 조회·재생목록 조회에만 사용한다.
+- 관리자의 운영 설정에서 설교 전용 재생목록 ID와 허용 분류를 지정한 뒤 자동 제작을 켠다. 예배 전체 영상은 목록에 넣지 않는다.
+- 활성화 이전·3분 이하·다른 채널·목록 밖·진행/예정 라이브·이미 생성한 원본·시스템이 게시한 쇼츠는 제외한다.
+- 자동 dispatch가 확정 실패한 작업은 실패 기록을 유지하고 관리자가 재시도한다. 이미 존재하는 작업을 주기 점검이 반복 초기화하지 않는다.
+- 업로드 전후에 교회 PC를 끈 상태로 예약 처리와 화면 상태 갱신이 계속되는지 실제 운영 시험을 한다.
+- Windows와 Linux lockfile 설치를 각각 확인하기 전까지 workflow의 npm install을 유지한다. Linux에서 npm ci가 확인되면 별도 변경으로 전환한다.
+
+## 중단·부분 실패·결과 불명확
+
+- publishing_enabled=false는 다음 게시 변경 요청 직전에 확인한다. 이미 시작된 외부 요청은 완료될 수 있으므로 플랫폼에 이미 게시된 영상을 자동 삭제하지 않는다.
+- 아직 runner가 획득하지 않은 요청은 관리자 화면의 대기 요청 취소로 종료할 수 있다. 특정 작업만 취소하려면 repair-shorts-jobs.ts --jobId=UUID --cancelQueued를 사용한다.
+- 실행 중인 제작은 GitHub에서 종료한 뒤 maintenance 대조를 기다린다. 단순 오프라인·오래된 heartbeat만으로 강제 소유권을 바꾸지 않는다.
+- YouTube 성공 후 Instagram 실패는 각각 별도 기록한다. 실패한 publication만 재시도하며 성공한 영상을 다시 올리지 않는다.
+- YouTube 세션·영상 ID가 있으면 같은 세션/영상에서 상태를 확인한다. 세션 만료로 결과를 알 수 없으면 새 업로드 대신 확인 필요 상태로 멈춘다.
+- Instagram 게시 요청의 응답이 유실되면 같은 컨테이너를 무작정 다시 게시하지 않는다. 확인 필요 상태에서 플랫폼의 실제 게시 내역을 대조한다.
+- 결과 불명확·checkpoint 저장 실패는 일반 재시도 버튼으로 초기화되지 않는다. 운영자가 실제 provider ID·공개 상태를 확인하고 보존된 checkpoint와 대조해야 한다.
+- daily_publish_limit은 한국 날짜와 플랫폼별로 적용한다. 진행·게시·결과 불명확 예약은 한도를 계속 점유하며 시험 업로드는 집계하지 않는다.
+- 재연결 후에도 기존 암호화 checkpoint를 삭제하지 않는다. 승인 버전이 바뀐 예약·처리 중인 클립은 서버가 변경을 거부한다.
+
+## 검증 기록과 운영 전 미완료 항목
+
+- 기본 검증: npm run typecheck, npm run lint, npm test, npm run build.
+- 실제 FFmpeg 경로 검증: SHORTS_MEDIA_TEST=1을 설정하고 scripts/shorts/render.integration.test.ts 실행. 두 편집 경로의 코덱·해상도·48kHz AAC·길이를 확인한다. 실제 사람의 입 모양·발언 의미 검수는 별도로 필요하다.
+- 현재 미완료: 운영 DB 적용, Linux npm ci, 교회 PC 서비스·재부팅·네트워크·디스크 검증, Noto Sans CJK KR 설치, 실제 설교 검수, YouTube/Instagram OAuth와 실계정 게시, PC 종료 상태 예약 시험.
+- 자동 제작·게시·배경음은 실제 단계별 확인 전 OFF를 유지한다.
+
+### 다중 연결 DB 검증 재실행
+
+별도 임시 폴더에 embedded-postgres@17.10.0-beta.17을 설치하고 SHORTS_NATIVE_POSTGRES_MODULE에 해당 패키지의 dist/index.js 절대 경로를 지정한 뒤 node --import tsx scripts/shorts/verify-database.mjs를 실행한다. 도구는 임시 포트·디렉터리의 독립 클러스터를 생성하고 검증 후 종료·정리하며 운영 DB 주소나 자격증명을 사용하지 않는다. 테스트용 OS 계정을 자동 생성하지 않는다.

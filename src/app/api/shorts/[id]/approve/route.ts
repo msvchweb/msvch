@@ -1,34 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin, AuthError } from "@/lib/admin-auth";
-
-type Params = Promise<{ id: string }>;
-
+import { z } from "zod";
+import { requireShortsAdmin } from "@/lib/shorts/permissions";
+import { reviewClip } from "@/lib/shorts/review";
+import { approveAndSchedule } from "@/lib/shorts/publication";
+import { shortsHttpError } from "@/lib/shorts/http";
 export async function POST(
   request: NextRequest,
-  { params }: { params: Params },
+  context: { params: Promise<{ id: string }> },
 ) {
   try {
-    const { id } = await params;
-    const { supabase } = await requireAdmin(request);
-
-    const { error } = await supabase
-      .from("shorts_clips")
-      .update({ review_status: "approved" })
-      .eq("id", id);
-
-    if (error) {
-      console.error("Approve clip error:", error);
+    await requireShortsAdmin(request);
+    const text = await request.text();
+    const raw = text ? JSON.parse(text) : {};
+    if (raw.platforms)
       return NextResponse.json(
-        { error: "승인 처리에 실패했습니다." },
-        { status: 500 },
+        await approveAndSchedule((await context.params).id, raw),
+        { status: 202 },
       );
-    }
-
-    return NextResponse.json({ ok: true });
-  } catch (err) {
-    if (err instanceof AuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
-    }
-    throw err;
+    const body = z
+      .object({ expectedVersion: z.number().int().positive().optional() })
+      .parse(raw);
+    return NextResponse.json(
+      await reviewClip(
+        (await context.params).id,
+        "approve",
+        body.expectedVersion ?? null,
+      ),
+    );
+  } catch (e) {
+    return shortsHttpError(e);
   }
 }

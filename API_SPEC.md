@@ -465,71 +465,65 @@ Gemini 기반 챗봇 — 최근 공지 10건을 system prompt 에 동적으로 �
 
 ---
 
-### GET `/api/shorts`
 
-쇼츠 작업 목록 조회. 각 job에 clips 배열 포함.
+### GET /api/shorts
 
-- **인증**: 선택. admin이면 모든 상태 조회 가능, 비인증/비admin이면 `published`만.
-- **캐시**: 없음 (`revalidate: 0`)
-- **쿼리 파라미터**:
-  - `status` — 특정 상태 필터, admin 전용 (예: `ready_for_review`)
-  - `published` — `true`이면 발행 완료 건만, admin 전용
-  - `limit` — 최대 결과 수 (기본 20, 상한 100, `parseLimit()`)
-- **응답**: `ShortsJobWithClips[]`
+작업과 현재 검수 대상 클립을 반환한다. admin/master는 생성 시도·플랫폼별 발행 상태와 checked_at을 함께 조회한다. 그 외 사용자는 게시 완료된 작업의 공개용 필드만 조회한다. 기본 limit=20, 상한 100. 캐시 없음.
 
-```
-GET /api/shorts                           → 전체 (최신 20개)
-GET /api/shorts?published=true&limit=10   → 발행된 쇼츠 (모바일용)
-GET /api/shorts?status=ready_for_review   → 검수 대기 (Admin용)
-```
+재시도 중에는 이전 성공 시도의 클립을 유지한다. 새 시도가 성공해야 review_attempt_id를 전환하며 미완성 클립은 목록에 섞지 않는다. 비공개 자격증명·업로드 세션·leaseToken은 응답에 포함하지 않는다.
 
----
+### POST /api/shorts/trigger
 
-### POST `/api/shorts/trigger`
+인증: admin/master. videoId는 영문·숫자·하이픈·밑줄 11자, count는 5 또는 10(기본 5). videoTitle은 필수이며 최대 300자. 선택 항목 videoPublishedAt은 ISO 시각, videoThumbnail은 URL이다.
 
-GitHub Actions 워크플로우를 트리거하여 쇼츠 생성 파이프라인을 시작한다.
+성공 202: { jobId, attemptId, status: "pending" }. 잘못된 입력 400, 미인증 401, 권한 부족 403, 중복/실행 경합 409, 확정 dispatch 실패 502. 응답 유실·5xx는 접수 여부가 불명확하므로 대기 상태를 보존하고 maintenance에서 attemptId가 포함된 GitHub 실행을 검색한다.
 
-- **인증**: admin 역할 필수 (`requireAdmin()`)
-- **요청 본문** (Zod 검증: `ShortsTriggerSchema`):
+### POST /api/shorts/jobs/[jobId]/retry
 
-```ts
+admin/master 전용. 승인된 클립 또는 활성 시도가 있으면 409. 기존 클립을 보존하고 새 시도를 만들어 202를 반환한다. 시도 관리 도입 전의 오래된 작업은 기존 GitHub 실행이 끝났는지 먼저 확인한다.
+
+### POST /api/shorts/jobs/[jobId]/cancel
+
+아직 runner가 획득하지 않은 queued 시도만 취소한다. 늦게 시작한 runner의 획득은 거부된다. 이미 실행 중이면 409이며 GitHub 종료 확인·상태 대조가 필요하다.
+
+### PATCH /api/shorts/[id]
+
+admin/master 전용. 본문 { expectedVersion, title, titleYt, captionYt, captionIg }. 제목 최대 100자, YouTube 설명 최대 5000자, Instagram 캡션 최대 2200자. 수정 시 content_version이 증가하고 승인이 해제되며 대기 예약은 취소된다. 오래된 버전이나 처리/게시/결과 불명확 상태는 409. 실제 발언 자막·영상 구도 수정은 제공하지 않는다.
+
+### POST /api/shorts/[id]/approve
+
+본문 없음 또는 { expectedVersion }는 검수 승인만 수행하며 게시하지 않는다(200, 갱신된 clip). 예약 본문은 다음과 같다.
+
+~~~json
 {
-  videoId: string;         // max 50
-  videoTitle: string;      // max 300
-  videoPublishedAt?: string; // max 50
-  videoThumbnail?: string; // max 2000
+  "expectedVersion": 1,
+  "platforms": ["youtube", "instagram"],
+  "scheduledAt": "2026-10-20T09:30:00+09:00",
+  "testOnly": false
 }
-```
+~~~
 
-- **응답 (200)**: `{ jobId: string; status: "pending" }`
-- **에러 응답**:
-  - `400` — 필수 필드 누락 또는 형식 오류
-  - `401` — 미인증
-  - `403` — 비admin
-  - `409` — 이미 해당 videoId로 작업 존재 (`{ error, jobId }`)
-  - `500` — Job 생성 실패
-  - `502` — GitHub Actions 트리거 실패
+예약 성공 202는 플랫폼별 publication 배열을 반환한다. 승인·버전·영상 검사·연결 상태를 DB 트랜잭션으로 확인한다. testOnly=true는 YouTube private 시험만 허용하며 test_uploaded 상태로 종료한다. 본문 없는 기존 승인 호출은 발행 행을 생성하지 않는다.
 
----
+### POST /api/shorts/[id]/reject
 
-### POST `/api/shorts/[id]/approve`
+본문 { expectedVersion, category, note }. category: context/hook/subtitle/framing/sync/other. note 최대 2000자. 200은 갱신된 clip을 반환한다. 버전 충돌·처리/게시/결과 불명확 상태는 409.
 
-쇼츠 클립을 승인한다.
+### POST /api/shorts/publications/[publicationId]/retry
 
-- **인증**: admin 역할 필수
-- **요청 본문**: 없음
-- **응답 (200)**: `{ ok: true }`
+안전하게 재개할 수 있는 오류에만 허용한다. 200 { ok: true }. 응답 유실 등 결과가 불명확한 게시를 새 업로드로 초기화하지 않으며, 플랫폼 상태 확인이 필요한 경우 409.
 
----
+### DELETE /api/shorts/publications/[publicationId]
 
-### POST `/api/shorts/[id]/reject`
+queued/retry_wait 예약을 취소한다. 200 { ok: true }. 처리 중·게시 완료 상태는 409. 취소한 예약은 같은 승인 버전으로 다시 예약할 수 있다.
 
-쇼츠 클립을 반려한다.
+### GET · PATCH /api/shorts/settings
 
-- **인증**: admin 역할 필수 (`requireAdmin()`)
-- **요청 본문** (Zod 검증: `ShortsRejectSchema`): `{ note?: string }` (max 500자)
-- **응답 (200)**: `{ ok: true }`
-- **에러**: `400` — 반려 사유 500자 초과
+admin/master 전용. GET은 { settings, connections }를 반환하며 연결의 플랫폼·계정 ID·상태·만료 시각만 제공한다. 자격증명은 반환하지 않는다.
+
+PATCH 허용 필드: publishing_enabled, auto_generate_enabled, source_playlist_id, allowed_categories, daily_publish_limit(1~20), bgm_enabled. 자동 제작 활성화에는 설교 전용 재생목록과 허용 분류가 필요하며 서버가 활성화 시점을 기록한다. auto_publish는 사용하지 않고 false를 유지한다.
+
+초기 자동 제작·게시·배경음은 OFF. GitHub 스케줄 지연 때문에 예약 시각의 정확한 발행을 보장하지 않는다. 설정·OAuth·배포 절차는 [운영 가이드](./RUNBOOK-shorts-automation.md)를 따른다.
 
 ---
 
@@ -1413,8 +1407,8 @@ Vercel Cron — 매일 04:00 KST (UTC 19:00). 7일 초과한 weekly_imports 행�
 |-----------|-----------|------|
 | POST `/api/revalidate` | `RevalidateSchema` | paths 최대 20개, 타이밍-세이프 시크릿 비교 |
 | POST `/api/sermon-summary` | `SermonSummarySchema` | 모든 필드 길이 제한 |
-| POST `/api/shorts/trigger` | `ShortsTriggerSchema` | videoId 50자, title 300자 |
-| POST `/api/shorts/[id]/reject` | `ShortsRejectSchema` | note 500자 |
+| POST `/api/shorts/trigger` | `ShortsTriggerSchema` | videoId 11자 고정, title 300자, count 5/10 |
+| POST `/api/shorts/[id]/reject` | `ShortsRejectSchema` | expectedVersion, category, note 2000자 |
 | GET `/api/gallery` | `parseLimit()` | limit 상한 100 |
 | GET `/api/shorts` | `parseLimit()` | limit 상한 100 |
 | GET `/api/calendar` | `parseLimit()` | limit 상한 100, days 상한 365 |
@@ -1521,8 +1515,8 @@ API 라우트 외에 Server Component에서 직접 호출하는 데이터 함수
 
 | 등급 | 포함 경로 |
 |------|----------|
-| **admin 이상** | `/admin/notices`, `/admin/weeklies`, `/admin/masters`, `/admin/calendar`, `/admin/event-subscribers`, `/admin/inquiries`, `/admin/new-families` |
-| **staff 이상** | `/admin/gallery`, `/admin/boards`, `/admin/posters`, `/admin/sermons`, `/admin/shorts` |
+| **admin 이상** | `/admin/notices`, `/admin/weeklies`, `/admin/masters`, `/admin/calendar`, `/admin/event-subscribers`, `/admin/inquiries`, `/admin/new-families`, `/admin/shorts` |
+| **staff 이상** | `/admin/gallery`, `/admin/boards`, `/admin/posters`, `/admin/sermons` |
 | **master 단독** | `/admin/members` |
 | **공통(staff 이상)** | `/admin`, `/admin/menu`, `/admin/guide`, `/admin/updates` |
 

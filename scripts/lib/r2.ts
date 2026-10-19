@@ -5,7 +5,11 @@
  * Next 런타임을 전제로 하는데, 이 스크립트들은 `npx tsx` 로 단독 실행된다.
  * **서명 구현(`src/lib/r2/sign.ts`)은 공유**하므로 SigV4 로직은 한 벌뿐이다.
  */
-import { signRequest, type Bytes, type SigV4Credentials } from "../../src/lib/r2/sign";
+import {
+  signRequest,
+  type Bytes,
+  type SigV4Credentials,
+} from "../../src/lib/r2/sign";
 
 export const IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable";
 
@@ -24,7 +28,10 @@ function config(): R2Config {
   const accessKeyId = process.env.R2_ACCESS_KEY_ID ?? "";
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY ?? "";
   const bucket = process.env.R2_BUCKET ?? "";
-  const cdnBase = (process.env.NEXT_PUBLIC_CDN_BASE_URL ?? "").replace(/\/$/, "");
+  const cdnBase = (process.env.NEXT_PUBLIC_CDN_BASE_URL ?? "").replace(
+    /\/$/,
+    "",
+  );
 
   const missing = [
     ["R2_ACCOUNT_ID", accountId],
@@ -40,7 +47,12 @@ function config(): R2Config {
   }
 
   cached = {
-    credentials: { accessKeyId, secretAccessKey, region: "auto", service: "s3" },
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+      region: "auto",
+      service: "s3",
+    },
     endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
     bucket,
     cdnBase,
@@ -58,6 +70,7 @@ async function request(
   key: string,
   body?: Bytes,
   headers: Record<string, string> = {},
+  signal?: AbortSignal,
 ): Promise<Response> {
   const c = config();
   const url = new URL(`${c.endpoint}/${c.bucket}/${key}`);
@@ -68,7 +81,7 @@ async function request(
     headers,
     body,
   });
-  return fetch(url, { method, headers: signed, body });
+  return fetch(url, { method, headers: signed, body, signal });
 }
 
 export async function objectExists(key: string): Promise<boolean> {
@@ -88,5 +101,34 @@ export async function putObject(
   if (!res.ok) {
     throw new Error(`R2 업로드 실패 (${res.status}): ${await res.text()}`);
   }
+  return publicUrlForKey(key);
+}
+
+/** Shorts attempts use immutable keys: never replace bytes after a response loss. */
+export async function putImmutableObject(
+  key: string,
+  body: Buffer,
+  contentType: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const res = await request(
+    "PUT",
+    key,
+    new Uint8Array(body),
+    {
+      "content-type": contentType,
+      "cache-control": IMMUTABLE_CACHE_CONTROL,
+      "if-none-match": "*",
+    },
+    signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(300000)])
+      : AbortSignal.timeout(300000),
+  );
+  if (!res.ok)
+    throw new Error(
+      res.status === 412
+        ? "immutable_media_exists_create_new_attempt"
+        : `r2_upload_${res.status}`,
+    );
   return publicUrlForKey(key);
 }

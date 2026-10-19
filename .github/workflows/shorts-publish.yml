@@ -1,0 +1,44 @@
+name: Publish approved shorts
+on:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Publication mode (private-test uploads YouTube privately)
+        type: choice
+        options: [dry-run, private-test, live]
+        default: dry-run
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: shorts-publish
+  cancel-in-progress: false
+  queue: max
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      # Keep install until the regenerated lockfile has passed a Linux npm ci.
+      - run: npm install --no-audit --no-fund
+      - name: Publish due approved versions
+        env:
+          SHORTS_MODE: ${{ github.event_name == 'schedule' && 'live' || inputs.mode }}
+          GITHUB_TOKEN: ${{ github.token }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          NEXT_PUBLIC_CDN_BASE_URL: ${{ secrets.NEXT_PUBLIC_CDN_BASE_URL }}
+          SHORTS_CREDENTIAL_ENCRYPTION_KEY: ${{ secrets.SHORTS_CREDENTIAL_ENCRYPTION_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          INSTAGRAM_API_VERSION: ${{ vars.INSTAGRAM_API_VERSION }}
+        run: node --import tsx scripts/shorts/publish/run.ts --mode="$SHORTS_MODE"
