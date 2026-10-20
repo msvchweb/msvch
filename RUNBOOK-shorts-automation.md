@@ -48,11 +48,11 @@
 
 ## 스키마·배포 전환
 
-1. 운영 DB를 변경하기 전에 별도 시험 DB에서 두 마이그레이션을 순서대로 적용한다. 기존 샘플 ID·영상 URL·선정 이유가 보존되는지 확인한다.
+1. 운영 DB를 변경하기 전에 별도 시험 DB에서 선행 스키마와 두 신규 마이그레이션을 순서대로 검증한다. 기존 샘플 ID·영상 URL·선정 이유가 보존되는지 확인한다. 2026-10-20 운영 조회에서는 highlight_count 컬럼과 supabase_migrations.schema_migrations 테이블이 모두 없었다. 저장소의 모든 마이그레이션을 db push로 일괄 적용하지 않으며, 전환 직전에 현재 스키마를 다시 확인한다.
 2. 서로 다른 두 DB 연결에서 같은 job의 shorts_create_attempt와 같은 publication의 shorts_claim_publication을 동시에 호출한다. 활성 시도·lease는 하나만 만들어져야 한다. RLS는 anon/member/staff/admin/master/service_role 각각 확인한다.
 3. 기본 회귀 테스트는 PGlite를 사용하며, 2026-10-19에는 별도 PostgreSQL 17.10의 실제 다중 연결 경합도 통과했다. 운영 이행 대상 Supabase 시험 DB 확인은 별도로 수행한다.
 4. 기존 제작을 잠시 중단하고 실행 중인 GitHub 작업이 종료된 뒤 운영 DB의 jobs/clips 수와 클립별 ID·URL을 보관한다. 조사 시점의 14개는 고정 운영값이 아니므로 전환 직전에 다시 조회한다.
-5. 20261018231828_shorts_generation_reliability.sql → 20261018233233_shorts_publications.sql과 웹 API를 같은 전환 작업으로 적용한다. 새 권한 정책에서는 구버전 API의 직접 쓰기가 차단되므로 구버전 웹과 장시간 혼용하지 않는다.
+5. highlight_count가 없으면 먼저 042_shorts_highlight_count.sql을 적용한다. 이어서 20261018231828_shorts_generation_reliability.sql → 20261018233233_shorts_publications.sql과 웹 API를 같은 전환 작업으로 적용한다. 새 권한 정책에서는 구버전 API의 직접 쓰기가 차단되므로 구버전 웹과 장시간 혼용하지 않는다.
 6. 새 워크플로가 배포되는 main과 웹의 SHORTS_WORKFLOW_REF를 일치시킨다. 세 자동화 스위치는 OFF 상태에서 수동 생성부터 확인한다.
 7. 운영 문제 시 publishing_enabled와 auto_generate_enabled를 끄고 새 스키마와 호환되는 API 버전으로 복구한다. 파괴적 down migration이나 기존 클립 삭제로 되돌리지 않는다.
 
@@ -122,7 +122,7 @@
 
 ### 2026-10-20 로컬 배포 준비 점검
 
-- 사용자 선택에 따라 원격 시험 DB 생성·변경과 운영 반영을 보류하고 로컬 검증만 진행했다. 현재 Supabase 커넥터의 프로젝트 목록에 교회 프로젝트가 없으며 CLI 로그인도 없다.
+- 최초 점검에서는 사용자 선택에 따라 원격 시험 DB 생성·변경과 운영 반영을 보류하고 로컬 검증만 진행했다. 당시 Supabase 커넥터의 프로젝트 목록에 교회 프로젝트가 없었으며 CLI 로그인도 없었다. 이후 CLI 연결과 운영 데이터의 로컬 복제본 검증 결과는 아래에 기록한다.
 - Ubuntu WSL2의 별도 홈 캐시 디렉터리에 공식 SHA-256을 확인한 Linux Node 24를 설치하고 커밋된 소스만 추출했다. 운영 .env나 자격증명을 복사하지 않았다.
 - 최초 npm ci는 @rolldown/binding-wasm32-wasi가 요구하는 @emnapi/core와 @emnapi/runtime 1.11.1의 중첩 lock 항목 누락으로 실패했다. 두 항목만 추가했으며 기존 의존성 버전 변경은 없다.
 - 보완 후 Windows/Linux 각각 npm ci·전체 테스트 206개·타입 검사를 통과했다. DB 회귀 테스트는 격리된 PostgreSQL 엔진에서 기존 클립 URL·선정 이유 보존, 권한, 경합 및 불확실 게시 보호를 검증한다. 실제 운영 데이터의 마이그레이션 후 비교는 아직 하지 않았다.
@@ -130,6 +130,19 @@
 - 2026-10-19의 운영 기준 기록은 작업 14개/클립 14개와 ID·URL·기존 transcript의 fingerprint다. 전체 데이터 백업이 아니므로 실제 전환 직전에 새 백업과 기준값 조회가 필요하다.
 - GitHub 설정은 이름만 조회했다. 기존 제작용 Secrets는 등록되어 있다. 게시용 SHORTS_CREDENTIAL_ENCRYPTION_KEY, YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_CHANNEL_ID, INSTAGRAM_ACCOUNT_ID와 repository variable INSTAGRAM_API_VERSION은 아직 없다. 값의 유효성 시험·설정 변경은 하지 않았다.
 - 웹의 GITHUB_PAT 및 SHORTS_WORKFLOW_REF는 실제 배포 환경에서 별도 확인해야 한다. 현재 점검을 원격 시험 DB나 실계정 게시 검증 완료로 해석하지 않는다.
+
+### 2026-10-20 운영 쇼츠 데이터의 로컬 복제본 이행 검증
+
+- 사용자 토큰으로 Supabase CLI 인증과 교회 프로젝트 prqebmdejdvbtkhabtfy의 SELECT 1을 확인했다. 플러그인 OAuth 연결이 복구됐다는 의미는 아니다.
+- CLI에서 접근 가능한 프로젝트는 운영 msvchDB 하나이며 시험 브랜치는 없었다. 사용자가 별도 시험 DB가 없음을 확인하고 추가 비용 없는 로컬 복제본 검증을 선택했다.
+- 운영의 shorts_jobs/shorts_clips/shorts_settings 구조·제약·인덱스·RLS 정책·권한과 전체 쇼츠 행을 읽어 Git에서 제외된 로컬 검증 폴더에 보관했다. 회원 데이터·인증 토큰·외부 서비스 자격증명은 복사하지 않았다. 이 자료는 쇼츠 3개 테이블에 대한 기록이며 전체 DB 백업은 아니다.
+- 저장소 초기 SQL과 운영 정책은 달랐다. 운영 정책이 참조하는 is_staff 및 is_admin_or_master의 실제 정의도 복원했다. Auth UID와 profiles는 필요한 최소 로컬 fixture를 사용했다.
+- 독립 PostgreSQL 17.10에서 실제 운영 스냅샷을 복원하고 042_shorts_highlight_count.sql → 제작 안정화 → 예약 발행 마이그레이션 적용을 통과했다. 운영 DB는 PostgreSQL 17.6이므로 동일 서버 환경을 검증한 것은 아니다.
+- 기존 작업 14개·클립 14개·설정 행의 모든 기존 필드가 이행 후에도 동일했다. ID·영상 URL·기존 transcript를 포함한 독립 비교 hash가 일치했다. 기존 transcript는 선정 이유로 복사되고 자막은 unverified이며, 신규 제작 자동화·게시·배경음 스위치는 모두 OFF였다.
+- 실제로 분리된 두 DB 연결에서 게시 획득이 하나만 성공했다. 게시 OFF·예약 시각 전 획득 차단, 중복 예약의 동일 행 반환, 오래된 lease 차단, 게시 중 수정 차단을 확인했다. anon/member/staff/admin/master/service_role의 초안 조회·함수 실행·비밀 테이블 차단도 확인했다.
+- YouTube 시험 예약은 live 큐·일일 한도·published 집계와 분리되며 test_uploaded로 끝났다. 이는 로컬 DB 상태 전이 검증으로, YouTube/Instagram API 호출이나 실제 업로드는 없었다.
+- 검증 후 운영을 다시 조회해 쇼츠 행·구조·권한 정책이 검증 전과 동일함을 확인했다. 운영 쇼츠 데이터/스키마 변경, 원격 시험 DB 생성, 배포, 실제 게시는 수행하지 않았다. 로컬 PostgreSQL 프로세스는 종료했다.
+- 상세 JSON 결과와 복원/검증 스크립트는 .superpowers/sdd/PLAN-shorts-automation/에 보관한다. PowerShell의 날짜 자동 변환으로 정밀도·표기가 달라지지 않도록 운영 스냅샷은 CLI 원본 JSON으로 저장한다. 원격 Supabase 서비스와 실제 OAuth/게시 시험은 여전히 미완료다.
 
 ### 다중 연결 DB 검증 재실행
 
