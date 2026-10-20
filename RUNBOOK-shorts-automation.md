@@ -4,6 +4,8 @@
 
 교회 현장의 설치·등록·첫 제작 순서는 [교회 PC 시작 안내](CHURCH-PC-START.md)를 먼저 따른다.
 
+Vercel 권한이 있는 다른 CLI에서 운영 반영을 이어받을 때는 [CLI 인계서](HANDOFF-shorts-vercel-cli.md)를 사용한다.
+
 ## 현재 확인 상태
 
 - Windows 로컬 단위/DB 엔진/합성 렌더 검증 및 최종 코드 검토·중요 문제 수정 완료. 운영 DB 마이그레이션·배포·실제 게시 미실행.
