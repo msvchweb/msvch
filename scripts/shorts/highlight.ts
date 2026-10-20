@@ -38,9 +38,14 @@ const Json3Schema = z.object({
   events: z.array(
     z.object({
       tStartMs: z.number().nonnegative(),
-      dDurationMs: z.number().nonnegative(),
+      // YouTube window/newline control events can omit duration; speech cannot.
+      dDurationMs: z.number().nonnegative().optional(),
       segs: z.array(z.object({ utf8: z.string() })).optional(),
-    }),
+    }).refine(
+      (event) => event.dDurationMs !== undefined ||
+        !(event.segs ?? []).some((seg) => seg.utf8.trim().length > 0),
+      { path: ["dDurationMs"], message: "Spoken subtitles require a duration" },
+    ),
   ),
 });
 export function parseJson3(filePath: string): SubtitleSegment[] {
@@ -48,7 +53,7 @@ export function parseJson3(filePath: string): SubtitleSegment[] {
     .events.map((e, i) => ({
       id: `s${String(i).padStart(6, "0")}`,
       startMs: e.tStartMs,
-      endMs: e.tStartMs + e.dDurationMs,
+      endMs: e.tStartMs + (e.dDurationMs ?? 0),
       text: (e.segs ?? [])
         .map((s) => s.utf8)
         .join("")

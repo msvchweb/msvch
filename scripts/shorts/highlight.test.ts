@@ -4,12 +4,50 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import {
+  parseJson3,
   resolveHighlight,
   rankHighlights,
   selectHighlights,
 } from "./highlight";
 import { modelJson } from "./lib/model";
 vi.mock("./lib/model", () => ({ modelJson: vi.fn() }));
+
+it("accepts YouTube JSON3 control events without changing spoken segment IDs", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "shorts-json3-test-"));
+  try {
+    const file = path.join(dir, "source.json3");
+    await writeFile(file, JSON.stringify({
+      events: [
+        { tStartMs: 0, id: 1, wpWinPosId: 0, wsWinStyleId: 0 },
+        { tStartMs: 180000, dDurationMs: 10000, segs: [{ utf8: "첫 발언" }] },
+        { tStartMs: 190000, aAppend: 1, segs: [{ utf8: "\n" }] },
+        { tStartMs: 190000, dDurationMs: 20000, segs: [{ utf8: "다음 발언" }] },
+      ],
+    }));
+    expect(parseJson3(file)).toEqual([
+      { id: "s000001", startMs: 180000, endMs: 190000, text: "첫 발언" },
+      { id: "s000003", startMs: 190000, endMs: 210000, text: "다음 발언" },
+    ]);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+it("still rejects spoken JSON3 events with missing or negative duration", async () => {
+  const dir = await mkdtemp(path.join(os.tmpdir(), "shorts-json3-test-"));
+  try {
+    const file = path.join(dir, "source.json3");
+    for (const timing of [{}, { dDurationMs: -1 }]) {
+      await writeFile(file, JSON.stringify({
+        events: [{ tStartMs: 180000, ...timing, segs: [{ utf8: "실제 발언" }] }],
+      }));
+      expect(() => parseJson3(file)).toThrow();
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
 const segments = [
   { id: "s0", startMs: 70000, endMs: 72000, text: "하나님은" },
   {
