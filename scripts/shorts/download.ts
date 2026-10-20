@@ -1,58 +1,58 @@
-import { execSync } from "child_process";
-import { existsSync, mkdirSync } from "fs";
-import path from "path";
-import { WORK_DIR } from "./lib/paths";
-
+import { existsSync, mkdirSync } from "node:fs";
+import path from "node:path";
+import { runTool } from "./lib/process";
+import { VideoIdSchema } from "../../src/lib/shorts/validation";
 export interface DownloadResult {
-  videoPath: string; // WORK_DIR/<videoId>.mp4
-  audioPath: string; // WORK_DIR/<videoId>.mp3  (16kHz mono)
+  videoPath: string;
+  audioPath: string;
 }
-
-export function download(videoId: string): DownloadResult {
-  mkdirSync(WORK_DIR, { recursive: true });
-
-  const videoPath = path.join(WORK_DIR, `${videoId}.mp4`);
-  const audioPath = path.join(WORK_DIR, `${videoId}.mp3`);
-
-  // 영상 다운로드 (자막 동시 수신 제거 — 자막은 transcribe 단계에서 Groq 로 생성)
-  execSync(
+export async function download(
+  videoId: string,
+  workDir: string,
+  signal?: AbortSignal,
+): Promise<DownloadResult> {
+  VideoIdSchema.parse(videoId);
+  mkdirSync(workDir, { recursive: true });
+  const videoPath = path.join(workDir, videoId + ".mp4"),
+    audioPath = path.join(workDir, videoId + ".mp3");
+  await runTool(
+    "yt-dlp",
     [
-      "yt-dlp",
-      '-f "bv*[height<=1080]+ba/b[height<=1080]"',
-      "--merge-output-format mp4",
-      "--fragment-retries infinite", // 네트워크 끊김 시 무한 재시도
-      `-o "${videoPath}"`,
+      "-f",
+      "bv*[height<=1080]+ba/b[height<=1080]",
+      "--merge-output-format",
+      "mp4",
+      "--fragment-retries",
+      "5",
+      "--retries",
+      "5",
+      "-o",
+      videoPath,
       "--no-playlist",
-      `"https://www.youtube.com/watch?v=${videoId}"`,
-    ].join(" "),
-    { stdio: "inherit", timeout: 3600_000 }, // 1시간 (대용량 영상 대응)
+      `https://www.youtube.com/watch?v=${videoId}`,
+    ],
+    { timeoutMs: 1200000, signal },
   );
-
-  if (!existsSync(videoPath)) {
-    throw new Error("영상 다운로드 실패");
-  }
-
-  // 다운로드한 영상에서 16kHz mono 32kbps mp3 추출 (2차 네트워크 다운로드 없음)
-  execSync(
+  if (!existsSync(videoPath)) throw new Error("download_missing");
+  await runTool(
+    "ffmpeg",
     [
-      "ffmpeg -y",
-      `-i "${videoPath}"`,
+      "-y",
+      "-i",
+      videoPath,
       "-vn",
-      "-ac 1",
-      "-ar 16000",
-      "-c:a libmp3lame",
-      "-b:a 32k",
-      `"${audioPath}"`,
-    ].join(" "),
-    { stdio: "inherit", timeout: 1800_000 }, // 30분
+      "-ac",
+      "1",
+      "-ar",
+      "16000",
+      "-c:a",
+      "libmp3lame",
+      "-b:a",
+      "32k",
+      audioPath,
+    ],
+    { timeoutMs: 300000, signal },
   );
-
-  if (!existsSync(audioPath)) {
-    throw new Error("오디오 추출 실패");
-  }
-
-  return {
-    videoPath,
-    audioPath,
-  };
+  if (!existsSync(audioPath)) throw new Error("audio_missing");
+  return { videoPath, audioPath };
 }

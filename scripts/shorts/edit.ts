@@ -1,8 +1,8 @@
-import { execSync } from "child_process";
+import { runTool } from "./lib/process";
+import { verifyClip, type MediaCheck } from "./verify-clip";
 import { existsSync, readFileSync, writeFileSync } from "fs";
 import path from "path";
 import type { HighlightSegment, VoicedChunk, Mood } from "./highlight";
-import { WORK_DIR } from "./lib/paths";
 
 const BGM_DIR = path.join(process.cwd(), "scripts/shorts/bgm");
 
@@ -44,7 +44,11 @@ function shiftSegment(
 }
 
 /** voiced chunks 가 단일 chunk 이고 [startSec, endSec] 전체를 덮으면 컷 없음. */
-function isFullClip(voiced: VoicedChunk[], startSec: number, endSec: number): boolean {
+function isFullClip(
+  voiced: VoicedChunk[],
+  startSec: number,
+  endSec: number,
+): boolean {
   return (
     voiced.length === 1 &&
     Math.abs(voiced[0].start - startSec) < 0.05 &&
@@ -81,7 +85,10 @@ function fmtASSTime(seconds: number): string {
 }
 
 function escapeASSText(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/\{/g, "\\{").replace(/\}/g, "\\}");
+  return text
+    .replace(/\\/g, "\\\\")
+    .replace(/\{/g, "\\{")
+    .replace(/\}/g, "\\}");
 }
 
 /** segment 텍스트 내 keywords 매칭 부분을 ASS inline override 로 감싼다. */
@@ -155,7 +162,10 @@ function generateASS(
     const evtEnd = (e.tStartMs + e.dDurationMs) / 1000;
     if (evtEnd < startSec || evtStart > endSec) continue;
     if (!e.segs) continue;
-    const text = e.segs.map((s) => s.utf8).join("").trim();
+    const text = e.segs
+      .map((s) => s.utf8)
+      .join("")
+      .trim();
     if (!text) continue;
     subtitles.push({ start: evtStart, end: evtEnd, text });
   }
@@ -192,21 +202,20 @@ ${assDialogue}`;
 }
 
 /** ffmpeg filter graph 안에 들어갈 ass= 경로를 escape (Windows ':' / ',' 등). */
-function escapeFilterPath(p: string): string {
-  return p.replace(/\\/g, "/").replace(/:/g, "\\:").replace(/'/g, "\\'");
-}
 
 /** editClips 성공 결과 — 출력 경로와 그 클립의 highlight 짝. 다운스트림 인덱스 정합 보존용. */
 export interface EditedClip {
   outputPath: string;
   highlight: HighlightSegment;
+  mediaCheck: MediaCheck;
 }
 
-export function editClips(
+export async function editClips(
   videoPath: string,
   subtitlePath: string,
   highlights: HighlightSegment[],
-): EditedClip[] {
+  options: { workDir: string; bgmEnabled?: boolean; signal?: AbortSignal },
+): Promise<EditedClip[]> {
   const result: EditedClip[] = [];
 
   for (let i = 0; i < highlights.length; i++) {
@@ -230,13 +239,14 @@ export function editClips(
         h.card_text,
         h.voiced,
       );
-      const assPath = path.join(WORK_DIR, `clip_${i}.ass`);
-      const outputPath = path.join(WORK_DIR, `clip_${i}.mp4`);
+      options.signal?.throwIfAborted();
+      const assPath = path.join(options.workDir, `clip_${i}.ass`);
+      const outputPath = path.join(options.workDir, `clip_${i}.mp4`);
 
       writeFileSync(assPath, assContent, "utf-8");
 
-      const assRef = escapeFilterPath(assPath);
-      const bgmPath = getBgmPath(h.mood);
+      const assRef = `clip_${i}.ass`;
+      const bgmPath = options.bgmEnabled ? getBgmPath(h.mood) : null;
       const logoPath = path.join(process.cwd(), "scripts/shorts/banner.png");
       const useCut = !isFullClip(h.voiced, h.start_sec, h.end_sec);
       const logoInputIdx = bgmPath ? 2 : 1;
@@ -247,30 +257,40 @@ export function editClips(
       //   영상 1:1 정사각 crop → [fg]
       //   overlay y=350 [merged] → ass 자막/카드 번인 → [captioned]
       //   로고 overlay (하단 가운데) → [vout]
-      const videoFilters: string[] = [];
+      const videoFilters: string[] = ["[0:v]setpts=PTS-STARTPTS,fps=30[vnorm]"];
       if (useCut) {
-        videoFilters.push(`[0:v]select='${buildSelectExpr(h.voiced, h.start_sec)}',setpts=N/FRAME_RATE/TB[vcut]`);
+        videoFilters.push(
+          `[vnorm]select='${buildSelectExpr(h.voiced, h.start_sec)}',setpts=N/30/TB[vcut]`,
+        );
       }
-      const fgSource = useCut ? "[vcut]" : "[0:v]";
+      const fgSource = useCut ? "[vcut]" : "[vnorm]";
       videoFilters.push("color=c=black:s=1080x1920:d=1[bg]");
-      videoFilters.push(`${fgSource}crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]`);
+      videoFilters.push(
+        `${fgSource}crop=ih:ih,scale=1080:1080,eq=contrast=1.05:saturation=1.1[fg]`,
+      );
       videoFilters.push("[bg][fg]overlay=0:350[merged]");
       videoFilters.push(`[merged]ass='${assRef}'[captioned]`);
       videoFilters.push(`[${logoInputIdx}:v]scale=400:-1[logo]`);
-      videoFilters.push(`[captioned][logo]overlay=(W-w)/2:H-h-30:shortest=1[vout]`);
+      videoFilters.push(
+        `[captioned][logo]overlay=(W-w)/2:H-h-30:shortest=1[vout]`,
+      );
 
       // 오디오 체인:
       //   (옵션) aselect: 침묵 컷 적용 → [acut]
       //   (옵션) BGM amix → [aout], 없으면 sermon audio 그대로
-      const audioFilters: string[] = [];
+      const audioFilters: string[] = ["[0:a]asetpts=PTS-STARTPTS[anorm]"];
       if (useCut) {
-        audioFilters.push(`[0:a]aselect='${buildSelectExpr(h.voiced, h.start_sec)}',asetpts=N/SR/TB[acut]`);
+        audioFilters.push(
+          `[anorm]aselect='${buildSelectExpr(h.voiced, h.start_sec)}',asetpts=N/SR/TB[acut]`,
+        );
       }
-      const sermonAudio = useCut ? "[acut]" : "[0:a]";
+      const sermonAudio = useCut ? "[acut]" : "[anorm]";
       if (bgmPath) {
         audioFilters.push("[1:a]volume=0.08,afade=t=in:d=0.5[bgm]");
-        audioFilters.push(`${sermonAudio}[bgm]amix=inputs=2:duration=first:dropout_transition=0[aout]`);
-      } else if (useCut) {
+        audioFilters.push(
+          `${sermonAudio}[bgm]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
+        );
+      } else {
         // BGM 없고 cut 적용 — sermon audio (cut) 만 [aout] 로 통일
         audioFilters.push(`${sermonAudio}anull[aout]`);
       }
@@ -278,33 +298,56 @@ export function editClips(
       const filterComplex = [...videoFilters, ...audioFilters].join(";");
 
       // BGM 없고 cut 도 없으면 [0:a] 그대로 map
-      const audioMap = bgmPath || useCut ? '-map "[aout]"' : "-map 0:a";
-
-      const sermonInput = `-ss ${h.start_sec} -to ${h.end_sec} -i "${videoPath}"`;
-      const bgmInput = bgmPath ? `-i "${bgmPath}"` : "";
-      const logoInput = `-loop 1 -i "${logoPath}"`;
-      const inputs = [sermonInput, bgmInput, logoInput].filter(Boolean).join(" ");
-
-      execSync(
+      const inputs = [
+        "-y",
+        "-ss",
+        String(h.start_sec),
+        "-t",
+        String(dur),
+        "-i",
+        videoPath,
+      ];
+      if (bgmPath) inputs.push("-i", bgmPath);
+      inputs.push("-loop", "1", "-i", logoPath);
+      await runTool(
+        "ffmpeg",
         [
-          "ffmpeg -y",
-          inputs,
-          `-filter_complex "${filterComplex}"`,
-          `-map "[vout]" ${audioMap}`,
-          "-c:v libx264 -preset medium -crf 23",
-          "-c:a aac -b:a 128k",
-          "-movflags +faststart",
-          `"${outputPath}"`,
-        ].join(" "),
-        { stdio: "inherit", timeout: 180_000 },
+          ...inputs,
+          "-filter_complex",
+          filterComplex,
+          "-map",
+          "[vout]",
+          "-map",
+          "[aout]",
+          "-c:v",
+          "libx264",
+          "-preset",
+          "medium",
+          "-crf",
+          "23",
+          "-c:a",
+          "aac",
+          "-ar",
+          "48000",
+          "-b:a",
+          "128k",
+          "-movflags",
+          "+faststart",
+          outputPath,
+        ],
+        { timeoutMs: 300000, signal: options.signal, cwd: options.workDir },
       );
+      const expected = h.voiced.reduce((sum, v) => sum + v.end - v.start, 0);
+      const mediaCheck = await verifyClip(outputPath, expected, options.signal);
+      if (!mediaCheck.valid) throw new Error("media_check_failed");
 
       console.log(
         `[shorts] clip ${i}: mood=${h.mood}, cut=${useCut ? `${h.voiced.length}chunks` : "none"}, bgm=${bgmPath ? path.basename(bgmPath) : "none"}`,
       );
 
-      result.push({ outputPath, highlight: h });
+      result.push({ outputPath, highlight: h, mediaCheck });
     } catch (err) {
+      options.signal?.throwIfAborted();
       const msg = err instanceof Error ? err.message : String(err);
       console.error(`[shorts] clip ${i} 렌더 실패 (skip): ${msg}`);
       continue;

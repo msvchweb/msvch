@@ -1,14 +1,18 @@
-import { execSync } from "child_process";
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "fs";
+import { runTool } from "./lib/process";
+import {
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from "fs";
 import path from "path";
 import { z } from "zod";
-import { WORK_DIR } from "./lib/paths";
 
 // ── 상수 (turbo 전환은 이 한 줄 교체) ─────────────────────
 export const GROQ_STT_MODEL = "whisper-large-v3";
 //   대안: "whisper-large-v3-turbo" (속도 우선 시)
-const GROQ_STT_ENDPOINT =
-  "https://api.groq.com/openai/v1/audio/transcriptions";
+const GROQ_STT_ENDPOINT = "https://api.groq.com/openai/v1/audio/transcriptions";
 
 // 25MB Groq 한도에 대한 보수적 가드 (인코딩 오버헤드 여유 1MB)
 const GROQ_MAX_BYTES = 24 * 1024 * 1024; // 24MB → 초과 시 청크 분할
@@ -56,7 +60,10 @@ export interface Json3Subtitle {
 }
 
 /** Groq STT 호출. verbose_json 응답을 zod 로 검증해 반환. */
-async function callGroq(audioFilePath: string): Promise<GroqVerboseJson> {
+async function callGroq(
+  audioFilePath: string,
+  signal?: AbortSignal,
+): Promise<GroqVerboseJson> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error("GROQ_API_KEY 미설정");
 
@@ -74,10 +81,13 @@ async function callGroq(audioFilePath: string): Promise<GroqVerboseJson> {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}` },
     body: form,
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(300000)])
+      : AbortSignal.timeout(300000),
   });
 
   if (!res.ok) {
-    throw new Error(`Groq STT 실패: ${res.status} ${await res.text()}`);
+    throw new Error(`groq_http_${res.status}`);
   }
 
   const json: unknown = await res.json();
@@ -104,22 +114,31 @@ function serializeToJson3(segments: GroqSegment[]): Json3Subtitle {
 }
 
 /** 24MB 초과 오디오를 10분 단위로 분할. 각 청크의 offsetSec 동봉. */
-function chunkAudio(audioPath: string): { path: string; offsetSec: number }[] {
+async function chunkAudio(
+  audioPath: string,
+  signal?: AbortSignal,
+): Promise<{ path: string; offsetSec: number }[]> {
+  const WORK_DIR = path.dirname(audioPath);
   // 방어적: 단독 실행/테스트 내성. 정상 파이프라인에선 download 가 선행 생성.
   mkdirSync(WORK_DIR, { recursive: true });
   const base = path.basename(audioPath, path.extname(audioPath));
   const pattern = path.join(WORK_DIR, `${base}_chunk_%03d.mp3`);
 
-  execSync(
+  await runTool(
+    "ffmpeg",
     [
-      "ffmpeg -y",
-      `-i "${audioPath}"`,
-      "-f segment",
-      `-segment_time ${CHUNK_DURATION_SEC}`,
-      "-c copy",
-      `"${pattern}"`,
-    ].join(" "),
-    { stdio: "inherit", timeout: 300_000 },
+      "-y",
+      "-i",
+      audioPath,
+      "-f",
+      "segment",
+      "-segment_time",
+      String(CHUNK_DURATION_SEC),
+      "-c",
+      "copy",
+      pattern,
+    ],
+    { timeoutMs: 300000, signal },
   );
 
   const prefix = `${base}_chunk_`;
@@ -163,18 +182,19 @@ function mergeSegments(
 export async function transcribeWithGroq(
   audioPath: string,
   outPath: string,
+  signal?: AbortSignal,
 ): Promise<string> {
   const sizeBytes = statSync(audioPath).size;
 
   let segments: GroqSegment[];
   if (sizeBytes <= GROQ_MAX_BYTES) {
-    const result = await callGroq(audioPath);
+    const result = await callGroq(audioPath, signal);
     segments = result.segments;
   } else {
-    const chunks = chunkAudio(audioPath);
+    const chunks = await chunkAudio(audioPath, signal);
     const parts: { segs: GroqSegment[]; offsetSec: number }[] = [];
     for (const chunk of chunks) {
-      const result = await callGroq(chunk.path);
+      const result = await callGroq(chunk.path, signal);
       parts.push({ segs: result.segments, offsetSec: chunk.offsetSec });
     }
     segments = mergeSegments(parts);

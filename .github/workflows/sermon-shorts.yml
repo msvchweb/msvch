@@ -1,67 +1,64 @@
 name: Generate sermon shorts
-
+run-name: Shorts ${{ inputs.attemptId }}
 on:
   workflow_dispatch:
     inputs:
       videoId:
-        description: "YouTube video ID"
+        description: YouTube video ID
         required: true
       jobId:
-        description: "Supabase shorts_jobs.id"
+        description: Shorts job ID
+        required: true
+      attemptId:
+        description: Queued generation attempt ID
         required: true
       count:
-        description: "Number of highlights (5 or 10)"
-        required: false
+        description: Number of clips
+        type: choice
+        options: ["5", "10"]
         default: "5"
-
+permissions:
+  contents: read
 concurrency:
   group: sermon-shorts
   cancel-in-progress: false
-
+  queue: max
 jobs:
   generate:
     runs-on: [self-hosted, windows, shorts]
     timeout-minutes: 60
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+      VIDEO_ID: ${{ inputs.videoId }}
+      JOB_ID: ${{ inputs.jobId }}
+      ATTEMPT_ID: ${{ inputs.attemptId }}
+      CLIP_COUNT: ${{ inputs.count }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      NEXT_PUBLIC_CDN_BASE_URL: ${{ secrets.NEXT_PUBLIC_CDN_BASE_URL }}
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-          cache: "npm"
-
-      - name: Preflight - verify toolchain
-        shell: powershell
-        run: |
-          yt-dlp --version
-          ffmpeg -version
-
+          cache: npm
+      # Lockfile verified with clean Node 24 installs on Windows and Linux.
       - name: Install dependencies
         shell: powershell
-      # npm ci 대신 npm install 을 쓰는 이유:
-      # @rolldown/binding-wasm32-wasi 가 @emnapi/core 를 정확히 1.11.1 로 고정 요구하는데,
-      # 개발 환경(Windows)에서는 이 wasm 대체 패키지를 설치하지 않아 npm 이 해당 하위 트리를
-      # lock 에 기록하지 않는다. 그 결과 lock 은 Linux 러너에서 npm ci 검증을 통과하지 못한다.
-      # (--os/--cpu 플래그, 전체 재생성 모두 시도했으나 Windows 에서는 재현 불가)
-      # 이 두 워크플로는 재현성보다 동작이 중요하므로 install 로 둔다.
-        run: npm install --no-audit --no-fund
-
-      - name: Run shorts pipeline
+        run: npm ci --no-audit --no-fund
+      - name: Preflight
         shell: powershell
-        env:
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_BUCKET: ${{ secrets.R2_BUCKET }}
-          NEXT_PUBLIC_CDN_BASE_URL: ${{ secrets.NEXT_PUBLIC_CDN_BASE_URL }}
-        run: |
-          npx tsx scripts/shorts/run.ts `
-            --videoId="${{ inputs.videoId }}" `
-            --jobId="${{ inputs.jobId }}" `
-            --count="${{ inputs.count }}"
+        run: node --import tsx scripts/shorts/preflight.ts
+      - name: Generate clips
+        shell: powershell
+        run: node --import tsx scripts/shorts/run.ts --videoId="$env:VIDEO_ID" --jobId="$env:JOB_ID" --attemptId="$env:ATTEMPT_ID" --count="$env:CLIP_COUNT"
+      - name: Record failure
+        if: failure()
+        shell: powershell
+        run: node --import tsx scripts/shorts/finalize-attempt.ts

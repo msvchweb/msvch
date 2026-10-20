@@ -925,111 +925,75 @@ interface SermonVideo {
 
 ---
 
-### `shorts_jobs`
 
-쇼츠 생성 파이프라인 작업 단위.
+### shorts_jobs · shorts_job_attempts
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| `id` | `uuid` PK | 자동 생성 |
-| `video_id` | `text NOT NULL UNIQUE` | YouTube videoId |
-| `video_title` | `text NOT NULL` | 설교 제목 |
-| `video_published_at` | `timestamptz` | 설교 게시일 |
-| `video_thumbnail` | `text` | 썸네일 URL |
-| `status` | `text NOT NULL DEFAULT 'pending'` | 상태 머신 (아래 참고) |
-| `error` | `text` | 실패 시 메시지 |
-| `created_at` | `timestamptz DEFAULT now()` | |
-| `updated_at` | `timestamptz DEFAULT now()` | |
+shorts_jobs는 원본 video_id UNIQUE를 유지한다. highlight_count는 5/10으로 요청하며 active_attempt_id와 review_attempt_id로 현재 실행과 마지막 성공 제작을 구분한다.
 
-**status 흐름**: `pending` → `downloading` → `transcribing` → `selecting` → `editing` → `ready_for_review` → `published` / `failed`
+shorts_job_attempts는 id, job_id, attempt_no, status(queued/running/succeeded/failed), stage, github_run_id, github_run_attempt, heartbeat_at, started_at, finished_at, error_code, error_message, transcription_source, created_at을 가진다. (job_id, attempt_no)는 UNIQUE이고 job당 queued/running은 한 행만 허용한다.
 
-**RLS 정책**: 누구나 SELECT, admin만 CUD
+획득·heartbeat·완료·클립 저장은 attemptId + GitHub run ID + run attempt로 소유권을 확인한다. 실패는 기존 review_attempt_id와 이전 클립을 지우지 않는다. 늦은 완료 통지는 현재 시도를 덮어쓰지 못한다.
 
-**TypeScript 타입** (`src/types/shorts.ts`):
-```ts
-interface ShortsJob {
-  id: string;
-  video_id: string;
-  video_title: string;
-  video_published_at: string | null;
-  video_thumbnail: string | null;
-  status: JobStatus;
-  error: string | null;
-  created_at: string;
-  updated_at: string;
-}
-```
+### shorts_clips
 
----
+기존 ID·원본 구간·URL·선정 이유·반려 이력을 보존한다. 새 attempt_id는 nullable FK이고 (attempt_id, clip_index)는 UNIQUE이다.
 
-### `shorts_clips`
+| 필드 | 의미 |
+|---|---|
+| transcript / transcript_status | 실제 발언 / verified 또는 unverified |
+| selection_reason | AI 선정 이유. 기존 transcript 내용은 여기에 보존 |
+| title / title_yt / caption_yt / caption_ig | 검수 제목·게시 제목·플랫폼별 설명 |
+| rendered_duration_sec | FFprobe 실측 길이. 기존 duration_sec는 원본 구간 길이 |
+| selection_data | 자막 구간 ID·원문 인용·후킹/독립 이해/공감/완결/문맥 점수 |
+| media_check | 영상·오디오·코덱·길이 검사 결과와 경고 |
+| content_version / approved_version | 현재 내용 버전 / 관리자가 승인한 버전 |
+| reject_category / reviewer_note | 반려 분류와 자유 사유 |
+| video_url | 새 제작은 R2 immutable URL, 기존 URL은 보존 |
 
-생성된 쇼츠 후보 클립.
+기존 행은 transcript_status=unverified다. 원본 전사 없이 실제 발언으로 간주하지 않는다. 새 미디어 키는 shorts/{jobId}/{attemptId}/clip_{index}.mp4이며 조건부 PUT으로 덮어쓰기를 막는다.
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| `id` | `uuid` PK | 자동 생성 |
-| `job_id` | `uuid NOT NULL` | `shorts_jobs.id` FK (CASCADE) |
-| `clip_index` | `int NOT NULL` | 순서 (0~4) |
-| `start_sec` | `numeric NOT NULL` | 시작 초 |
-| `end_sec` | `numeric NOT NULL` | 종료 초 |
-| `duration_sec` | `numeric GENERATED` | 계산된 길이 |
-| `title` | `text` | LLM 생성 제목 |
-| `hook` | `text` | 첫 3초 훅 문장 |
-| `transcript` | `text` | 선정 이유 |
-| `caption_yt` | `text` | YouTube 설명 |
-| `caption_ig` | `text` | Instagram 캡션 |
-| `video_url` | `text` | Supabase Storage URL |
-| `review_status` | `text DEFAULT 'pending'` | `pending`/`approved`/`rejected` |
-| `reviewer_note` | `text` | 반려 사유 |
-| `youtube_video_id` | `text` | 발행 후 YouTube ID |
-| `published_at` | `timestamptz` | 발행 시각 |
-| `created_at` | `timestamptz DEFAULT now()` | |
+### shorts_settings
 
-**RLS 정책**: approved 클립은 누구나 SELECT, admin은 모든 상태 SELECT + CUD
+기존 singleton(id=1)을 유지한다. auto_publish=false는 미검수 게시를 허용하지 않는 기준이며 워커 활성화 조건으로 사용하지 않는다.
 
-**인덱스**: `idx_shorts_clips_job_id`, `idx_shorts_clips_review`
+| 설정 | 기본/의미 |
+|---|---|
+| publishing_enabled | false. 승인된 예약의 플랫폼 게시 활성화 |
+| auto_generate_enabled | false. 지정 재생목록의 새 설교 자동 제작 |
+| auto_generate_after | 활성화 시 서버 시각. 이전 영상 제외 |
+| source_playlist_id / allowed_categories | 설교 전용 allowlist |
+| daily_publish_limit | 기존 기본 5, KST 날짜·플랫폼별 상한 |
+| bgm_enabled | false. 이용 권한 확인 후 선택 |
+| max_clips_per_sermon | 기존 기본 5 |
+| highlight_prompt / metadata_prompt | 기존 보관 필드, 새 자동화에서 임의로 실행하지 않음 |
 
-**TypeScript 타입**:
-```ts
-interface ShortsClip {
-  id: string;
-  job_id: string;
-  clip_index: number;
-  start_sec: number;
-  end_sec: number;
-  duration_sec: number;
-  title: string | null;
-  hook: string | null;
-  transcript: string | null;
-  caption_yt: string | null;
-  caption_ig: string | null;
-  video_url: string | null;
-  review_status: ReviewStatus;
-  reviewer_note: string | null;
-  youtube_video_id: string | null;
-  published_at: string | null;
-  created_at: string;
-}
-```
+### shorts_publications
 
----
+clip_id + platform + content_version + test_only UNIQUE. 플랫폼 상태는 queued/processing/retry_wait/needs_attention/test_uploaded/published/canceled다.
 
-### `shorts_settings`
+scheduled_at, next_attempt_at, attempt_count, public_request_started, quota_date, lease_token, lease_expires_at, worker_run_id, provider_id, provider_url, published_at, error_code, error_message와 생성·수정 시각을 저장한다. test_only는 YouTube만 허용한다.
 
-쇼츠 글로벌 설정 (싱글톤, id=1).
+획득은 승인 버전·예약 시각·운영 스위치·KST 일일 한도를 원자적으로 확인한다. lease는 20분이며 워커는 30초마다 갱신한다. 모든 checkpoint·완료 갱신은 leaseToken을 확인한다. 만료 lease는 이전 GitHub 실행의 종료를 확인하고 저장된 provider 상태를 대조한 뒤 복구한다.
 
-| 컬럼 | 타입 | 설명 |
-|------|------|------|
-| `id` | `int PK CHECK (id = 1)` | 싱글톤 |
-| `auto_publish` | `boolean DEFAULT false` | 자동 발행 여부 |
-| `max_clips_per_sermon` | `int DEFAULT 5` | 설교당 최대 클립 수 |
-| `daily_publish_limit` | `int DEFAULT 5` | 일일 발행 상한 |
-| `highlight_prompt` | `text` | Gemini 하이라이트 프롬프트 |
-| `metadata_prompt` | `text` | Gemini 메타데이터 프롬프트 |
-| `updated_at` | `timestamptz DEFAULT now()` | |
+진행·게시·결과 불명확 행은 날짜별 한도에 포함한다. 자정 이후 공개 전환 직전 새 날짜 한도를 확인한다. 안전한 일시 오류는 2/10/30분 간격 최대 3회 재시도하며, 결과 불명확 오류는 자동 새 업로드를 하지 않는다. private 시험은 실제 게시 수와 job published 집계에서 제외한다.
 
-**RLS 정책**: 누구나 SELECT, admin만 UPDATE
+public_request_started는 공개 요청 전에 checkpoint와 원자적으로 저장하고 heartbeat·재시도가 지우지 않는 표시다. retry_wait 중이라도 이 값이 true면 수정·반려·취소를 금지해 결과 불확실 게시를 새 버전으로 중복 업로드하지 않는다.
+
+### shorts_connections · shorts_publish_private
+
+shorts_connections는 platform PK, account_id, credentials_encrypted(AES-256-GCM), expires_at, refreshed_at, status, updated_at을 저장한다.
+
+shorts_publish_private는 publication_id PK와 checkpoint_encrypted를 저장한다. 세션 URI·토큰·컨테이너 상태는 publication별 문맥으로 인증된 암호문이며 일반 API에 노출하지 않는다.
+
+### 쇼츠 권한·전이
+
+- jobs/clips: 게시된 공개 데이터 또는 admin/master만 조회. settings/attempts/publications는 admin/master만 조회.
+- authenticated/anon의 직접 쓰기는 차단. 웹 API에서 admin/master 확인 후 service_role 전이 함수를 호출한다.
+- 연결·비공개 checkpoint 테이블과 전이 RPC는 service_role 전용이다. 새 테이블은 모두 RLS를 활성화한다.
+- 생성/검수/게시 전이는 짧은 트랜잭션 잠금으로 직렬화하며 외부 네트워크 요청은 잠금 밖에서 수행한다.
+- TypeScript 계약은 src/types/shorts.ts, 입력 스키마는 src/lib/shorts/validation.ts에 있다.
+
+마이그레이션: 20261018231828_shorts_generation_reliability.sql → 20261018233233_shorts_publications.sql. 운영 적용·실제 계정 연결은 별도 단계다. [운영 가이드](./RUNBOOK-shorts-automation.md).
 
 ---
 

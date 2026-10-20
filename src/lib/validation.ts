@@ -307,17 +307,10 @@ export const SermonSummarySchema = z.object({
 });
 
 /** POST /api/shorts/trigger */
-export const ShortsTriggerSchema = z.object({
-  videoId: z.string().min(1).max(50),
-  videoTitle: z.string().min(1).max(300),
-  videoPublishedAt: z.string().max(50).optional(),
-  videoThumbnail: z.string().max(2000).optional(),
-});
+export { GenerationRequestSchema as ShortsTriggerSchema } from "./shorts/validation";
 
 /** POST /api/shorts/[id]/reject */
-export const ShortsRejectSchema = z.object({
-  note: z.string().max(500).optional(),
-});
+export { RejectionSchema as ShortsRejectSchema } from "./shorts/validation";
 
 /** 그룹 게시글 */
 export const GroupPostSchema = z.object({
