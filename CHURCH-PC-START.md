@@ -53,7 +53,7 @@ ffprobe -version
 아래 C:\church-shorts는 **새 폴더** 기준이다. 이미 있는 폴더를 지우거나 덮어쓰지 않는다. 비공개 저장소 인증이 나오면 저장소 접근 권한이 있는 개인 GitHub 계정을 사용한다.
 
 ~~~powershell
-git clone --branch codex/shorts-automation --single-branch https://github.com/msvchweb/msvch.git C:\church-shorts
+git clone --branch main --single-branch https://github.com/msvchweb/msvch.git C:\church-shorts
 Set-Location C:\church-shorts
 npm ci --no-audit --no-fund
 node --import tsx scripts/shorts/preflight.ts --tools-only
@@ -61,7 +61,7 @@ node --import tsx scripts/shorts/preflight.ts --tools-only
 
 성공 조건은 yt-dlp: OK, ffmpeg: OK, ffprobe: OK, font / temp / banner: OK가 모두 나오고 종료 코드가 0인 것이다. 글꼴 검사에서 멈추면 Noto Sans CJK KR의 설치 범위부터 확인한다.
 
-이미 이 브랜치를 받은 작업 폴더라면 로컬 변경을 먼저 확인하고 git pull --ff-only를 사용한다. 개인 설정과 파일을 강제로 초기화하지 않는다.
+이미 main을 받은 작업 폴더라면 로컬 변경을 먼저 확인하고 git pull --ff-only를 사용한다. 개인 설정과 파일을 강제로 초기화하지 않는다.
 
 ## 3. GitHub 러너를 Windows 서비스로 등록
 
