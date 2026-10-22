@@ -1,8 +1,9 @@
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import AiCourseForm from "./AiCourseForm";
 import { CAPABILITIES } from "@/lib/ai-course";
+import { AiCourseMotionProvider } from "@/components/ai-course/motion/AiCourseMotionProvider";
 const fetchMock = vi.fn();
 const policy = { version: "ai-course-privacy-v1", text: "테스트 전용 동의 문안" };
 function next() { fireEvent.click(screen.getByRole("button", { name: "다음" })); }
@@ -26,6 +27,23 @@ function toReview() {
 describe("AI course form", () => {
   beforeEach(() => { vi.stubGlobal("fetch", fetchMock); fetchMock.mockReset(); });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  it("motion setting keeps draft and input focus", () => {
+    let reduced = false;
+    const listeners = new Set<() => void>();
+    vi.stubGlobal("matchMedia", () => ({ get matches() { return reduced; }, addEventListener: (_: string, callback: () => void) => listeners.add(callback), removeEventListener: (_: string, callback: () => void) => listeners.delete(callback) }));
+    render(<AiCourseMotionProvider><AiCourseForm privacyPolicy={policy} /></AiCourseMotionProvider>);
+    const name = screen.getByLabelText("이름"); name.focus(); fireEvent.change(name, { target: { value: "작성 중인 이름" } });
+    act(() => { reduced = true; listeners.forEach((listener) => listener()); });
+    expect(name).toHaveValue("작성 중인 이름"); expect(name).toHaveFocus(); expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("reduced motion still completes submission with completion focus", async () => {
+    vi.stubGlobal("matchMedia", () => ({ matches: true, addEventListener() {}, removeEventListener() {} }));
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    render(<AiCourseMotionProvider><AiCourseForm privacyPolicy={policy} /></AiCourseMotionProvider>); toReview();
+    fireEvent.click(screen.getByLabelText("개인정보 수집·이용에 동의합니다."));
+    fireEvent.click(screen.getByRole("button", { name: "신청서 제출하기" }));
+    await screen.findByText("신청이 접수되었습니다."); await waitFor(() => expect(screen.getByRole("status")).toHaveFocus()); expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
   it("requires the other tool description before leaving experience even when later steps are unanswered", () => {
     render(<AiCourseForm privacyPolicy={policy} />); fillBasic(); next(); fillExperience();
     fireEvent.click(screen.getByLabelText("기타"));

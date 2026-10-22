@@ -5,6 +5,13 @@ import { AI_COURSE_URL } from "@/lib/ai-course";
 import { createAiCourseQrDataUrl } from "@/lib/ai-course-qr";
 import AiCourseForm from "./AiCourseForm";
 import { getAiCoursePrivacyPolicy } from "./privacy-policy";
+import { AiCourseMotionProvider, AiCourseMotionControls } from "@/components/ai-course/motion/AiCourseMotionProvider";
+import AiCourseWorkbench from "@/components/ai-course/motion/AiCourseWorkbench";
+import AiCourseShowcase from "@/components/ai-course/motion/AiCourseShowcase";
+import AiCourseFeatureNetwork from "@/components/ai-course/motion/AiCourseFeatureNetwork";
+import AiCourseRoadmap from "@/components/ai-course/motion/AiCourseRoadmap";
+import AiCourseReveal from "@/components/ai-course/motion/AiCourseReveal";
+import motionStyles from "@/components/ai-course/motion/ai-course-motion.module.css";
 
 const title = "AI로 내 일을 끝내는 12주";
 const description = "ChatGPT·Codex로 문서 작업, 반복 업무, 모바일 원격 활용부터 개인 앱 제작까지. 주 1회 60분, 12주 동안 내 일에 쓰는 AI를 배웁니다.";
@@ -40,29 +47,23 @@ function SectionLabel({ children }: { children: React.ReactNode }) { return <p c
 export default async function AiCoursePage() {
   const qr = await createAiCourseQrDataUrl();
   const privacyPolicy = getAiCoursePrivacyPolicy();
-  return <div id="course" className="bg-church-cream text-church-dark">
-    <section className="relative overflow-hidden bg-[#151d35] text-white">
-      <div aria-hidden="true" className="pointer-events-none absolute -right-24 -top-40 h-[580px] w-[580px] rounded-full border border-white/10" />
-      <div aria-hidden="true" className="pointer-events-none absolute -right-8 -top-24 h-[450px] w-[450px] rounded-full border border-white/10" />
+  return <AiCourseMotionProvider><div id="course" className="bg-church-cream text-church-dark">
+    <section className={motionStyles.hero}>
+      <div aria-hidden="true" className={motionStyles.heroGlow} />
+      <div aria-hidden="true" className={motionStyles.heroRings} />
       <div className="relative mx-auto grid max-w-6xl gap-12 px-5 py-16 sm:px-8 sm:py-24 lg:grid-cols-[1.2fr_1fr] lg:items-center">
         <div>
           <p className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs tracking-wide text-church-gold-light"><span className="h-1.5 w-1.5 rounded-full bg-church-gold" />명성비전교회 · AI 활용 과정</p>
-          <h1 className="break-keep text-4xl font-bold leading-[1.3] tracking-tight sm:text-5xl">매번 하던 일은<br />더 간단하게.<br /><span className="text-church-gold">만들고 싶던 앱은<br />내 손으로.</span></h1>
+          <h1 className="break-keep text-4xl font-bold leading-[1.3] tracking-tight sm:text-5xl"><span className={motionStyles.headlineLine}>매번 하던 일은</span><span className={motionStyles.headlineLine}>더 간단하게.</span><span className={`${motionStyles.headlineLine} text-church-gold`}>만들고 싶던 앱은</span><span className={`${motionStyles.headlineLine} text-church-gold`}>내 손으로.</span></h1>
           <p className="mt-7 max-w-md text-base leading-8 text-slate-300">ChatGPT·Codex로 내 일을 끝내는 12주.<br />문서 작업부터 반복 업무, 모바일 원격 활용,<br className="hidden sm:block" /> 그리고 직접 고쳐 쓰는 나만의 앱까지.</p>
           <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-slate-200"><span className="rounded-lg bg-white/10 px-3 py-2">주 1회 60분 × 12주</span><span className="rounded-lg bg-white/10 px-3 py-2">AI 활용 8주 + 앱 4주</span></div>
-          <a href="#apply" className="mt-9 inline-flex min-h-13 items-center justify-center gap-6 rounded-xl bg-church-gold px-7 py-4 font-bold text-[#151d35] transition-colors hover:bg-church-gold-light">강의 신청하기 <ArrowRight size={19} /></a>
+          <a href="#apply" className={`${motionStyles.cta} mt-9 inline-flex min-h-13 items-center justify-center gap-6 rounded-xl bg-church-gold px-7 py-4 font-bold text-[#151d35] transition-colors hover:bg-church-gold-light`}>강의 신청하기 <ArrowRight size={19} /></a>
           <a href="#outcomes" className="ml-0 mt-4 flex items-center gap-2 text-sm text-slate-300 sm:ml-6 sm:inline-flex">어떤 일을 할 수 있게 되나요? <ArrowDown size={15} /></a>
         </div>
         <div className="relative mx-auto w-full max-w-md">
-          <div className="rounded-2xl border border-white/15 bg-white/[0.06] p-5 shadow-2xl sm:p-7">
-            <div className="mb-6 flex items-center justify-between border-b border-white/10 pb-4"><span className="text-sm font-medium text-slate-200">12주 뒤, 나의 작업 공간</span><span className="text-[10px] text-church-gold-light">실습 예시</span></div>
-            <p className="text-xs text-slate-400">이렇게 요청하면</p>
-            <div className="mt-3 rounded-xl bg-white/10 p-4 text-sm leading-7">“이 메모로 할 일 목록을 만들고,<br />우리 모임에 보낼 안내문도 써줘.”</div>
-            <div className="my-4 flex justify-center text-church-gold"><ArrowDown size={20} /></div>
-            <div className="rounded-xl bg-white p-5 text-church-dark"><p className="mb-4 text-sm font-bold">모임 준비 문서</p>{["준비물과 담당 역할 정리", "빠진 정보 확인 목록", "바로 검토할 수 있는 안내문 초안"].map((item) => <div key={item} className="mt-3 flex items-center gap-2 text-xs text-gray-600"><Check size={15} className="shrink-0 text-emerald-600" />{item}</div>)}</div>
-            <div className="mt-4 flex items-center gap-3 rounded-xl border border-church-gold/30 bg-church-gold/10 p-4"><Globe2 size={21} className="shrink-0 text-church-gold" /><p className="text-xs leading-6 text-slate-200">이제 나를 소개하는 앱도<br /><strong className="text-white">직접 만들고, 필요할 때 수정합니다.</strong></p></div>
-          </div>
+          <AiCourseWorkbench />
           <p className="mt-4 text-center text-xs text-slate-400">질문에서 끝내지 않고, 결과물로 남기는 시간</p>
+          <div className="mt-5 flex justify-center"><AiCourseMotionControls /></div>
         </div>
       </div>
     </section>
@@ -71,30 +72,30 @@ export default async function AiCoursePage() {
       <SectionLabel>BEFORE → AFTER</SectionLabel>
       <h2 className="text-3xl font-bold leading-snug tracking-tight sm:text-4xl">배운 기능이<br className="sm:hidden" /> 내 일의 변화를 만듭니다.</h2>
       <p className="mt-4 max-w-2xl leading-8 text-gray-600">반복하던 일 하나에서 시작해 보세요. 설명하고, 실행하고, 결과를 확인하는 과정을 함께 연습합니다.</p>
-      <div className="mt-10 grid gap-5 lg:grid-cols-3">
+      <div className="mt-10"><AiCourseShowcase>
         {[
           { number: "01", title: "흩어진 메모 → 실행 계획", before: "모임 준비 / 간식 확인 / 참석 인원? / 안내 보내기", after: ["할 일: 간식·준비물 정리", "확인할 것: 참석 인원과 담당자", "결과물: 할 일 목록 + 안내문 초안"], tag: "내 자료로 문서 만들기" },
           { number: "02", title: "같은 설명 → 다시 쓰는 절차", before: "매주 자료를 올리고, 형식을 설명하고, 빠진 항목을 다시 요청하고…", after: ["내가 정한 형식과 확인 기준 저장", "새 자료로 같은 절차 실행", "결과를 검토하고 필요한 부분 수정"], tag: "지침·스킬로 반복 줄이기" },
           { number: "03", title: "수정하고 싶은 앱 → 새 버전", before: "소개글만 있는 내 앱. 새 활동과 사진을 추가하고 싶어요.", after: ["“활동 소개와 사진 영역을 추가해줘”", "바뀐 앱을 확인하고 수정", "새 버전을 배포해 같은 주소로 공유"], tag: "만들고 고쳐 쓰는 앱" },
         ].map((example) => <article key={example.number} className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
           <div className="border-b border-gray-100 p-6"><span className="text-xs font-bold text-primary-700">{example.number} / 실습 예시</span><h3 className="mt-3 text-lg font-bold">{example.title}</h3></div>
-          <div className="p-6"><p className="text-[10px] font-bold tracking-widest text-gray-400">BEFORE</p><p className="mt-2 min-h-20 text-sm leading-7 text-gray-500">{example.before}</p><div className="my-4 h-px bg-gray-100" /><p className="text-[10px] font-bold tracking-widest text-primary-700">AFTER</p><ul className="mt-3 space-y-3">{example.after.map((item) => <li key={item} className="flex gap-2 text-sm leading-6 text-gray-700"><Check size={15} className="mt-1 shrink-0 text-primary-700" />{item}</li>)}</ul><p className="mt-6 rounded-lg bg-church-gold-light px-3 py-2 text-center text-xs font-semibold text-primary-900">{example.tag}</p></div>
+          <div className={motionStyles.caseBody}><div className={motionStyles.caseBefore}><p className="text-[10px] font-bold tracking-widest text-gray-400">BEFORE</p><p className="mt-3 text-sm leading-8 text-gray-500">{example.before}</p></div><div className={motionStyles.caseAfter}><p className="text-[10px] font-bold tracking-widest">AFTER</p><ul className="mt-3 space-y-3">{example.after.map((item) => <li key={item} className="flex gap-2 text-sm leading-6 text-gray-700"><Check size={15} className="mt-1 shrink-0 text-primary-700" />{item}</li>)}</ul><p className="mt-6 rounded-lg bg-church-gold-light px-3 py-2 text-center text-xs font-semibold text-primary-900">{example.tag}</p></div></div>
         </article>)}
-      </div>
+      </AiCourseShowcase></div>
     </section>
 
     <section className="border-y border-gray-200/70 bg-white px-5 py-16 sm:px-8 sm:py-24"><div className="mx-auto max-w-6xl">
       <SectionLabel>WHAT YOU CAN DO</SectionLabel><h2 className="text-3xl font-bold leading-snug sm:text-4xl">12주 동안, 내게 남는 여섯 가지.</h2>
-      <div className="mt-10 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">{outcomes.map(({ icon: Icon, title: outcomeTitle, text, result }) => <article key={outcomeTitle}>
-        <div className="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-primary-50 text-primary-900"><Icon size={22} /></div><h3 className="text-lg font-bold">{outcomeTitle}</h3><p className="mt-3 text-sm leading-7 text-gray-600">{text}</p><p className="mt-4 border-l-2 border-church-gold pl-3 text-xs font-semibold leading-6 text-primary-900">{result}</p>
-      </article>)}</div>
+      <AiCourseFeatureNetwork>{outcomes.map(({ icon: Icon, title: outcomeTitle, text, result }, index) => <article key={outcomeTitle} className={motionStyles.featureCard} data-ai-feature={['documents','workspace','skills','schedule','remote','app'][index]}>
+        <div data-ai-icon className="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-primary-50 text-primary-900"><Icon size={22} /></div><AiCourseReveal delay={index * 0.08}><h3 className="text-lg font-bold">{outcomeTitle}</h3><p className="mt-3 text-sm leading-7 text-gray-600">{text}</p><p className="mt-4 border-l-2 border-church-gold pl-3 text-xs font-semibold leading-6 text-primary-900">{result}</p></AiCourseReveal>
+      </article>)}</AiCourseFeatureNetwork>
       <p className="mt-10 text-xs leading-6 text-gray-500">예약과 원격 활용은 계정·기기의 기능 지원을 확인한 뒤 진행합니다. 내 컴퓨터에서 실행하는 작업에는 컴퓨터와 앱이 켜져 있고 인터넷에 연결된 환경이 필요합니다.</p>
     </div></section>
 
     <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
       <SectionLabel>8 WEEKS + 4 WEEKS</SectionLabel><h2 className="text-3xl font-bold leading-snug sm:text-4xl">먼저 AI를 내 일에.<br />그다음, 나만의 앱으로.</h2>
       <p className="mt-4 leading-8 text-gray-600">앞 8주는 AI 활용의 기본과 작업 방법을 익힙니다.<br />마지막 4주는 그 경험을 앱 제작과 운영으로 이어갑니다.</p>
-      <div className="mt-10 space-y-3">{curriculum.map(([weeks, heading, topics, result], index) => <article key={weeks} className={`grid gap-4 rounded-2xl border p-5 sm:grid-cols-[90px_1fr_1fr] sm:items-center sm:p-6 ${index < 4 ? "border-gray-200 bg-white" : "border-primary-200 bg-primary-50"}`}><p className="text-xl font-bold tabular-nums text-primary-900">{weeks}<span className="ml-1 text-xs font-normal">주</span></p><div><h3 className="font-bold">{heading}</h3><p className="mt-1 text-xs leading-6 text-gray-500">{topics}</p></div><p className="text-sm leading-6 text-gray-700"><span className="mr-2 text-xs text-primary-700">남는 것</span>{result}</p></article>)}</div>
+      <AiCourseRoadmap>{curriculum.map(([weeks, heading, topics, result], index) => <article key={weeks} data-ai-course-stage={index} className={`grid gap-4 rounded-2xl border p-5 sm:grid-cols-[90px_1fr_1fr] sm:items-center sm:p-6 ${index < 4 ? "border-gray-200 bg-white" : "border-primary-200 bg-primary-50"}`}><p className="text-xl font-bold tabular-nums text-primary-900">{weeks}<span className="ml-1 text-xs font-normal">주</span></p><div><h3 className="font-bold">{heading}</h3><p className="mt-1 text-xs leading-6 text-gray-500">{topics}</p></div><p className="text-sm leading-6 text-gray-700"><span className="mr-2 text-xs text-primary-700">남는 것</span>{result}</p></article>)}</AiCourseRoadmap>
       <div className="mt-8 rounded-2xl bg-church-gold-light p-6"><h3 className="font-bold text-primary-900">설명을 듣고, 노트북에서 실행하고, 결과를 확인합니다.</h3><p className="mt-2 text-sm leading-7 text-gray-700">공통 자료로 같은 작업을 연습한 뒤 자신의 업무에 맞게 바꿔봅니다. 직장 업무, 사업·가게 운영, 개인 작업, 교회·모임 활동까지 각자의 일터와 일상에 연결합니다.</p></div>
     </section>
 
@@ -105,5 +106,5 @@ export default async function AiCoursePage() {
       <AiCourseForm privacyPolicy={privacyPolicy} />
     </section>
     <section className="border-t border-gray-200 bg-white px-5 py-12 sm:px-8"><div className="mx-auto flex max-w-3xl flex-col items-center gap-6 text-center sm:flex-row sm:text-left"><Image src={qr} alt="AI 강의 소개와 신청 페이지 QR코드" width={148} height={148} unoptimized className="shrink-0 rounded-xl border border-gray-100" /><div><h2 className="text-lg font-bold">스캔하고, 할 수 있게 될 일을 확인하세요.</h2><p className="mt-2 text-sm leading-7 text-gray-600">강의 소개부터 신청·AI 활용 수준 설문까지 한곳에서.</p><a href={AI_COURSE_URL} className="mt-2 block break-all text-xs text-gray-500">www.msvch.org/ai-course</a><a href={qr} download="ai-course-qr.png" className="mt-4 inline-flex items-center gap-2 rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-primary-900">QR 이미지 내려받기 <ArrowDown size={14} /></a></div></div></section>
-  </div>;
+  </div></AiCourseMotionProvider>;
 }
