@@ -2,6 +2,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { useAnimate } from "motion/react";
 import { useAiCourseMotion } from "./AiCourseMotionProvider";
+import styles from "./ai-course-motion.module.css";
 
 export default function AiCourseReveal({ children, delay = 0 }: { children: ReactNode; delay?: number }) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
@@ -20,5 +21,5 @@ export default function AiCourseReveal({ children, delay = 0 }: { children: Reac
     observer.observe(node);
     return () => { observer.disconnect(); playback?.stop(); node.style.removeProperty("transform"); node.style.removeProperty("opacity"); };
   }, [mode, documentVisible, delay, scope, animate]);
-  return <div ref={scope}>{children}</div>;
+  return <div ref={scope} className={styles.reveal}>{children}</div>;
 }

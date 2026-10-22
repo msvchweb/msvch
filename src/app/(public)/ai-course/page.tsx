@@ -7,6 +7,10 @@ import AiCourseForm from "./AiCourseForm";
 import { getAiCoursePrivacyPolicy } from "./privacy-policy";
 import { AiCourseMotionProvider, AiCourseMotionControls } from "@/components/ai-course/motion/AiCourseMotionProvider";
 import AiCourseWorkbench from "@/components/ai-course/motion/AiCourseWorkbench";
+import AiCourseShowcase from "@/components/ai-course/motion/AiCourseShowcase";
+import AiCourseFeatureNetwork from "@/components/ai-course/motion/AiCourseFeatureNetwork";
+import AiCourseRoadmap from "@/components/ai-course/motion/AiCourseRoadmap";
+import AiCourseReveal from "@/components/ai-course/motion/AiCourseReveal";
 import motionStyles from "@/components/ai-course/motion/ai-course-motion.module.css";
 
 const title = "AI로 내 일을 끝내는 12주";
@@ -68,30 +72,30 @@ export default async function AiCoursePage() {
       <SectionLabel>BEFORE → AFTER</SectionLabel>
       <h2 className="text-3xl font-bold leading-snug tracking-tight sm:text-4xl">배운 기능이<br className="sm:hidden" /> 내 일의 변화를 만듭니다.</h2>
       <p className="mt-4 max-w-2xl leading-8 text-gray-600">반복하던 일 하나에서 시작해 보세요. 설명하고, 실행하고, 결과를 확인하는 과정을 함께 연습합니다.</p>
-      <div className="mt-10 grid gap-5 lg:grid-cols-3">
+      <div className="mt-10"><AiCourseShowcase>
         {[
           { number: "01", title: "흩어진 메모 → 실행 계획", before: "모임 준비 / 간식 확인 / 참석 인원? / 안내 보내기", after: ["할 일: 간식·준비물 정리", "확인할 것: 참석 인원과 담당자", "결과물: 할 일 목록 + 안내문 초안"], tag: "내 자료로 문서 만들기" },
           { number: "02", title: "같은 설명 → 다시 쓰는 절차", before: "매주 자료를 올리고, 형식을 설명하고, 빠진 항목을 다시 요청하고…", after: ["내가 정한 형식과 확인 기준 저장", "새 자료로 같은 절차 실행", "결과를 검토하고 필요한 부분 수정"], tag: "지침·스킬로 반복 줄이기" },
           { number: "03", title: "수정하고 싶은 앱 → 새 버전", before: "소개글만 있는 내 앱. 새 활동과 사진을 추가하고 싶어요.", after: ["“활동 소개와 사진 영역을 추가해줘”", "바뀐 앱을 확인하고 수정", "새 버전을 배포해 같은 주소로 공유"], tag: "만들고 고쳐 쓰는 앱" },
         ].map((example) => <article key={example.number} className="overflow-hidden rounded-2xl border border-gray-200 bg-white">
           <div className="border-b border-gray-100 p-6"><span className="text-xs font-bold text-primary-700">{example.number} / 실습 예시</span><h3 className="mt-3 text-lg font-bold">{example.title}</h3></div>
-          <div className="p-6"><p className="text-[10px] font-bold tracking-widest text-gray-400">BEFORE</p><p className="mt-2 min-h-20 text-sm leading-7 text-gray-500">{example.before}</p><div className="my-4 h-px bg-gray-100" /><p className="text-[10px] font-bold tracking-widest text-primary-700">AFTER</p><ul className="mt-3 space-y-3">{example.after.map((item) => <li key={item} className="flex gap-2 text-sm leading-6 text-gray-700"><Check size={15} className="mt-1 shrink-0 text-primary-700" />{item}</li>)}</ul><p className="mt-6 rounded-lg bg-church-gold-light px-3 py-2 text-center text-xs font-semibold text-primary-900">{example.tag}</p></div>
+          <div className={motionStyles.caseBody}><div className={motionStyles.caseBefore}><p className="text-[10px] font-bold tracking-widest text-gray-400">BEFORE</p><p className="mt-3 text-sm leading-8 text-gray-500">{example.before}</p></div><div className={motionStyles.caseAfter}><p className="text-[10px] font-bold tracking-widest">AFTER</p><ul className="mt-3 space-y-3">{example.after.map((item) => <li key={item} className="flex gap-2 text-sm leading-6 text-gray-700"><Check size={15} className="mt-1 shrink-0 text-primary-700" />{item}</li>)}</ul><p className="mt-6 rounded-lg bg-church-gold-light px-3 py-2 text-center text-xs font-semibold text-primary-900">{example.tag}</p></div></div>
         </article>)}
-      </div>
+      </AiCourseShowcase></div>
     </section>
 
     <section className="border-y border-gray-200/70 bg-white px-5 py-16 sm:px-8 sm:py-24"><div className="mx-auto max-w-6xl">
       <SectionLabel>WHAT YOU CAN DO</SectionLabel><h2 className="text-3xl font-bold leading-snug sm:text-4xl">12주 동안, 내게 남는 여섯 가지.</h2>
-      <div className="mt-10 grid gap-x-10 gap-y-9 sm:grid-cols-2 lg:grid-cols-3">{outcomes.map(({ icon: Icon, title: outcomeTitle, text, result }) => <article key={outcomeTitle}>
-        <div className="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-primary-50 text-primary-900"><Icon size={22} /></div><h3 className="text-lg font-bold">{outcomeTitle}</h3><p className="mt-3 text-sm leading-7 text-gray-600">{text}</p><p className="mt-4 border-l-2 border-church-gold pl-3 text-xs font-semibold leading-6 text-primary-900">{result}</p>
-      </article>)}</div>
+      <AiCourseFeatureNetwork>{outcomes.map(({ icon: Icon, title: outcomeTitle, text, result }, index) => <article key={outcomeTitle} className={motionStyles.featureCard} data-ai-feature={['documents','workspace','skills','schedule','remote','app'][index]}>
+        <div data-ai-icon className="mb-5 grid h-11 w-11 place-items-center rounded-xl bg-primary-50 text-primary-900"><Icon size={22} /></div><AiCourseReveal delay={index * 0.08}><h3 className="text-lg font-bold">{outcomeTitle}</h3><p className="mt-3 text-sm leading-7 text-gray-600">{text}</p><p className="mt-4 border-l-2 border-church-gold pl-3 text-xs font-semibold leading-6 text-primary-900">{result}</p></AiCourseReveal>
+      </article>)}</AiCourseFeatureNetwork>
       <p className="mt-10 text-xs leading-6 text-gray-500">예약과 원격 활용은 계정·기기의 기능 지원을 확인한 뒤 진행합니다. 내 컴퓨터에서 실행하는 작업에는 컴퓨터와 앱이 켜져 있고 인터넷에 연결된 환경이 필요합니다.</p>
     </div></section>
 
     <section className="mx-auto max-w-6xl px-5 py-16 sm:px-8 sm:py-24">
       <SectionLabel>8 WEEKS + 4 WEEKS</SectionLabel><h2 className="text-3xl font-bold leading-snug sm:text-4xl">먼저 AI를 내 일에.<br />그다음, 나만의 앱으로.</h2>
       <p className="mt-4 leading-8 text-gray-600">앞 8주는 AI 활용의 기본과 작업 방법을 익힙니다.<br />마지막 4주는 그 경험을 앱 제작과 운영으로 이어갑니다.</p>
-      <div className="mt-10 space-y-3">{curriculum.map(([weeks, heading, topics, result], index) => <article key={weeks} className={`grid gap-4 rounded-2xl border p-5 sm:grid-cols-[90px_1fr_1fr] sm:items-center sm:p-6 ${index < 4 ? "border-gray-200 bg-white" : "border-primary-200 bg-primary-50"}`}><p className="text-xl font-bold tabular-nums text-primary-900">{weeks}<span className="ml-1 text-xs font-normal">주</span></p><div><h3 className="font-bold">{heading}</h3><p className="mt-1 text-xs leading-6 text-gray-500">{topics}</p></div><p className="text-sm leading-6 text-gray-700"><span className="mr-2 text-xs text-primary-700">남는 것</span>{result}</p></article>)}</div>
+      <AiCourseRoadmap>{curriculum.map(([weeks, heading, topics, result], index) => <article key={weeks} data-ai-course-stage={index} className={`grid gap-4 rounded-2xl border p-5 sm:grid-cols-[90px_1fr_1fr] sm:items-center sm:p-6 ${index < 4 ? "border-gray-200 bg-white" : "border-primary-200 bg-primary-50"}`}><p className="text-xl font-bold tabular-nums text-primary-900">{weeks}<span className="ml-1 text-xs font-normal">주</span></p><div><h3 className="font-bold">{heading}</h3><p className="mt-1 text-xs leading-6 text-gray-500">{topics}</p></div><p className="text-sm leading-6 text-gray-700"><span className="mr-2 text-xs text-primary-700">남는 것</span>{result}</p></article>)}</AiCourseRoadmap>
       <div className="mt-8 rounded-2xl bg-church-gold-light p-6"><h3 className="font-bold text-primary-900">설명을 듣고, 노트북에서 실행하고, 결과를 확인합니다.</h3><p className="mt-2 text-sm leading-7 text-gray-700">공통 자료로 같은 작업을 연습한 뒤 자신의 업무에 맞게 바꿔봅니다. 직장 업무, 사업·가게 운영, 개인 작업, 교회·모임 활동까지 각자의 일터와 일상에 연결합니다.</p></div>
     </section>
 
