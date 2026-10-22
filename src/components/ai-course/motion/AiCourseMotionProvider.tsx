@@ -50,7 +50,7 @@ export function AiCourseMotionProvider({ children }: { children: ReactNode }) {
 export function useAiCourseMotion() { return useContext(Context); }
 export function AiCourseMotionControls() {
   const { mode, prefersReducedMotion, setPaused } = useAiCourseMotion();
-  return <button type="button" className={styles.motionControl} disabled={prefersReducedMotion} onClick={() => setPaused(mode === "animated")}>
+  return <button type="button" className={styles.motionControl} aria-disabled={prefersReducedMotion} onClick={() => { if (!prefersReducedMotion) setPaused(mode === "animated"); }}>
     {mode === "animated" ? <Pause size={12} aria-hidden /> : <Play size={12} aria-hidden />}
     {prefersReducedMotion ? "동작 줄이기 적용 중" : mode === "animated" ? "모션 끄기" : "모션 켜기"}
   </button>;

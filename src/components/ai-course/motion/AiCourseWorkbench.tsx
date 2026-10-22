@@ -48,6 +48,6 @@ export default function AiCourseWorkbench() {
         </div><div className={styles.sharedBadge}><Check size={12} />내 손으로 만든 앱</div>
       </div>
     </div>
-    <div className={styles.benchBottom}><span>질문 → 문서 → 업무 절차 → 나만의 앱</span><button type="button" disabled={playing || mode === "static"} onClick={replay} aria-label="작업실 모션 다시 보기"><RotateCcw size={12} aria-hidden />다시 보기</button></div>
+    <div className={styles.benchBottom}><span>질문 → 문서 → 업무 절차 → 나만의 앱</span><button type="button" aria-disabled={playing || mode === "static"} onClick={replay} aria-label="작업실 모션 다시 보기"><RotateCcw size={12} aria-hidden />다시 보기</button></div>
   </div>;
 }

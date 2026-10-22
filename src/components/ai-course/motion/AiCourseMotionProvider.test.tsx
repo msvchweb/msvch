@@ -31,9 +31,17 @@ it("reduced motion updates during use and overrides enable", () => {
   const input = screen.getByLabelText("입력"); input.focus(); fireEvent.change(input, { target: { value: "작성 중" } });
   act(() => { reduced = true; listeners.forEach((listener) => listener()); });
   expect(screen.getByLabelText("모션 상태")).toHaveTextContent("static"); expect(input).toHaveFocus(); expect(input).toHaveValue("작성 중");
-  expect(screen.getByRole("button", { name: "동작 줄이기 적용 중" })).toBeDisabled();
+  const control = screen.getByRole("button", { name: "동작 줄이기 적용 중" });
+  expect(control).toHaveAttribute("aria-disabled", "true"); fireEvent.click(control);
+  expect(screen.getByLabelText("모션 상태")).toHaveTextContent("static");
   act(() => { reduced = false; listeners.forEach((listener) => listener()); });
   expect(screen.getByLabelText("모션 상태")).toHaveTextContent("animated");
+});
+it("retains the control focus when the OS reduces motion", () => {
+  render(<AiCourseMotionProvider><Probe /></AiCourseMotionProvider>);
+  const button = screen.getByRole("button", { name: "모션 끄기" }); button.focus();
+  act(() => { reduced = true; listeners.forEach((listener) => listener()); });
+  expect(button).not.toBeDisabled(); expect(button).toHaveAttribute("aria-disabled", "true"); expect(button).toHaveFocus();
 });
 it("removes its visibility and media listeners", () => {
   const add = vi.spyOn(document, "addEventListener"); const remove = vi.spyOn(document, "removeEventListener");

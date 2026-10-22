@@ -20,6 +20,7 @@ function createPlayer() {
     getSnapshot: () => snapshot,
     getServerSnapshot: () => REST,
     canAutoplay: () => !consumed,
+    skipAutoplay() { consumed = true; },
     cancel() { generation++; controls?.stop(); controls = undefined; publish(REST); },
     start() {
       if (snapshot.playing) return;
@@ -39,18 +40,19 @@ function createPlayer() {
   };
 }
 export function useWorkbenchPlayback({ scope, inView }: { scope: RefObject<HTMLDivElement | null>; inView: boolean }) {
-  const { mode, documentVisible, skipIntro } = useAiCourseMotion();
+  const { mode, documentVisible, skipIntro, paused, prefersReducedMotion } = useAiCourseMotion();
   const [player] = useState(createPlayer);
   const state = useSyncExternalStore(player.subscribe, player.getSnapshot, player.getServerSnapshot);
   const eligible = mode === "animated" && documentVisible && inView;
   useEffect(() => {
     let disposed = false;
+    if (paused || prefersReducedMotion) player.skipAutoplay();
     // Deferring one microtask lets StrictMode's abandoned effect cancel before it starts.
     if (eligible && !skipIntro && player.canAutoplay()) queueMicrotask(() => {
       if (!disposed && scope.current) player.start();
     });
     return () => { disposed = true; player.cancel(); };
-  }, [eligible, skipIntro, player, scope]);
+  }, [eligible, skipIntro, paused, prefersReducedMotion, player, scope]);
   const replay = useCallback(() => { if (eligible && scope.current) player.start(); }, [eligible, scope, player]);
   return { scene: eligible ? state.scene : "settled" as WorkbenchScene, playing: eligible && state.playing, replay };
 }

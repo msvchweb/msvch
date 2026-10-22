@@ -2,7 +2,7 @@
 .motionControl { display:inline-flex; align-items:center; gap:7px; border:1px solid #ffffff2b; border-radius:999px; padding:8px 12px; font-size:11px; color:#e1d7b7; cursor:pointer; }
 .motionControl:hover { background:#ffffff0d; }
 .motionControl:focus-visible { outline:2px solid #c9a84c; outline-offset:4px; }
-.motionControl:disabled { cursor:default; opacity:.7; }
+.motionControl[aria-disabled="true"] { cursor:default; opacity:.7; }
 .hero { position:relative; overflow:hidden; isolation:isolate; background:#151d35; color:white; }
 .heroGlow { position:absolute; pointer-events:none; z-index:-1; width:700px; height:700px; top:-260px; right:-180px; background:radial-gradient(ellipse,#c9a84c24,transparent 66%); }
 .heroGlow::after { content:""; position:absolute; inset:180px -80px -100px -220px; background:radial-gradient(ellipse,#ffffff0e,transparent 66%); }
@@ -67,7 +67,7 @@
 .appFooter { display:flex; justify-content:space-between; padding-top:10px; border-top:1px solid #ece9e1; color:#909097; font-size:8px; }.appFooter>svg { color:#168264; }
 .sharedBadge { position:absolute; bottom:18px; right:12px; display:flex; align-items:center; gap:6px; background:#e3d09b; color:#353020; border:1px solid #eddcae; border-radius:8px; padding:9px 12px; font-size:10px; box-shadow:0 10px 24px #0003; }
 .benchBottom { display:flex; align-items:center; justify-content:space-between; gap:8px; border-top:1px solid #ffffff12; padding:14px 17px; color:#a6aabb; font-size:9px; }
-.benchBottom button { display:flex; gap:5px; align-items:center; padding:4px 0 4px 8px; color:#e5d7ab; white-space:nowrap; cursor:pointer; }.benchBottom button:disabled { opacity:.4; cursor:default; }.benchBottom button:focus-visible { outline:2px solid #c9a84c; outline-offset:5px; border-radius:2px; }
+.benchBottom button { display:flex; gap:5px; align-items:center; padding:4px 0 4px 8px; color:#e5d7ab; white-space:nowrap; cursor:pointer; }.benchBottom button[aria-disabled="true"] { opacity:.4; cursor:default; }.benchBottom button:focus-visible { outline:2px solid #c9a84c; outline-offset:5px; border-radius:2px; }
 @keyframes headline-in { from { opacity:.75; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
 @keyframes glow-drift { from { opacity:.4; transform:translate(-70px,40px) scale(.8); } to { opacity:1; transform:none; } }
 @keyframes orbit-light { from { stroke-dashoffset:900; } to { stroke-dashoffset:0; } }
