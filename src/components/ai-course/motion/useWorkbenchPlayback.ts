@@ -28,7 +28,7 @@ function createPlayer() {
       const run = ++generation;
       publish({ scene: "intro", playing: true });
       controls = animate(0, 1, {
-        duration: 4.5, ease: "linear",
+        duration: 5.85, ease: "linear",
         onUpdate(progress) {
           if (run !== generation) return;
           const scene: WorkbenchScene = progress < 0.8 / 4.5 ? "intro" : progress < 2 / 4.5 ? "document" : progress < 3.3 / 4.5 ? "workflow" : "app";

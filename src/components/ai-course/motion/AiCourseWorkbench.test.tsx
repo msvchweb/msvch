@@ -10,7 +10,7 @@ vi.mock("motion/react", async (original) => ({ ...await original<object>(), anim
 let visible = true;
 let reduced = false;
 const mediaListeners = new Set<() => void>();
-let options: { onUpdate(value: number): void; onComplete(): void };
+let options: { duration: number; onUpdate(value: number): void; onComplete(): void };
 let stops: ReturnType<typeof vi.fn>[];
 function Example({ inView = true }: { inView?: boolean }) {
   const scope = useRef<HTMLDivElement>(null);
@@ -59,6 +59,7 @@ it("replay stays single and ignores cancelled completion callbacks", async () =>
 it("autoplays once in StrictMode", async () => {
   render(<StrictMode><AiCourseMotionProvider><Example /></AiCourseMotionProvider></StrictMode>);
   await waitFor(() => expect(animation.animate).toHaveBeenCalledTimes(1));
+  expect(options.duration).toBeCloseTo(5.85);
 });
 it("initial reduced motion waits for explicit replay after being re-enabled", async () => {
   reduced = true;
