@@ -144,8 +144,8 @@ export default function AiCourseForm({ privacyPolicy }: { privacyPolicy: AiCours
         <CapabilityQuestions value={draft.capabilities} onChange={(value) => update("capabilities", value)} errors={Object.fromEntries(CAPABILITIES.map((q) => [q.value, errors[`surveyAnswers.capabilities.${q.value}`]]))} />
       </>}
       {step === 2 && <>
-        {choices("websiteExperience", "surveyAnswers.websiteExperience", "홈페이지 제작 경험은 어느 정도인가요?", WEBSITE_OPTIONS)}
-        {draft.websiteExperience === "other" && text("websiteExperienceOther", "surveyAnswers.websiteExperienceOther", "홈페이지 경험 설명 (선택)", 200)}
+        {choices("websiteExperience", "surveyAnswers.websiteExperience", "앱 제작 경험은 어느 정도인가요?", WEBSITE_OPTIONS)}
+        {draft.websiteExperience === "other" && text("websiteExperienceOther", "surveyAnswers.websiteExperienceOther", "앱 경험 설명 (선택)", 200)}
         {choices("learningGoals", "surveyAnswers.learningGoals", "가장 먼저 배우고 싶은 것 (최대 2개)", LEARNING_GOALS, true, 2)}
         {text("repetitiveTask", "surveyAnswers.repetitiveTask", "AI로 줄이고 싶은 반복 업무 하나", 500, { multiline: true, hint: "예: 회의 후 할 일 정리, 고객 안내문 작성, 매주 모임 준비. 아직 떠오르지 않으면 ‘수업에서 찾아보고 싶어요’라고 적어 주세요. 실제 고객명이나 비공개 업무 내용은 적지 않아도 됩니다." })}
       </>}

@@ -51,8 +51,8 @@ export const EXPERIENCE_OPTIONS = [
 ] as const;
 export const WEBSITE_OPTIONS = [
   { value: "none", label: "만들어 본 적이 없어요" },
-  { value: "builder", label: "홈페이지 제작 도구로 내용을 입력하거나 수정해 봤어요" },
-  { value: "ai_local", label: "AI로 페이지를 만들어 봤지만 인터넷에 배포하지는 못했어요" },
+  { value: "builder", label: "앱 제작 도구로 내용을 입력하거나 수정해 봤어요" },
+  { value: "ai_local", label: "AI로 앱을 만들어 봤지만 인터넷에 배포하지는 못했어요" },
   { value: "deployed", label: "GitHub·Vercel 등을 이용해 배포하고 수정해 본 적이 있어요" },
   { value: "other", label: "위 선택지로 설명하기 어려워요" },
 ] as const;
@@ -62,7 +62,7 @@ export const LEARNING_GOALS = [
   { value: "integrations", label: "플러그인·외부 앱 연결해서 쓰기" },
   { value: "automation", label: "반복 업무를 스킬과 예약으로 처리하기" },
   { value: "remote", label: "휴대폰에서 내 컴퓨터의 작업 이어가기" },
-  { value: "website", label: "내 홈페이지 만들고 직접 고치기" },
+  { value: "website", label: "내 앱 만들고 직접 고치기" },
   { value: "explore", label: "어떤 활용이 나에게 맞는지 찾아보기" },
 ] as const;
 export type Choice = { readonly value: string; readonly label: string };
