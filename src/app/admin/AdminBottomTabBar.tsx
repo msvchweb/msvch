@@ -62,6 +62,7 @@ const MORE_TAB: MoreTab = {
     "/admin/shorts",
     "/admin/inquiries",
     "/admin/new-families",
+    "/admin/ai-course-applications",
     "/admin/members",
     "/admin/posters",
     "/admin/updates",

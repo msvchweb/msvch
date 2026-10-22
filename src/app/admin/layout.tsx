@@ -62,6 +62,7 @@ const baseNav: AdminNavItem[] = [
       "/admin/inquiries",
       "/admin/new-families",
       "/admin/myeongbi-prayers",
+      "/admin/ai-course-applications",
     ],
   },
   { label: "회원관리", href: "/admin/members", icon: "members" },

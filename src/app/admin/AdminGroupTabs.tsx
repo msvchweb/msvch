@@ -49,11 +49,13 @@ const TAB_GROUPS: TabGroup[] = [
       "/admin/inquiries",
       "/admin/new-families",
       "/admin/myeongbi-prayers",
+      "/admin/ai-course-applications",
     ],
     tabs: [
       { label: "문의 내역", href: "/admin/inquiries" },
       { label: "새가족 등록", href: "/admin/new-families" },
       { label: "명비 기도인", href: "/admin/myeongbi-prayers" },
+      { label: "AI 강의 신청", href: "/admin/ai-course-applications" },
     ],
   },
 ];
