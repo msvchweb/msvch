@@ -97,6 +97,13 @@
 .roadDot { position:absolute; width:9px; height:9px; left:-25px; top:30px; border-radius:50%; background:#e8e3d7; border:2px solid #faf8f4; box-shadow:0 0 0 1px #e8e3d7; }
 .roadStep[data-active="true"] .roadDot { background:#b49235; box-shadow:0 0 0 4px #c9a84c22; }
 .roadStep[data-active="true"]>article { border-color:#c9a84c99; background:#fffcf3; box-shadow:0 8px 24px #c9a84c10; }
+.formSteps li { position:relative; }
+.formSteps li::before { content:""; position:absolute; top:-4px; height:4px; inset-inline:0; background:#c9a84c; transform:scaleX(0); transform-origin:left; }
+.formSteps[data-form-motion="animated"] li::before { transition:transform .2s ease; }
+.formSteps li[data-complete="true"]::before { transform:scaleX(1); }
+.completeCheck path { stroke-dasharray:30; stroke-dashoffset:0; }
+.formComplete[data-form-motion="animated"] .completeCheck path { animation:check-draw .4s ease-out both; }
+@keyframes check-draw { from { stroke-dashoffset:30; } to { stroke-dashoffset:0; } }
 .root[data-ai-course-motion="static"] *, .root[data-ai-course-motion="static"] *::after,.root[data-ai-course-motion="static"] *::before, .root[data-motion-visible="false"] * { animation:none!important; transition:none!important; }
 @media(min-width:640px) { .featureGrid { grid-template-columns:repeat(2,minmax(0,1fr)); }.caseBody { padding:30px; display:grid; gap:40px; grid-template-columns:1fr 1fr; }.caseBefore { padding:0 30px 0 0; border-bottom:0; border-right:1px solid #ece9e1; }.caseAfter { padding:0; } }
 @media(min-width:1024px) { .featureGrid { grid-template-columns:repeat(3,minmax(0,1fr)); }.showcaseCard>article { min-height:380px; }.caseBody { padding:32px; } }

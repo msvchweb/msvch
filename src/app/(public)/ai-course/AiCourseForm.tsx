@@ -5,6 +5,8 @@ import type { AiCourseSubmission, CapabilityKey, ExperienceLevel } from "@/types
 import type { AiCoursePrivacyPolicy } from "./privacy-policy";
 import CapabilityQuestions, { ChoiceQuestion } from "./CapabilityQuestions";
 import ApplicationDetails from "@/components/ai-course/ApplicationDetails";
+import { useAiCourseMotion } from "@/components/ai-course/motion/AiCourseMotionProvider";
+import motionStyles from "@/components/ai-course/motion/ai-course-motion.module.css";
 
 const STEPS = ["신청 정보", "현재 활용 경험", "수강 목표", "확인·제출"];
 const VALIDATION_ID = "00000000-0000-4000-8000-000000000000";
@@ -33,6 +35,7 @@ function TextQuestion({ name, title, value, onChange, error, maxLength, multilin
   </div>;
 }
 export default function AiCourseForm({ privacyPolicy }: { privacyPolicy: AiCoursePrivacyPolicy }) {
+  const { mode } = useAiCourseMotion();
   const [draft, setDraft] = useState<Draft>(INITIAL);
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -114,15 +117,15 @@ export default function AiCourseForm({ privacyPolicy }: { privacyPolicy: AiCours
     return <TextQuestion name={name} title={title} value={draft[key] as string} onChange={(value) => update(key, value)} error={errors[name]} maxLength={maxLength} {...extra} />;
   }
   const review = step === 3 ? AiCourseSubmissionSchema.safeParse(candidate(true)) : null;
-  if (status === "done") return <div ref={completionRef} tabIndex={-1} role="status" className="rounded-3xl border border-emerald-200 bg-emerald-50 p-8 text-center outline-none sm:p-12">
-    <div aria-hidden="true" className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-2xl text-emerald-800">✓</div>
+  if (status === "done") return <div ref={completionRef} tabIndex={-1} role="status" data-form-motion={mode} className={`${motionStyles.formComplete} rounded-3xl border border-emerald-200 bg-emerald-50 p-8 text-center outline-none sm:p-12`}>
+    <div aria-hidden="true" className="mx-auto mb-5 grid h-14 w-14 place-items-center rounded-full bg-emerald-100 text-2xl text-emerald-800"><svg className={motionStyles.completeCheck} width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M5 12l4 4L19 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg></div>
     <h2 className="text-2xl font-bold text-church-dark">신청이 접수되었습니다.</h2>
     <p className="mt-3 leading-relaxed text-gray-700">신청 정보와 AI 활용 수준 설문을 잘 받았습니다.</p>
     <a href="#course" className="mt-6 inline-block font-semibold text-primary-900 underline underline-offset-4">강의 내용 다시 보기</a>
   </div>;
   return <form ref={formRef} onSubmit={submit} noValidate aria-busy={status === "submitting"} className="rounded-3xl border border-gray-200 bg-white p-5 shadow-sm sm:p-8">
-    <ol aria-label="신청 단계" className="mb-8 grid grid-cols-4 gap-2">
-      {STEPS.map((title, index) => <li key={title} aria-current={index === step ? "step" : undefined} className={`border-t-4 pt-3 text-xs leading-relaxed sm:text-sm ${index <= step ? "border-primary-900 text-primary-900" : "border-gray-100 text-gray-400"}`}><span className="block font-bold">0{index + 1}</span>{title}</li>)}
+    <ol aria-label="신청 단계" data-form-motion={mode} className={`${motionStyles.formSteps} mb-8 grid grid-cols-4 gap-2`}>
+      {STEPS.map((title, index) => <li key={title} data-complete={index <= step ? "true" : "false"} aria-current={index === step ? "step" : undefined} className={`border-t-4 pt-3 text-xs leading-relaxed sm:text-sm ${index <= step ? "border-primary-900 text-primary-900" : "border-gray-100 text-gray-400"}`}><span className="block font-bold">0{index + 1}</span>{title}</li>)}
     </ol>
     <h2 ref={headingRef} tabIndex={-1} className="mb-2 text-2xl font-bold text-church-dark outline-none">{STEPS[step]}</h2>
     <p className="mb-8 text-sm leading-relaxed text-gray-500">{step === 0 ? "신청 정보와 설문은 마지막 단계에서 함께 제출합니다." : step === 1 ? "지금 할 수 있는 만큼만 알려주세요. 실습 준비를 위한 설문입니다." : step === 2 ? "수업에서 바꾸고 싶은 일을 알려주세요." : "이름, 연락처와 설문 답변을 확인한 후 제출해 주세요."}</p>
