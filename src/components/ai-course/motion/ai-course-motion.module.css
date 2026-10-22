@@ -1,0 +1,6 @@
+.root { --motion-gold: #c9a84c; }
+.motionControl { display:inline-flex; align-items:center; gap:7px; border:1px solid #ffffff2b; border-radius:999px; padding:8px 12px; font-size:11px; color:#e1d7b7; cursor:pointer; }
+.motionControl:hover { background:#ffffff0d; }
+.motionControl:focus-visible { outline:2px solid #c9a84c; outline-offset:4px; }
+.motionControl:disabled { cursor:default; opacity:.7; }
+@media(prefers-reduced-motion:reduce) { .root *, .root *::before, .root *::after { animation:none!important; transition:none!important; } }
