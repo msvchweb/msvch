@@ -1,0 +1,59 @@
+import React, { StrictMode, useRef } from "react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { AiCourseMotionProvider } from "./AiCourseMotionProvider";
+import { useWorkbenchPlayback } from "./useWorkbenchPlayback";
+
+const animation = vi.hoisted(() => ({ animate: vi.fn() }));
+vi.mock("motion/react", async (original) => ({ ...await original<object>(), animate: animation.animate }));
+let visible = true;
+let options: { onUpdate(value: number): void; onComplete(): void };
+let stops: ReturnType<typeof vi.fn>[];
+function Example({ inView = true }: { inView?: boolean }) {
+  const scope = useRef<HTMLDivElement>(null);
+  const { scene, playing, replay } = useWorkbenchPlayback({ scope, inView });
+  return <div ref={scope}><output aria-label="장면">{scene}</output><button disabled={playing} onClick={replay}>다시 보기</button></div>;
+}
+beforeEach(() => {
+  stops = []; visible = true; window.history.replaceState(null, "", "/ai-course");
+  vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener() {}, removeEventListener() {} }));
+  vi.spyOn(document, "visibilityState", "get").mockImplementation(() => visible ? "visible" : "hidden");
+  animation.animate.mockReset().mockImplementation((_from, _to, next) => { options = next; const stop = vi.fn(); stops.push(stop); return { stop }; });
+});
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+it("apply hash skips autoplay", async () => {
+  window.history.replaceState(null, "", "/ai-course#apply");
+  render(<AiCourseMotionProvider><Example /></AiCourseMotionProvider>);
+  await act(async () => {}); expect(animation.animate).not.toHaveBeenCalled(); expect(screen.getByLabelText("장면")).toHaveTextContent("settled");
+});
+it("hide stops playback and returning does not autoreplay", async () => {
+  render(<AiCourseMotionProvider><Example /></AiCourseMotionProvider>);
+  await waitFor(() => expect(animation.animate).toHaveBeenCalledTimes(1));
+  act(() => { options.onUpdate(0.25); }); expect(screen.getByLabelText("장면")).toHaveTextContent("document");
+  act(() => { visible = false; document.dispatchEvent(new Event("visibilitychange")); });
+  expect(stops[0]).toHaveBeenCalled(); expect(screen.getByLabelText("장면")).toHaveTextContent("settled");
+  act(() => { visible = true; document.dispatchEvent(new Event("visibilitychange")); });
+  await act(async () => {}); expect(animation.animate).toHaveBeenCalledTimes(1);
+});
+it("leaving the viewport cancels and unmount cleans the latest replay", async () => {
+  const view = render(<AiCourseMotionProvider><Example /></AiCourseMotionProvider>);
+  await waitFor(() => expect(animation.animate).toHaveBeenCalledTimes(1));
+  view.rerender(<AiCourseMotionProvider><Example inView={false} /></AiCourseMotionProvider>);
+  expect(stops[0]).toHaveBeenCalled();
+  view.rerender(<AiCourseMotionProvider><Example /></AiCourseMotionProvider>);
+  fireEvent.click(screen.getByRole("button", { name: "다시 보기" }));
+  expect(animation.animate).toHaveBeenCalledTimes(2); view.unmount(); expect(stops[1]).toHaveBeenCalled();
+});
+it("replay stays single and ignores cancelled completion callbacks", async () => {
+  render(<AiCourseMotionProvider><Example /></AiCourseMotionProvider>);
+  await waitFor(() => expect(animation.animate).toHaveBeenCalledTimes(1));
+  const old = options; act(() => options.onComplete());
+  const button = screen.getByRole("button", { name: "다시 보기" }); button.focus(); fireEvent.click(button); fireEvent.click(button);
+  expect(animation.animate).toHaveBeenCalledTimes(2); expect(button).toBeDisabled();
+  act(() => old.onComplete()); expect(button).toBeDisabled();
+  act(() => options.onComplete()); expect(button).toBeEnabled(); expect(button).toHaveFocus();
+});
+it("autoplays once in StrictMode", async () => {
+  render(<StrictMode><AiCourseMotionProvider><Example /></AiCourseMotionProvider></StrictMode>);
+  await waitFor(() => expect(animation.animate).toHaveBeenCalledTimes(1));
+});
