@@ -13,7 +13,7 @@ export default function ApplicationDetails({ application }: { application: Pick<
     ["최근 한 달 AI 사용", choiceLabel(FREQUENCY_OPTIONS, answers.usageFrequency)],
     ["사용해 본 도구", answers.tools.map((v) => choiceLabel(TOOL_OPTIONS, v)).join(", ") + (answers.toolsOther ? ` · ${answers.toolsOther}` : "")],
     ...CAPABILITIES.map((q) => [q.label, choiceLabel(EXPERIENCE_OPTIONS, answers.capabilities[q.value])]),
-    ["홈페이지 제작 경험", choiceLabel(WEBSITE_OPTIONS, answers.websiteExperience) + (answers.websiteExperienceOther ? ` · ${answers.websiteExperienceOther}` : "")],
+    ["앱 제작 경험", choiceLabel(WEBSITE_OPTIONS, answers.websiteExperience) + (answers.websiteExperienceOther ? ` · ${answers.websiteExperienceOther}` : "")],
     ["배우고 싶은 것", answers.learningGoals.map((v) => choiceLabel(LEARNING_GOALS, v)).join(" / ")],
     ["줄이고 싶은 반복 업무", answers.repetitiveTask],
   ];
