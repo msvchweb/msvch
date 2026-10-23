@@ -132,6 +132,40 @@ function highlightKeywords(text: string, keywords: string[]): string {
     .join("");
 }
 
+/** 한글 14자 폭으로 줄을 나누고, 최대 두 줄을 한 화면에 표시한다. */
+function splitCaption(text: string): {
+  lines: string[];
+  startRatio: number;
+  endRatio: number;
+}[] {
+  const chars = [...text.replace(/\s+/g, " ").trim()];
+  const lines: { text: string; end: number }[] = [];
+  let start = 0;
+  while (start < chars.length) {
+    let end = Math.min(start + 14, chars.length);
+    if (end < chars.length && chars[end] !== " ") {
+      const wordEnd = chars.lastIndexOf(" ", end);
+      if (wordEnd > start) end = wordEnd;
+    }
+    const line = chars.slice(start, end).join("");
+    while (chars[end] === " ") end++;
+    lines.push({ text: line, end });
+    start = end;
+  }
+
+  const pages: { lines: string[]; startRatio: number; endRatio: number }[] = [];
+  for (let i = 0; i < lines.length; i += 2) {
+    const page = lines.slice(i, i + 2);
+    pages.push({
+      lines: page.map((line) => line.text),
+      // 단어별 시각이 없는 전사이므로 원본 구간을 글자 수에 비례해 분배한다.
+      startRatio: i === 0 ? 0 : lines[i - 1].end / chars.length,
+      endRatio: page[page.length - 1].end / chars.length,
+    });
+  }
+  return pages;
+}
+
 function generateASS(
   subtitlePath: string,
   startSec: number,
@@ -151,7 +185,11 @@ function generateASS(
 
   // 1) 상단 고정 카드 — 컷 후 클립 전체 동안 노출
   if (cardText.trim().length > 0 && finalDuration > 0) {
-    assDialogue += `Dialogue: 0,${fmtASSTime(0)},${fmtASSTime(finalDuration)},Card,,0,0,0,,{\\fad(300,0)}${escapeASSText(cardText.trim())}\n`;
+    const title = cardText.replace(/\s+/g, " ").trim();
+    // 짧은 제목은 크게, 긴 제목은 한 줄에 들어오도록 축소한다.
+    const titleWidth = [...title].reduce((width, char) => width + (char === " " ? 0.3 : 0.8), 0);
+    const titleSize = Math.min(200, Math.floor(1000 / titleWidth));
+    assDialogue += `Dialogue: 0,${fmtASSTime(0)},${fmtASSTime(finalDuration)},Card,,0,0,0,,{\\fad(300,0)\\fs${titleSize}\\b900}${escapeASSText(title)}\n`;
   }
 
   // 2) 하단 본문 자막
@@ -176,25 +214,35 @@ function generateASS(
     }
   }
   for (const evt of subtitles) {
-    const shifted = shiftSegment(evt.start, evt.end, voiced);
-    if (!shifted) continue;
-    const styled = highlightKeywords(evt.text, keywords);
-    assDialogue += `Dialogue: 0,${fmtASSTime(shifted.relStart)},${fmtASSTime(shifted.relEnd)},Default,,0,0,0,,${styled}\n`;
+    if (evt.end <= evt.start) continue;
+    // 침묵 컷/클립 경계로 시간을 압축하기 전에 분할해야 원본 발화 순서가 유지된다.
+    for (const page of splitCaption(evt.text)) {
+      const duration = evt.end - evt.start;
+      const shifted = shiftSegment(
+        evt.start + duration * page.startRatio,
+        evt.start + duration * page.endRatio,
+        voiced,
+      );
+      if (!shifted) continue;
+      const styled = page.lines.map((line) => highlightKeywords(line, keywords)).join("\\N");
+      assDialogue += `Dialogue: 0,${fmtASSTime(shifted.relStart)},${fmtASSTime(shifted.relEnd)},Default,,0,0,0,,${styled}\n`;
+    }
   }
 
   // 레이아웃:
-  //   y=0~350  상단 여백 (카드 영역, Alignment=8, MarginV=120)
+  //   y=0~350  상단 여백 (카드 영역, Alignment=8, MarginV=100)
   //   y=350~1430  영상 1080x1080 (overlay y=350, 1:1 정사각 crop)
   //   y=1430~1920  하단 여백 (본문 자막, Alignment=2, MarginV=240 → y≈1680)
   return `[Script Info]
 ScriptType: v4.00+
 PlayResX: 1080
 PlayResY: 1920
+WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,Noto Sans CJK KR,64,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,40,40,240,1
-Style: Card,Noto Sans CJK KR,80,&H00FFFFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,4,0,8,40,40,120,1
+Style: Card,Malgun Gothic,200,&H0000FFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,0,0,8,40,40,100,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
