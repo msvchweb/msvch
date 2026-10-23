@@ -34,7 +34,7 @@ function TextQuestion({ name, title, value, onChange, error, maxLength, multilin
     {error && <p id={`${name}-error`} className="text-sm text-red-700">{error}</p>}
   </div>;
 }
-export default function AiCourseForm({ privacyPolicy }: { privacyPolicy: AiCoursePrivacyPolicy }) {
+export default function AiCourseForm({ privacyPolicy, preview = false }: { privacyPolicy: AiCoursePrivacyPolicy; preview?: boolean }) {
   const { mode } = useAiCourseMotion();
   const [draft, setDraft] = useState<Draft>(INITIAL);
   const [step, setStep] = useState(0);
@@ -90,6 +90,7 @@ export default function AiCourseForm({ privacyPolicy }: { privacyPolicy: AiCours
     event.preventDefault();
     if (busy.current) return;
     if (step < 3) { next(); return; }
+    if (preview) return;
     const result = AiCourseSubmissionSchema.safeParse(candidate());
     if (!result.success) {
       const fields = aiCourseFieldErrors(result.error); setErrors(fields); setStep(stepForField(Object.keys(fields)[0])); return;
@@ -129,6 +130,7 @@ export default function AiCourseForm({ privacyPolicy }: { privacyPolicy: AiCours
     </ol>
     <h2 ref={headingRef} tabIndex={-1} className="mb-2 text-2xl font-bold text-church-dark outline-none">{STEPS[step]}</h2>
     <p className="mb-8 text-sm leading-relaxed text-gray-500">{step === 0 ? "신청 정보와 설문은 마지막 단계에서 함께 제출합니다." : step === 1 ? "지금 할 수 있는 만큼만 알려주세요. 실습 준비를 위한 설문입니다." : step === 2 ? "수업에서 바꾸고 싶은 일을 알려주세요." : "이름, 연락처와 설문 답변을 확인한 후 제출해 주세요."}</p>
+    {preview && <p role="note" className="mb-6 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">미리보기에서는 입력한 신청이 전송되지 않아요.</p>}
     <fieldset disabled={status === "submitting"} className="min-w-0 space-y-7">
       <legend className="sr-only">{STEPS[step]} 입력</legend>
       {step === 0 && <>
@@ -150,7 +152,7 @@ export default function AiCourseForm({ privacyPolicy }: { privacyPolicy: AiCours
         {choices("websiteExperience", "surveyAnswers.websiteExperience", "앱 제작 경험은 어느 정도인가요?", WEBSITE_OPTIONS)}
         {draft.websiteExperience === "other" && text("websiteExperienceOther", "surveyAnswers.websiteExperienceOther", "앱 경험 설명 (선택)", 200)}
         {choices("learningGoals", "surveyAnswers.learningGoals", "가장 먼저 배우고 싶은 것 (최대 2개)", LEARNING_GOALS, true, 2)}
-        {text("repetitiveTask", "surveyAnswers.repetitiveTask", "AI로 줄이고 싶은 반복 업무 하나", 500, { multiline: true, hint: "예: 회의 후 할 일 정리, 고객 안내문 작성, 매주 모임 준비. 아직 떠오르지 않으면 ‘수업에서 찾아보고 싶어요’라고 적어 주세요. 실제 고객명이나 비공개 업무 내용은 적지 않아도 됩니다." })}
+        {text("repetitiveTask", "surveyAnswers.repetitiveTask", "AI의 도움을 받고 싶은 일", 500, { multiline: true, hint: "예: 수업 자료 정리, 발표 준비, 일정 관리, 안내문 작성. 아직 모르겠다면 ‘수업에서 찾아보고 싶어요’라고 적어 주세요. 개인정보나 비공개 내용은 적지 않아도 됩니다." })}
       </>}
       {step === 3 && <>
         {review?.success && <ApplicationDetails application={review.data} />}
@@ -162,7 +164,7 @@ export default function AiCourseForm({ privacyPolicy }: { privacyPolicy: AiCours
     {serverError && <p role="alert" className="mt-6 rounded-xl bg-red-50 p-4 text-sm text-red-800">{serverError}</p>}
     <div className="mt-8 flex gap-3 border-t border-gray-100 pt-6">
       {step > 0 && <button type="button" disabled={status === "submitting"} onClick={() => { setStep(step - 1); setErrors({}); setServerError(""); }} className="min-h-12 rounded-xl border border-gray-300 px-6 font-semibold text-gray-700 disabled:opacity-50">이전</button>}
-      <button type="submit" disabled={status === "submitting"} className="min-h-12 flex-1 rounded-xl bg-primary-900 px-6 font-semibold text-white hover:bg-primary-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-700 disabled:opacity-60">{step < 3 ? "다음" : status === "submitting" ? "제출 중…" : "신청서 제출하기"}</button>
+      <button type="submit" disabled={status === "submitting" || (preview && step === 3)} className="min-h-12 flex-1 rounded-xl bg-primary-900 px-6 font-semibold text-white hover:bg-primary-800 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-700 disabled:opacity-60">{step < 3 ? "다음" : preview ? "미리보기 · 전송하지 않아요" : status === "submitting" ? "제출 중…" : "신청서 제출하기"}</button>
     </div>
   </form>;
 }

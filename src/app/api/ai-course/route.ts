@@ -4,6 +4,7 @@ import { createServiceClient } from "@/lib/supabase/api";
 import { submitAiCourseApplication } from "@/lib/ai-course-server";
 
 export async function POST(request: NextRequest) {
+  if (process.env.AI_COURSE_PREVIEW === "1") return NextResponse.json({ error: "미리보기에서는 신청을 전송하지 않습니다." }, { status: 503, headers: { "Cache-Control": "no-store" } });
   let json: unknown;
   try { json = await request.json(); }
   catch { return NextResponse.json({ error: "신청 내용을 확인해 주세요." }, { status: 400 }); }

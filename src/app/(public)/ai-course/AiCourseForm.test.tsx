@@ -15,18 +15,26 @@ function fillBasic() {
 function fillExperience() {
   fireEvent.click(screen.getByLabelText("사용하지 않았어요"));
   fireEvent.click(screen.getByLabelText("아직 직접 사용한 도구가 없어요"));
-  for (const question of CAPABILITIES) fireEvent.click(within(screen.getByRole("group", { name: question.label })).getByLabelText("처음 접해요"));
+  for (const question of CAPABILITIES) fireEvent.click(within(screen.getByRole("group", { name: question.label })).getByLabelText("처음이에요"));
 }
 function toReview() {
   fillBasic(); next(); fillExperience(); next();
   fireEvent.click(screen.getByLabelText("만들어 본 적이 없어요"));
-  fireEvent.click(screen.getByLabelText("내 자료로 문서와 업무 정리하기"));
-  fireEvent.change(screen.getByLabelText("AI로 줄이고 싶은 반복 업무 하나"), { target: { value: "수업에서 찾아보고 싶어요" } });
+  fireEvent.click(screen.getByLabelText("공부·일상에 필요한 자료 정리하기"));
+  fireEvent.change(screen.getByLabelText("AI의 도움을 받고 싶은 일"), { target: { value: "수업에서 찾아보고 싶어요" } });
   next();
 }
 describe("AI course form", () => {
   beforeEach(() => { vi.stubGlobal("fetch", fetchMock); fetchMock.mockReset(); });
   afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+  it("allows reviewing a preview without making a submission request", () => {
+    render(<AiCourseForm privacyPolicy={policy} preview />); toReview();
+    fireEvent.click(screen.getByLabelText("개인정보 수집·이용에 동의합니다."));
+    const button = screen.getByRole("button", { name: /신청서 제출하기|미리보기/ });
+    expect(button).toBeDisabled();
+    fireEvent.submit(button.closest("form")!);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
   it("motion setting keeps draft and input focus", () => {
     let reduced = false;
     const listeners = new Set<() => void>();
@@ -86,7 +94,7 @@ describe("AI course form", () => {
     fireEvent.click(screen.getByLabelText("개인정보 수집·이용에 동의합니다."));
     fireEvent.click(screen.getByRole("button", { name: "신청서 제출하기" })); await screen.findByText("저장 실패");
     fireEvent.click(screen.getByRole("button", { name: "이전" }));
-    fireEvent.change(screen.getByLabelText("AI로 줄이고 싶은 반복 업무 하나"), { target: { value: "회의 정리" } }); next();
+    fireEvent.change(screen.getByLabelText("AI의 도움을 받고 싶은 일"), { target: { value: "회의 정리" } }); next();
     fireEvent.click(screen.getByRole("button", { name: "신청서 제출하기" }));
     expect(screen.getByRole("button", { name: "제출 중…" })).toBeDisabled();
     expect(JSON.parse(fetchMock.mock.calls[0][1].body).requestId).not.toBe(JSON.parse(fetchMock.mock.calls[1][1].body).requestId);

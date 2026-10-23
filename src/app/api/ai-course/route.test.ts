@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { aiCourseFixture } from "@/test/ai-course-fixture";
 import { POST } from "./route";
@@ -7,7 +7,14 @@ vi.mock("@/lib/ai-course-server", () => ({ submitAiCourseApplication: submit }))
 vi.mock("@/lib/supabase/api", () => ({ createServiceClient: createService }));
 function request(input: unknown) { return new NextRequest("https://example.test/api/ai-course", { method: "POST", body: JSON.stringify(input) }); }
 describe("public AI course API", () => {
-  beforeEach(() => { vi.resetAllMocks(); createService.mockReturnValue({}); submit.mockResolvedValue("created"); });
+  beforeEach(() => { vi.stubEnv("AI_COURSE_PREVIEW", "0"); vi.resetAllMocks(); createService.mockReturnValue({}); submit.mockResolvedValue("created"); });
+  afterEach(() => vi.unstubAllEnvs());
+  it("blocks preview writes before opening a service client", async () => {
+    vi.stubEnv("AI_COURSE_PREVIEW", "1");
+    const response = await POST(request(aiCourseFixture()));
+    expect(response.status).toBe(503);
+    expect(createService).not.toHaveBeenCalled(); expect(submit).not.toHaveBeenCalled();
+  });
   it.each(["created", "replayed"])("acknowledges %s without returning personal information", async (result) => {
     submit.mockResolvedValue(result);
     const res = await POST(request(aiCourseFixture()));

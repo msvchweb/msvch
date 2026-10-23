@@ -15,7 +15,7 @@ export default function ApplicationDetails({ application }: { application: Pick<
     ...CAPABILITIES.map((q) => [q.label, choiceLabel(EXPERIENCE_OPTIONS, answers.capabilities[q.value])]),
     ["앱 제작 경험", choiceLabel(WEBSITE_OPTIONS, answers.websiteExperience) + (answers.websiteExperienceOther ? ` · ${answers.websiteExperienceOther}` : "")],
     ["배우고 싶은 것", answers.learningGoals.map((v) => choiceLabel(LEARNING_GOALS, v)).join(" / ")],
-    ["줄이고 싶은 반복 업무", answers.repetitiveTask],
+    ["AI의 도움을 받고 싶은 일", answers.repetitiveTask],
   ];
   return <dl className="divide-y divide-gray-100">
     {rows.map(([label, value]) => <div key={label} className="grid gap-1 py-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] sm:gap-5">

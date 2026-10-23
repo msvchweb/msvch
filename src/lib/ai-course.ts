@@ -8,6 +8,7 @@ export const AI_COURSE_SURVEY_VERSION = "ai-course-v1";
 export const AI_COURSE_PRIVACY_POLICY_VERSION = "ai-course-privacy-v1";
 
 export const USE_CASES = [
+  { value: "study", label: "학업·공부" },
   { value: "work", label: "직장 업무" }, { value: "business", label: "사업·가게 운영" },
   { value: "freelance", label: "프리랜서·개인 작업" }, { value: "daily_life", label: "가정·일상" },
   { value: "church_group", label: "교회·모임 활동" }, { value: "other", label: "기타" },
@@ -35,32 +36,32 @@ export const TOOL_OPTIONS = [
   { value: "other", label: "기타" }, { value: "none", label: "아직 직접 사용한 도구가 없어요" },
 ] as const;
 export const CAPABILITIES = [
-  { value: "prompting", label: "AI에게 목적, 참고 자료, 원하는 결과 형식을 함께 설명할 수 있어요." },
-  { value: "files", label: "문서나 표 파일을 주고 필요한 결과물을 만들어 본 적이 있어요." },
-  { value: "verification", label: "AI 결과를 원자료와 비교하고, 잘못된 부분을 구체적으로 수정 요청할 수 있어요." },
-  { value: "instructions", label: "프로젝트나 지침을 설정해 다음 작업에도 같은 기준을 사용할 수 있어요." },
-  { value: "integrations", label: "플러그인이나 외부 앱을 연결해 그곳의 자료를 작업에 활용해 봤어요." },
-  { value: "skills", label: "반복할 작업을 스킬로 저장하거나, 준비된 스킬을 실행해 봤어요." },
-  { value: "scheduling", label: "AI 작업을 예약하고 실제 실행 결과를 확인해 봤어요." },
-  { value: "execution_location", label: "작업이 내 컴퓨터에서 실행되는지 클라우드에서 실행되는지, 결과 파일이 어디 있는지 확인할 수 있어요." },
-  { value: "remote", label: "휴대폰을 내 컴퓨터에 원격 연결해 AI 작업을 이어가 봤어요." },
+  { value: "prompting", label: "AI에게 원하는 일을 설명하고, 답을 보고 다시 요청할 수 있어요." },
+  { value: "files", label: "문서나 표 파일을 올려 필요한 결과물을 만들어 봤어요." },
+  { value: "verification", label: "AI의 답을 원래 자료와 비교하고, 틀린 부분을 고쳐 달라고 할 수 있어요." },
+  { value: "instructions", label: "내가 원하는 답변 방식이나 작업 규칙을 저장해 봤어요." },
+  { value: "integrations", label: "AI에 다른 앱을 연결해 그 앱의 자료를 사용해 봤어요." },
+  { value: "skills", label: "자주 하는 일을 저장해 두고 같은 방식으로 다시 실행해 봤어요." },
+  { value: "scheduling", label: "AI가 정해진 시간에 작업하도록 예약하고 결과를 확인해 봤어요." },
+  { value: "execution_location", label: "작업이 어디서 실행되고, 결과 파일이 어디 저장됐는지 확인할 수 있어요." },
+  { value: "remote", label: "휴대폰으로 내 컴퓨터에 연결해 AI 작업을 이어가 봤어요." },
 ] as const;
 export const EXPERIENCE_OPTIONS = [
-  { value: "new", label: "처음 접해요" }, { value: "aware", label: "무엇인지는 알지만 해본 적은 없어요" },
-  { value: "guided", label: "안내를 보며 해본 적이 있어요" }, { value: "independent", label: "혼자서 해본 적이 있어요" },
+  { value: "new", label: "처음이에요" }, { value: "aware", label: "들어봤지만 해보진 않았어요" },
+  { value: "guided", label: "안내를 보며 따라 해봤어요" }, { value: "independent", label: "혼자 해봤어요" },
 ] as const;
 export const WEBSITE_OPTIONS = [
   { value: "none", label: "만들어 본 적이 없어요" },
   { value: "builder", label: "앱 제작 도구로 내용을 입력하거나 수정해 봤어요" },
   { value: "ai_local", label: "AI로 앱을 만들어 봤지만 인터넷에 배포하지는 못했어요" },
-  { value: "deployed", label: "GitHub·Vercel 등을 이용해 배포하고 수정해 본 적이 있어요" },
+  { value: "deployed", label: "앱을 인터넷에 공개하고 고쳐본 적이 있어요" },
   { value: "other", label: "위 선택지로 설명하기 어려워요" },
 ] as const;
 export const LEARNING_GOALS = [
-  { value: "documents", label: "내 자료로 문서와 업무 정리하기" },
-  { value: "instructions", label: "내 기준에 맞는 프로젝트와 지침 만들기" },
-  { value: "integrations", label: "플러그인·외부 앱 연결해서 쓰기" },
-  { value: "automation", label: "반복 업무를 스킬과 예약으로 처리하기" },
+  { value: "documents", label: "공부·일상에 필요한 자료 정리하기" },
+  { value: "instructions", label: "AI가 내게 맞게 답하도록 설정하기" },
+  { value: "integrations", label: "다른 앱의 자료를 가져와 활용하기" },
+  { value: "automation", label: "자주 하는 일을 AI로 줄이기" },
   { value: "remote", label: "휴대폰에서 내 컴퓨터의 작업 이어가기" },
   { value: "website", label: "내 앱 만들고 직접 고치기" },
   { value: "explore", label: "어떤 활용이 나에게 맞는지 찾아보기" },
@@ -102,7 +103,7 @@ export const SurveyAnswersSchema = z.strictObject({
   ...experienceFields,
   websiteExperience: choice(WEBSITE_OPTIONS), websiteExperienceOther: optionalText(200),
   learningGoals: multiple(LEARNING_GOALS, 2),
-  repetitiveTask: z.string().trim().min(1, "줄이고 싶은 반복 업무를 적어 주세요.").max(500, "500자 이내로 작성해 주세요."),
+  repetitiveTask: z.string().trim().min(1, "AI의 도움을 받고 싶은 일을 적어 주세요.").max(500, "500자 이내로 작성해 주세요."),
 }).superRefine(refineExperience).transform(({ toolsOther, websiteExperienceOther, ...data }) => ({
   ...data, ...(data.tools.includes("other") ? { toolsOther } : {}),
   ...(data.websiteExperience === "other" && websiteExperienceOther ? { websiteExperienceOther } : {}),
