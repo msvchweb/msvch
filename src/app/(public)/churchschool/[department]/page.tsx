@@ -118,8 +118,8 @@ const departments: Record<string, DepartmentInfo> = {
     title: "청년부",
     description: "믿음 위에 미래를 세우는 청년 공동체",
     target: "청년",
-    time: "매월 첫째주일 14:30",
-    location: "본관 2층",
+    time: "매월 첫째주일 14:00",
+    location: "교육관 3층",
     motto: "복음의 열매 안에서 함께 지어져 가는 우리",
     verse: "너희도 성령 안에서 하나님이 거하실 처소가 되기 위하여 그리스도 예수 안에서 함께 지어져 가느니라 (에베소서 2:22)",
     goals: [
@@ -133,7 +133,7 @@ const departments: Record<string, DepartmentInfo> = {
       { role: "부감", name: "박영호 집사" },
       { role: "회장", name: "유세인 청년" },
       { role: "총무", name: "종승연 청년" },
-      { role: "서기", name: "최지안 청년" },
+      { role: "서기", name: "최지원 청년" },
     ],
     prayers: [
       "성령의 능력 안에서 함께 지어져 가는 청년부 되도록.",

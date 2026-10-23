@@ -43,7 +43,9 @@ export async function getGalleryAlbums(options: GetAlbumsOptions = {}): Promise<
       .from("gallery_images")
       .select("*")
       .in("album_id", albumIds)
-      .order("sort_order", { ascending: true });
+      // 최근 올린 사진이 앞에 오도록 역순 정렬
+      .order("sort_order", { ascending: false })
+      .order("created_at", { ascending: false });
 
     for (const img of (images ?? []) as GalleryImage[]) {
       if (!imagesByAlbum[img.album_id]) imagesByAlbum[img.album_id] = [];

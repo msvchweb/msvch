@@ -195,7 +195,9 @@ export default function AdminGalleryPage() {
       .from("gallery_images")
       .select("*")
       .eq("album_id", albumId)
-      .order("sort_order", { ascending: true });
+      // 최근 올린 사진이 앞에 오도록 역순 정렬 (공개 갤러리와 동일)
+      .order("sort_order", { ascending: false })
+      .order("created_at", { ascending: false });
     return (data ?? []) as GalleryImage[];
   }
 
@@ -345,9 +347,9 @@ export default function AdminGalleryPage() {
     const existingCount = imageCounts[albumId] ?? album?.images.length ?? 0;
     const failures: string[] = [...preflightFailures];
     let successCount = 0;
-    let firstUploadedUrl: string | null = null;
-    // 썸네일 생성용 — 업로드에 성공한 첫 파일(압축 후)을 들고 있는다.
-    let firstUploadedFile: File | null = null;
+    let lastUploadedUrl: string | null = null;
+    // 썸네일 생성용 — 업로드에 성공한 마지막 파일(압축 후)을 들고 있는다.
+    let lastUploadedFile: File | null = null;
 
     for (let i = 0; i < validFiles.length; i++) {
       const original = validFiles[i];
@@ -397,21 +399,28 @@ export default function AdminGalleryPage() {
         continue;
       }
 
-      if (firstUploadedUrl === null) {
-        firstUploadedUrl = uploaded.publicUrl;
-        firstUploadedFile = toUpload;
-      }
+      lastUploadedUrl = uploaded.publicUrl;
+      lastUploadedFile = toUpload;
       successCount++;
       setUploadProgress({ done: i + 1, total: validFiles.length });
     }
 
-    // 빈 앨범에 처음 업로드된 사진이 있으면 thumbnail 설정
-    if (existingCount === 0 && firstUploadedFile) {
-      const thumbUrl = await uploadAlbumThumbnail(albumId, firstUploadedFile);
-      await supabase
+    // 썸네일은 항상 가장 최근 사진으로 — 앨범을 열었을 때 맨 앞에 오는 사진과 맞춘다.
+    if (lastUploadedFile && lastUploadedUrl) {
+      const thumbnailUrl =
+        (await uploadAlbumThumbnail(albumId, lastUploadedFile)) ?? lastUploadedUrl;
+      const { error: thumbError } = await supabase
         .from("gallery_albums")
-        .update({ thumbnail_url: thumbUrl ?? firstUploadedUrl })
+        .update({ thumbnail_url: thumbnailUrl })
         .eq("id", albumId);
+      if (thumbError) {
+        console.error("[gallery upload] 썸네일 갱신 실패", thumbError);
+      } else {
+        // 목록 전체를 다시 불러오면 더보기로 펼친 페이지가 접히므로 in-place 갱신
+        setAlbums((prev) =>
+          prev.map((a) => (a.id === albumId ? { ...a, thumbnail_url: thumbnailUrl } : a)),
+        );
+      }
     }
 
     setUploading(false);
@@ -445,10 +454,6 @@ export default function AdminGalleryPage() {
         ...prev,
         [albumId]: (prev[albumId] ?? 0) + successCount,
       }));
-    }
-    // 썸네일이 새로 설정된 경우 앨범 목록도 다시 로드
-    if (existingCount === 0 && firstUploadedUrl) {
-      loadAlbums();
     }
   }
 

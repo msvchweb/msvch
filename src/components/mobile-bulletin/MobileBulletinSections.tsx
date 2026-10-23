@@ -1,22 +1,12 @@
 import Link from "next/link";
 import type { OfferingAccountValue } from "@/types/bulletin-master";
-import type { GuideCommitteeRow, NewsItem } from "@/types/notice";
+import type { GuideCommitteeRow } from "@/types/notice";
+import { SectionHeading } from "./SectionHeading";
 
 const PART_LABELS = ["1부", "2부", "3부"];
 
 function nonEmpty(value: string): boolean {
   return value.trim().length > 0;
-}
-
-function SectionHeading({ children, sub }: { children: React.ReactNode; sub?: string }) {
-  return (
-    <div className="mb-3 flex items-baseline gap-2 px-0.5">
-      <h2 className="text-[17px] font-extrabold tracking-[-0.035em] text-[var(--bt-ink)]">
-        {children}
-      </h2>
-      {sub && <span className="text-xs text-[var(--bt-faint)]">{sub}</span>}
-    </div>
-  );
 }
 
 /** 분류 라벨 왼쪽 + 부별 명단 오른쪽. 핸드오프의 Committee 행 형태. */
@@ -130,50 +120,6 @@ export function PrayerTopics({ prayers }: { prayers: string[] }): React.ReactNod
           </li>
         ))}
       </ol>
-    </section>
-  );
-}
-
-export function ChurchNews({ news }: { news: NewsItem[] }): React.ReactNode {
-  const visibleNews = news
-    .map((item) => ({
-      title: item.title.trim(),
-      items: item.items.map((line) => line.trim()).filter(nonEmpty),
-    }))
-    .filter((item) => nonEmpty(item.title) && item.items.length > 0);
-
-  if (visibleNews.length === 0) return null;
-
-  return (
-    <section className="scroll-mt-20 snap-start bg-[var(--bt-bg)] px-4 pb-10 transition-colors duration-300 motion-reduce:transition-none sm:px-6">
-      <SectionHeading>교회소식</SectionHeading>
-
-      <div className="flex flex-col gap-2.5">
-        {visibleNews.map((item, index) => (
-          <details
-            key={`${item.title}-${index}`}
-            open={index === 0}
-            className="group rounded-[15px] border border-[var(--bt-line)] bg-[var(--bt-card)] px-4"
-          >
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 py-3.5 text-[14.5px] font-extrabold tracking-[-0.025em] text-[var(--bt-ink)] marker:content-none">
-              <span className="min-w-0 break-words">{item.title}</span>
-              <span
-                aria-hidden="true"
-                className="shrink-0 text-[var(--bt-acc)] transition-transform group-open:rotate-45 motion-reduce:transition-none"
-              >
-                +
-              </span>
-            </summary>
-            <ul className="flex flex-col gap-2 pb-4 pl-4 text-[13px] leading-[1.65] tracking-[-0.01em] text-[var(--bt-sub)]">
-              {item.items.map((line, lineIndex) => (
-                <li key={`${line}-${lineIndex}`} className="list-disc whitespace-pre-wrap break-words">
-                  {line}
-                </li>
-              ))}
-            </ul>
-          </details>
-        ))}
-      </div>
     </section>
   );
 }
