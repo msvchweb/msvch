@@ -3,6 +3,12 @@ import { AiCourseSubmissionSchema, parseAiCourseSubmission } from "./ai-course";
 import { aiCourseFixture } from "@/test/ai-course-fixture";
 
 describe("AI course submission contract", () => {
+  it("accepts study alongside existing use cases without changing stored keys", () => {
+    const input = aiCourseFixture();
+    const parsed = parseAiCourseSubmission({ ...input, applicationContext: { ...input.applicationContext, useCases: ["work", "study"] } });
+    expect(parsed.applicationContext.useCases).toEqual(["study", "work"]);
+    expect(parsed.surveyVersion).toBe(input.surveyVersion);
+  });
   it.each(["01012345678", "+82 10 1234 5678", "010-1234-5678"])("normalizes %s and accepts all-new experience", (phone) => {
     expect(parseAiCourseSubmission({ ...aiCourseFixture(), phone }).phone).toBe("010-1234-5678");
   });

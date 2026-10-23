@@ -15,12 +15,12 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
-it("highlights the current stage immediately after motion resumes", () => {
-  render(<AiCourseMotionProvider><AiCourseRoadmap>{Array.from({ length: 6 }, (_, index) => <article key={index}>단계 {index + 1}</article>)}</AiCourseRoadmap></AiCourseMotionProvider>);
+it.each([{ count: 3, first: "단계 1", last: "단계 3" }, { count: 6, first: "단계 2", last: "단계 5" }])("highlights the current stage after motion resumes with $count stages", ({ count, first, last }) => {
+  render(<AiCourseMotionProvider><AiCourseRoadmap>{Array.from({ length: count }, (_, index) => <article key={index}>단계 {index + 1}</article>)}</AiCourseRoadmap></AiCourseMotionProvider>);
   act(() => progress.set(0.2));
-  expect(screen.getByText("단계 2").parentElement).toHaveAttribute("data-active", "true");
+  expect(screen.getByText(first).parentElement).toHaveAttribute("data-active", "true");
   act(() => { reduced = true; listeners.forEach((listener) => listener()); });
   act(() => progress.set(0.8));
   act(() => { reduced = false; listeners.forEach((listener) => listener()); });
-  expect(screen.getByText("단계 5").parentElement).toHaveAttribute("data-active", "true");
+  expect(screen.getByText(last).parentElement).toHaveAttribute("data-active", "true");
 });
