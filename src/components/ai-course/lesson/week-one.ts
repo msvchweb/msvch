@@ -1,19 +1,19 @@
 import type { LessonSlide } from "./LessonDeck";
 
 export const weekOneSlides: readonly LessonSlide[] = [
-  { title: "질문에서 한 걸음 더.\n내 자료로 결과물 만들기", phase: "도입", time: "0–5분", tone: "dark" },
-  { title: "오늘, 이 두 가지를\n가져갑니다.", phase: "도입", time: "0–5분" },
-  { title: "화면에서는\n네 곳만 찾으세요.", phase: "기본 조작", time: "5–10분" },
-  { title: "원하는 결과의\n기준을 알려주세요.", phase: "요청하는 방법", time: "10–12분" },
-  { title: "먼저,\n자료 두 개.", phase: "시연", time: "12–16분" },
-  { title: "이렇게\n부탁해 봅니다.", phase: "시연", time: "12–16분" },
-  { title: "이제,\n직접 해볼 차례.", phase: "실습 1", time: "16–28분" },
-  { title: "그럴듯한 답도\n원문과 비교하세요.", phase: "원문 대조", time: "28–38분", tone: "dark" },
-  { title: "자료가 다르면,\n다르다고 남깁니다.", phase: "함께 확인", time: "28–38분" },
-  { title: "새 정보는\n같은 대화에.", phase: "실습 2", time: "38–49분" },
-  { title: "고친 뒤에도,\n다시 확인합니다.", phase: "결과 확인", time: "38–49분" },
-  { title: "저장은,\n다시 열어보는 것까지.", phase: "저장", time: "49–55분" },
-  { title: "이제, 작은 일 하나를\n맡길 수 있습니다.", phase: "마무리", time: "55–60분", tone: "dark" },
+  { title: "AI로 준비표와 안내문 만들기", phase: "도입", time: "0–5분", tone: "dark" },
+  { title: "오늘 만들 결과물", phase: "도입", time: "0–5분" },
+  { title: "기본 사용법", phase: "기본 조작", time: "5–10분" },
+  { title: "요청할 때 알려줄 내용", phase: "요청하는 방법", time: "10–12분" },
+  { title: "실습 자료 내려받기", phase: "시연", time: "12–16분" },
+  { title: "준비표 작성 요청하기", phase: "시연", time: "12–16분" },
+  { title: "실습 1: 준비표 만들기", phase: "실습 1", time: "16–28분" },
+  { title: "원문과 결과 비교하기", phase: "원문 대조", time: "28–38분", tone: "dark" },
+  { title: "확인해야 할 내용", phase: "함께 확인", time: "28–38분" },
+  { title: "추가 정보로 수정하기", phase: "실습 2", time: "38–49분" },
+  { title: "수정한 결과 확인하기", phase: "결과 확인", time: "38–49분" },
+  { title: "결과 저장하기", phase: "저장", time: "49–55분" },
+  { title: "오늘 배운 내용과 과제", phase: "마무리", time: "55–60분", tone: "dark" },
 ];
 
 export const lessonPrompts = {
