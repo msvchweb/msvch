@@ -19,8 +19,8 @@ export function RootFurniture({
 }: RootFurnitureProps) {
   const pathname = usePathname();
   
-  // 가입 페이지(/regist) 및 링크 모음(/links 하위 포함)에서는 모든 글로벌 UI 요소를 숨김
-  const isStandalone = pathname === "/regist" || pathname.startsWith("/links");
+  // 별도 화면으로 쓰는 가입·링크·강의 발표 페이지에서는 글로벌 UI를 숨김
+  const isStandalone = pathname === "/regist" || pathname.startsWith("/links") || pathname === "/ai-course/week-1";
 
   if (isStandalone) {
     return <main className="flex-1">{children}</main>;
