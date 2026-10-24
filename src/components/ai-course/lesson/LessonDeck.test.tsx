@@ -13,9 +13,69 @@ function showDeck() {
   return render(<LessonDeck slides={slides}>{slides.map(({ title }, index) => <div key={title}><h1 id={`lesson-title-${index}`}>{title}</h1>{index === 0 && <textarea aria-label="실습 메모" />}</div>)}</LessonDeck>);
 }
 afterEach(() => {
-  cleanup(); window.history.replaceState(null, "", "/"); vi.restoreAllMocks();
+  cleanup(); window.history.replaceState(null, "", "/"); vi.restoreAllMocks(); vi.unstubAllGlobals();
   if (fullscreenDescriptor) Object.defineProperty(HTMLElement.prototype, "requestFullscreen", fullscreenDescriptor);
   else Reflect.deleteProperty(HTMLElement.prototype, "requestFullscreen");
+});
+
+function motionPreference(reduced = false) {
+  const listeners = new Set<() => void>();
+  const query = {
+    get matches() { return reduced; },
+    addEventListener: (_: string, listener: () => void) => listeners.add(listener),
+    removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
+  };
+  vi.stubGlobal("matchMedia", () => query);
+  return (value: boolean) => act(() => { reduced = value; listeners.forEach(listener => listener()); });
+}
+
+describe("LessonDeck motion", () => {
+  it("lets the presenter stop motion across slides and resume it without navigating", () => {
+    motionPreference();
+    const { container } = showDeck();
+    const deck = container.firstElementChild;
+    expect(deck).toHaveAttribute("data-lesson-motion", "animated");
+    fireEvent.click(screen.getByRole("button", { name: "모션 멈추기" }));
+    expect(deck).toHaveAttribute("data-lesson-motion", "static");
+    fireEvent.click(screen.getByRole("button", { name: "다음 슬라이드" }));
+    expect(deck).toHaveAttribute("data-lesson-motion", "static");
+    expect(screen.getByRole("heading", { name: "두 번째" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "모션 재생" }));
+    expect(deck).toHaveAttribute("data-lesson-motion", "animated");
+    expect(window.location.hash).toBe("#slide-2");
+  });
+
+  it("honors live reduced-motion changes without losing the presenter's pause choice", () => {
+    const changePreference = motionPreference(true);
+    const { container } = showDeck();
+    const deck = container.firstElementChild;
+    expect(deck).toHaveAttribute("data-lesson-motion", "static");
+    expect(screen.getByRole("button", { name: "동작 줄이기 적용 중" })).toBeDisabled();
+    changePreference(false);
+    expect(deck).toHaveAttribute("data-lesson-motion", "animated");
+    fireEvent.click(screen.getByRole("button", { name: "모션 멈추기" }));
+    changePreference(true);
+    changePreference(false);
+    expect(deck).toHaveAttribute("data-lesson-motion", "static");
+    expect(screen.getByRole("button", { name: "모션 재생" })).toBeEnabled();
+  });
+
+  it("stops in a hidden document and restores motion only when not manually paused", () => {
+    motionPreference();
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("visible");
+    const { container } = showDeck();
+    const deck = container.firstElementChild;
+    const setVisible = (value: DocumentVisibilityState) => act(() => {
+      visibility.mockReturnValue(value); document.dispatchEvent(new Event("visibilitychange"));
+    });
+    setVisible("hidden");
+    expect(deck).toHaveAttribute("data-lesson-motion", "static");
+    setVisible("visible");
+    expect(deck).toHaveAttribute("data-lesson-motion", "animated");
+    fireEvent.click(screen.getByRole("button", { name: "모션 멈추기" }));
+    setVisible("hidden"); setVisible("visible");
+    expect(deck).toHaveAttribute("data-lesson-motion", "static");
+  });
 });
 describe("LessonDeck", () => {
   it("moves one slide at a time without wrapping and keeps a reloadable URL", () => {

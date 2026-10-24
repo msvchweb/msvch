@@ -1,16 +1,33 @@
 "use client";
 
-import { Children, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Children, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Expand, Minimize, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Expand, Minimize, Pause, Play, Sparkles } from "lucide-react";
 import styles from "./lesson.module.css";
 
 export type LessonSlide = { title: string; phase: string; time: string; tone?: "dark" };
+
+function subscribeMotion(notify: () => void) {
+  const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  query?.addEventListener("change", notify);
+  document.addEventListener("visibilitychange", notify);
+  return () => { query?.removeEventListener("change", notify); document.removeEventListener("visibilitychange", notify); };
+}
+function readMotionEnvironment() {
+  const query = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+  if (!query) return "static";
+  if (query.matches) return "reduced";
+  return document.visibilityState === "hidden" ? "static" : "animated";
+}
+const serverMotionEnvironment = () => "static";
 
 export default function LessonDeck({ slides, children }: { slides: readonly LessonSlide[]; children: ReactNode }) {
   const [current, setCurrent] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [message, setMessage] = useState("");
+  const [motionPaused, setMotionPaused] = useState(false);
+  const motionEnvironment = useSyncExternalStore(subscribeMotion, readMotionEnvironment, serverMotionEnvironment);
+  const reducedMotion = motionEnvironment === "reduced";
   const root = useRef<HTMLDivElement>(null);
   const viewport = useRef<HTMLDivElement>(null);
   const count = slides.length;
@@ -67,7 +84,7 @@ export default function LessonDeck({ slides, children }: { slides: readonly Less
     }
   }
 
-  return <div ref={root} className={`${styles.deck} ${slides[current].tone === "dark" ? styles.dark : ""}`}>
+  return <div ref={root} data-lesson-motion={!motionPaused && motionEnvironment === "animated" ? "animated" : "static"} className={`${styles.deck} ${slides[current].tone === "dark" ? styles.dark : ""}`}>
     <header className={styles.toolbar}>
       <Link href="/ai-course" className={styles.brand} aria-label="AI 강의 소개로 돌아가기"><Sparkles size={21} aria-hidden /><span>명성비전교회 <b>AI 활용 · 1주차</b></span></Link>
       <div className={styles.tools}>
@@ -75,6 +92,9 @@ export default function LessonDeck({ slides, children }: { slides: readonly Less
         <select id="lesson-slide" value={current} onChange={event => move(Number(event.target.value))} className={styles.jump}>
           {slides.map((slide, index) => <option key={slide.title} value={index}>{String(index + 1).padStart(2, "0")} {slide.title.replace(/\n/g, " ")}</option>)}
         </select>
+        <button type="button" className={styles.motionToggle} disabled={reducedMotion} aria-label={reducedMotion ? "동작 줄이기 적용 중" : motionPaused ? "모션 재생" : "모션 멈추기"} aria-pressed={motionPaused || reducedMotion} onClick={() => setMotionPaused(value => !value)}>
+          {motionPaused || reducedMotion ? <Play size={17} aria-hidden /> : <Pause size={17} aria-hidden />}<span>{reducedMotion ? "동작 줄이기" : motionPaused ? "모션 재생" : "모션 멈추기"}</span>
+        </button>
         <button type="button" className={styles.fullscreen} aria-label={fullscreen ? "전체화면 종료" : "전체화면"} aria-pressed={fullscreen} onClick={toggleFullscreen}>{fullscreen ? <Minimize size={18} aria-hidden /> : <Expand size={18} aria-hidden />}<span>전체화면</span></button>
       </div>
     </header>

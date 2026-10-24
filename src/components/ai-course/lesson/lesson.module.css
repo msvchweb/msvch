@@ -1,5 +1,6 @@
 .deck { --paper:#f6f4ee; --ink:#17213a; --muted:#646b79; --line:#dcdedc; --accent:#a77b23; --soft:#ece9de; background:var(--paper); color:var(--ink); height:100svh; height:100dvh; display:grid; grid-template-rows:auto minmax(0,1fr) auto; position:relative; isolation:isolate; }
 .dark { --paper:#131e34; --ink:#f9f7f0; --muted:#aeb9cb; --line:#ffffff25; --accent:#e7c574; --soft:#ffffff0a; }
+.dark { --motion-cyan:#76ded8; --motion-art-opacity:.72; }
 .deck:fullscreen { width:100%; height:100%; }
 .toolbar { display:flex; align-items:center; justify-content:space-between; gap:20px; min-height:78px; padding:16px clamp(20px,4vw,64px); border-bottom:1px solid var(--line); }
 .brand { display:flex; gap:12px; align-items:center; font-size:12px; line-height:1.5; color:var(--muted); }
@@ -87,6 +88,41 @@
 .progress span { display:block; height:100%; background:var(--accent); }
 .feedback { position:absolute; z-index:2; bottom:108px; left:20px; right:20px; max-width:640px; margin:auto; padding:16px 20px; background:var(--ink); color:var(--paper); border-radius:10px; font-size:14px; box-shadow:0 4px 30px #0002; }
 .srOnly { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.motionToggle { display:flex; align-items:center; gap:7px; min-height:38px; padding:8px; color:var(--muted); font-size:12px; cursor:pointer; white-space:nowrap; }
+.motionToggle:disabled { cursor:default; }
+.motionToggle svg { color:var(--accent); flex-shrink:0; }
+.slide { position:relative; isolation:isolate; }
+.canvas > :not([data-lesson-scene]) { position:relative; z-index:1; }
+.outcome,.file,.criterion,.finding { position:relative; }
+.outcome::after,.file::after,.criterion::after,.finding::after { content:""; position:absolute; top:-1px; left:0; width:25%; height:2px; background:linear-gradient(90deg,transparent,var(--accent),transparent); pointer-events:none; animation:lessonLine 10s ease-in-out infinite; }
+.file::after { top:0; left:12%; width:20%; }
+.slide:not([hidden]) .eyebrow { animation:lessonEnter .7s ease-out both; }
+.slide:not([hidden]) .title { animation:lessonEnter .85s .08s ease-out both; }
+.slide:not([hidden]) .canvas > .lead { animation:lessonEnter .85s .18s ease-out both; }
+.slide:not([hidden]) .content { animation:lessonEnter .9s .24s ease-out both; }
+.slide:not([hidden]) .twoColumns > *,.slide:not([hidden]) .criterion,.slide:not([hidden]) .finding,.slide:not([hidden]) .steps li,.slide:not([hidden]) .checkList li { animation:lessonEnter .85s .3s ease-out both; }
+.slide:not([hidden]) .twoColumns > :nth-child(2),.slide:not([hidden]) .criterion:nth-child(2),.slide:not([hidden]) .finding:nth-child(2),.slide:not([hidden]) .steps li:nth-child(2),.slide:not([hidden]) .checkList li:nth-child(2) { animation-delay:.4s; }
+.slide:not([hidden]) .criterion:nth-child(3),.slide:not([hidden]) .finding:nth-child(3),.slide:not([hidden]) .steps li:nth-child(3),.slide:not([hidden]) .checkList li:nth-child(3) { animation-delay:.5s; }
+.slide:not([hidden]) .criterion:nth-child(4),.slide:not([hidden]) .steps li:nth-child(4),.slide:not([hidden]) .checkList li:nth-child(4) { animation-delay:.6s; }
+.heroFlow span { animation:lessonFlow 13s ease-in-out infinite; }
+.heroFlow span:nth-of-type(2) { animation-delay:1.6s; }
+.heroFlow span:nth-of-type(3) { animation-delay:3.2s; }
+.heroFlow span:nth-of-type(4) { animation-delay:4.8s; }
+.heroFlow span:nth-of-type(5) { animation-delay:6.4s; }
+.heroFlow > svg { animation:lessonArrow 5s ease-in-out infinite; }
+.comparison > svg { animation:lessonCompare 7s ease-in-out infinite; }
+.file > svg,.criterion > svg,.outcome > svg { animation:lessonIcon 9s ease-in-out infinite; }
+.progress span { transition:width .65s cubic-bezier(.2,.8,.2,1); }
+.action { transition:background-color .2s,color .2s; }
+.action:hover { background:var(--soft); }
+@keyframes lessonEnter { from { opacity:0; transform:translateY(18px); } to { opacity:1; transform:translateY(0); } }
+@keyframes lessonLine { 0%,100% { transform:translateX(0); opacity:.3; } 50% { transform:translateX(270%); opacity:1; } }
+@keyframes lessonFlow { 0%,25%,100% { color:var(--ink); text-shadow:none; } 10% { color:var(--accent); text-shadow:0 0 22px #a77b2350; } }
+@keyframes lessonArrow { 0%,100% { transform:translateX(0); opacity:.5; } 50% { transform:translateX(4px); opacity:1; } }
+@keyframes lessonCompare { 0%,100% { transform:translateX(-4px); } 50% { transform:translateX(4px); } }
+@keyframes lessonIcon { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-4px); } }
+.deck[data-lesson-motion="static"] *,.deck[data-lesson-motion="static"] *::before,.deck[data-lesson-motion="static"] *::after { animation:none !important; transition:none !important; }
+@media(prefers-reduced-motion:reduce) { .deck *,.deck *::before,.deck *::after { animation:none !important; transition:none !important; } }
 @media(min-width:900px) and (max-height:1000px) {
   .canvas { padding-top:24px; padding-bottom:24px; }
   .eyebrow { margin-bottom:12px; }
@@ -115,3 +151,4 @@
 }
 @media(max-width:760px) { .fourGrid { grid-template-columns:1fr 1fr; }.twoColumns,.exercise { grid-template-columns:1fr; gap:28px; }.threeColumns { grid-template-columns:1fr; gap:24px; }.toolbar { min-height:64px; padding:12px 18px; gap:10px; }.brand { font-size:10px; gap:8px; }.brand b { font-size:12px; }.jump { width:100px; min-width:100px; max-width:100px; padding-left:8px; }.fullscreen { padding:8px; }.fullscreen span { display:none; }.tools { gap:4px; }.controls { gap:8px; padding:12px 14px 16px; }.previous,.next { padding:8px 10px; gap:6px; }.phase { display:none; }.position { gap:0; }.canvas { padding:28px 24px 40px; }.comparison { gap:28px; }.heroFlow { gap:10px; margin-top:32px; }.heroHint { margin-top:28px; }.file { padding:24px; }.file p { font-size:16px; }.promptExcerpt { padding-left:18px; }.checkList { gap:22px; }.caption { font-size:12px; } }
 @media(max-width:360px) { .toolbar { padding:12px; }.brand svg { display:none; }.canvas { padding-left:20px; padding-right:20px; }.tools { gap:0; }.jump { width:94px; min-width:94px; }.fourGrid { gap:20px; }.title { font-size:32px; }.hero .title { font-size:36px; } }
+@media(max-width:760px) { .motionToggle { padding:8px; }.motionToggle span { display:none; } }

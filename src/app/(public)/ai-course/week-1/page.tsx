@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ArrowRight, ArrowLeftRight, Check, Clock3, Download, FileText, FolderOpen, ListChecks, MessageSquare, Paperclip, ShieldCheck, Table2 } from "lucide-react";
 import LessonDeck from "@/components/ai-course/lesson/LessonDeck";
 import CopyLessonPrompt from "@/components/ai-course/lesson/CopyLessonPrompt";
+import LessonMotion from "@/components/ai-course/lesson/LessonMotion";
 import { lessonNotice, lessonPrompts, weekOneSlides } from "@/components/ai-course/lesson/week-one";
 import styles from "@/components/ai-course/lesson/lesson.module.css";
 
@@ -16,6 +17,7 @@ const materials = "/ai-course/week-1/materials";
 
 function Slide({ index, children, lead, hero = false }: { index: number; children: ReactNode; lead?: string; hero?: boolean }) {
   return <div className={`${styles.canvas} ${hero ? styles.hero : ""}`}>
+    <LessonMotion index={index} />
     <p className={styles.eyebrow}>{index === 0 ? "AI 활용 1주차" : weekOneSlides[index].phase}</p>
     <h1 id={`lesson-title-${index}`} className={styles.title}>{weekOneSlides[index].title}</h1>
     {lead && <p className={styles.lead}>{lead}</p>}

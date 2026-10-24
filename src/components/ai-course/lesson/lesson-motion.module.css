@@ -1,0 +1,61 @@
+.scene { --cyan:var(--motion-cyan,#478f99); position:absolute; inset:0; z-index:0; overflow:hidden; pointer-events:none; contain:paint; }
+.wash { position:absolute; inset:-15%; opacity:.55; background:radial-gradient(ellipse at 84% 78%,#77c9c532,transparent 43%),radial-gradient(ellipse at 15% 10%,#bca5721e,transparent 40%),radial-gradient(ellipse at 94% 4%,#7998e426,transparent 36%); animation:aurora 16s ease-in-out infinite alternate; }
+.grid { position:absolute; inset:0; background-image:linear-gradient(#7897ad0a 1px,transparent 1px),linear-gradient(90deg,#7897ad0a 1px,transparent 1px); background-size:56px 56px; mask-image:linear-gradient(120deg,transparent 35%,#000 100%); animation:gridDrift 24s linear infinite; }
+.ring { position:absolute; width:430px; aspect-ratio:1; right:-210px; top:-180px; border:1px solid #9eafc82b; border-radius:50%; outline:1px dashed #9eafc825; outline-offset:27px; animation:turn 60s linear infinite; }
+.ring::after { content:""; position:absolute; inset:38px; border:1px solid #9eafc825; border-radius:50%; }
+.drawing { position:absolute; width:clamp(320px,44vw,590px); height:auto; max-height:390px; right:-1%; bottom:-3%; color:var(--accent); opacity:var(--motion-art-opacity,.42); }
+.card { fill:var(--paper); stroke:currentColor; stroke-width:1.8; }
+.rows { stroke:var(--cyan); stroke-dasharray:250; stroke-dashoffset:0; animation:write 9s ease-in-out infinite; }
+.ink { stroke-width:3; }
+.core { fill:var(--accent); fill-opacity:.17; stroke-width:2; }
+.coreHalo { fill:var(--cyan); fill-opacity:.13; stroke:var(--cyan); stroke-opacity:.3; animation:breathe 8s ease-in-out infinite; }
+.spin { transform-box:fill-box; transform-origin:center; animation:turn 28s linear infinite; }
+.stream { stroke:var(--cyan); stroke-width:2.2; stroke-dasharray:6 12; animation:flow 8s linear infinite; }
+.float { animation:float 9s ease-in-out infinite; }
+.floatLate { animation:float 10s -4s ease-in-out infinite; }
+.packet,.packetLate { fill:var(--cyan); stroke:none; animation:packet 8s ease-in-out infinite; }
+.packetLate { animation-delay:-4s; }
+.badge { fill:var(--paper); stroke:var(--cyan); stroke-width:2; }
+.mint { color:var(--cyan); }
+.check { stroke:var(--cyan); stroke-width:4; stroke-dasharray:180; stroke-dashoffset:0; animation:check 10s ease-in-out infinite; }
+.bubble,.input { fill:var(--cyan); fill-opacity:.07; stroke:var(--cyan); }
+.cursor { stroke:var(--cyan); stroke-width:3; animation:cursor 3s ease-in-out infinite; }
+.upload { animation:upload 10s ease-in-out infinite; }
+.tray { fill:var(--paper); fill-opacity:.88; stroke-width:2; }
+.arrow { animation:drop 8s ease-in-out infinite; }
+.dial { stroke:var(--cyan); stroke-width:4; stroke-dasharray:600 180; transform-box:fill-box; transform-origin:center; animation:turn 22s linear infinite; }
+.clockHand { animation:turn 18s linear infinite; }
+.pulse { animation:pulse 9s ease-in-out infinite; }
+.pulseLate { animation:pulse 9s -4s ease-in-out infinite; }
+.scan { stroke:var(--cyan); stroke-width:4; animation:scan 10s ease-in-out infinite; }
+.lens { animation:lens 12s ease-in-out infinite; }
+.patch,.patchLate { fill:var(--cyan); fill-opacity:.14; stroke:var(--cyan); animation:patch 10s ease-in-out infinite; }
+.patchLate { animation-delay:-4s; }
+.shield { fill:var(--cyan); fill-opacity:.08; stroke:var(--cyan); stroke-width:3; animation:breathe 9s ease-in-out infinite; }
+.folder { fill:var(--paper); stroke-width:2.5; }
+.fileToFolder { animation:fileSave 11s ease-in-out infinite; }
+.spark,.sparkLate { stroke:var(--cyan); stroke-width:2; animation:spark 10s ease-in-out infinite; }
+.sparkLate { animation-delay:-5s; }
+.particles { position:absolute; inset:0; mask-image:linear-gradient(120deg,transparent 30%,#000); }
+.particles i { position:absolute; width:4px; height:4px; background:var(--accent); border-radius:50%; opacity:.26; animation:particle 12s ease-in-out infinite; }
+@keyframes aurora { to { transform:translate(-3%,3%) scale(1.1); opacity:.85; } }
+@keyframes gridDrift { to { transform:translate(0,56px); } }
+@keyframes turn { to { transform:rotate(360deg); } }
+@keyframes float { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-12px); } }
+@keyframes flow { to { stroke-dashoffset:-144; } }
+@keyframes write { 0%,100% { stroke-dashoffset:0; opacity:1; } 50% { stroke-dashoffset:35; opacity:.45; } }
+@keyframes breathe { 0%,100% { opacity:.65; } 50% { opacity:1; } }
+@keyframes packet { 0%,100% { transform:translateX(-25px); opacity:.4; } 50% { transform:translateX(25px); opacity:1; } }
+@keyframes check { 0%,12% { stroke-dashoffset:180; } 36%,100% { stroke-dashoffset:0; } }
+@keyframes cursor { 0%,100% { opacity:1; } 50% { opacity:.15; } }
+@keyframes upload { 0%,100% { transform:translateY(-8px); } 50% { transform:translateY(26px); } }
+@keyframes drop { 0%,100% { transform:translateY(-8px); opacity:.6; } 50% { transform:translateY(6px); opacity:1; } }
+@keyframes pulse { 0%,100% { opacity:.55; } 50% { opacity:1; } }
+@keyframes scan { 0%,100% { transform:translateY(-54px); opacity:.25; } 50% { transform:translateY(54px); opacity:1; } }
+@keyframes lens { 0%,100% { transform:translate(0,0); } 50% { transform:translate(-36px,-18px); } }
+@keyframes patch { 0%,100% { opacity:.3; } 40%,70% { opacity:1; } }
+@keyframes fileSave { 0%,100% { transform:translateY(-14px); } 50%,70% { transform:translateY(42px); } }
+@keyframes spark { 0%,100% { opacity:.15; } 50% { opacity:1; } }
+@keyframes particle { 0%,100% { transform:translateY(10px); opacity:.1; } 50% { transform:translateY(-24px); opacity:.5; } }
+@media(min-width:1500px) { .drawing { right:3%; bottom:0; opacity:var(--motion-art-opacity,.5); } }
+@media(max-width:760px) { .drawing { width:360px; right:-80px; bottom:0; opacity:.16; }.wash { opacity:.5; }.grid { background-size:42px 42px; }.ring { width:280px; right:-180px; }.particles i:nth-child(even) { display:none; } }
