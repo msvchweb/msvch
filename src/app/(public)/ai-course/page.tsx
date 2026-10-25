@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { ArrowDown, ArrowRight, Check, ChevronDown } from "lucide-react";
+import { ArrowDown, ArrowRight, Check, ChevronDown, MessageCircle } from "lucide-react";
 import { AI_COURSE_URL } from "@/lib/ai-course";
 import { createAiCourseQrDataUrl } from "@/lib/ai-course-qr";
 import AiCourseForm from "./AiCourseForm";
+import AiCourseInquiryForm from "./AiCourseInquiryForm";
 import { getAiCoursePrivacyPolicy } from "./privacy-policy";
 import { AiCourseMotionProvider, AiCourseMotionControls } from "@/components/ai-course/motion/AiCourseMotionProvider";
 import AiCourseWorkbench from "@/components/ai-course/motion/AiCourseWorkbench";
@@ -55,6 +56,7 @@ export default async function AiCoursePage() {
           <div className="mt-7 flex flex-wrap items-center gap-3 text-sm text-slate-200"><span className="rounded-lg bg-white/10 px-3 py-2">주 1회 60분 × 12주</span><span className="inline-flex items-center gap-1.5"><Check size={15} className="text-church-gold" />코딩 경험 없이 시작</span></div>
           <a href="#apply" className={motionStyles.cta + " mt-8 inline-flex min-h-13 items-center justify-center gap-6 rounded-xl bg-church-gold px-7 py-4 font-bold text-[#151d35] transition-colors hover:bg-church-gold-light"}>강의 신청하기 <ArrowRight size={19} /></a>
           <a href="#outcomes" className="ml-0 mt-4 flex items-center gap-2 text-sm text-slate-300 sm:ml-6 sm:inline-flex">어디에 쓸 수 있나요? <ArrowDown size={15} /></a>
+          <a href="#inquiry" className="mt-5 flex w-fit min-h-11 items-center gap-2 text-sm text-slate-200 underline underline-offset-4 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-church-gold"><MessageCircle size={16} aria-hidden />신청 전 문의하기</a>
         </div>
         <div className="relative mx-auto w-full max-w-md"><AiCourseWorkbench /><div className="mt-5 flex justify-center"><AiCourseMotionControls /></div></div>
       </div>
@@ -74,6 +76,12 @@ export default async function AiCoursePage() {
       </details>
     </div></section>
     <section className="mx-auto max-w-3xl px-5 py-16 sm:px-8 sm:py-20"><SectionLabel>시작하기 전에</SectionLabel><h2 className="text-3xl font-bold leading-snug">궁금한 점을 확인하세요.</h2><div className="mt-8 divide-y divide-gray-200">{faq.map(([question, answer]) => <details key={question} className="group py-5"><summary className="flex cursor-pointer list-none items-center justify-between gap-5 text-base font-semibold leading-7 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-700">{question}<ChevronDown size={18} className="shrink-0 text-primary-700 transition-transform group-open:rotate-180" aria-hidden /></summary><p className="mt-4 max-w-2xl text-base leading-8 text-gray-600">{answer}</p></details>)}</div></section>
+    <section id="inquiry" aria-labelledby="inquiry-heading" className="mx-auto max-w-3xl scroll-mt-24 px-5 pb-16 sm:px-8 sm:pb-20">
+      <SectionLabel>신청 전, 편하게 물어보세요</SectionLabel>
+      <h2 id="inquiry-heading" className="text-2xl font-bold leading-snug sm:text-3xl">아직 궁금한 점이 있나요?</h2>
+      <p className="mb-6 mt-3 text-base leading-8 text-gray-600">강의를 신청하지 않아도 문의할 수 있어요. 궁금한 점을 남겨주시면 연락드릴게요.</p>
+      <AiCourseInquiryForm preview={preview} />
+    </section>
     <section id="apply" className="border-t border-gray-200/70 bg-white px-5 py-16 sm:px-8 sm:py-20"><div className="mx-auto max-w-3xl">
       <SectionLabel>나에게 맞는 AI 활용, 지금부터</SectionLabel><h2 className="text-3xl font-bold leading-snug">함께 시작해요.</h2><p className="mb-8 mt-4 text-base leading-8 text-gray-600">현재 경험을 알려주시면 수업 준비에 도움이 됩니다.</p>
       <AiCourseForm privacyPolicy={privacyPolicy} preview={preview} />
