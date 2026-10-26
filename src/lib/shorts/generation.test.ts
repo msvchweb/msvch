@@ -25,7 +25,8 @@ it("rejects malformed input before creating or dispatching anything", async () =
   ).rejects.toThrow();
   expect(d.db.rpc).not.toHaveBeenCalled();
   expect(d.fetch).not.toHaveBeenCalled();
-  expect(hasShortsAccess("staff")).toBe(false);
+  expect(hasShortsAccess("member")).toBe(false);
+  expect(hasShortsAccess("staff")).toBe(true);
   expect(hasShortsAccess("admin")).toBe(true);
 });
 it("records missing configuration and definite dispatch failures on that attempt", async () => {

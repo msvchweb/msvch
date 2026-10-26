@@ -47,8 +47,8 @@ export const ADMIN_ROUTE_PERMISSIONS: ReadonlyArray<RoutePermission> = [
   { prefix: "/admin/myeongbi-prayers", minRole: "admin" },
   { prefix: "/admin/ai-course-applications", minRole: "admin" },
   { prefix: "/admin/sermons", minRole: "admin" },
-  { prefix: "/admin/shorts", minRole: "admin" },
   // staff 이상
+  { prefix: "/admin/shorts", minRole: "staff" },
   { prefix: "/admin/gallery", minRole: "staff" },
   { prefix: "/admin/boards", minRole: "staff" },
   { prefix: "/admin/posters", minRole: "staff" },
