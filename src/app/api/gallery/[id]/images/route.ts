@@ -15,7 +15,9 @@ export async function GET(
     .from("gallery_images")
     .select("*")
     .eq("album_id", id)
-    .order("sort_order", { ascending: true });
+    // 최근 올린 사진이 앞에 오도록 역순 정렬
+    .order("sort_order", { ascending: false })
+    .order("created_at", { ascending: false });
 
   return NextResponse.json((data ?? []) as GalleryImage[]);
 }
