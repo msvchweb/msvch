@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { AuthError } from "@/lib/admin-auth";
 import { createApiClient } from "@/lib/supabase/api";
 export function hasShortsAccess(role?: string | null) {
-  return role === "admin" || role === "master";
+  return role === "staff" || role === "admin" || role === "master";
 }
 export async function requireShortsAdmin(request?: NextRequest) {
   const supabase = await createApiClient(request);
