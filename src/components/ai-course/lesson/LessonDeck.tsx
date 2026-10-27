@@ -2,7 +2,7 @@
 
 import { Children, useCallback, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Expand, Minimize, Pause, Play, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Expand, Minimize, Pause, Play } from "lucide-react";
 import styles from "./lesson.module.css";
 
 export type LessonSlide = { title: string; phase: string; time: string; tone?: "dark" };
@@ -21,7 +21,7 @@ function readMotionEnvironment() {
 }
 const serverMotionEnvironment = () => "static";
 
-export default function LessonDeck({ slides, children }: { slides: readonly LessonSlide[]; children: ReactNode }) {
+export default function LessonDeck({ slides, children, week = 1 }: { slides: readonly LessonSlide[]; children: ReactNode; week?: number }) {
   const [current, setCurrent] = useState(0);
   const [fullscreen, setFullscreen] = useState(false);
   const [message, setMessage] = useState("");
@@ -86,7 +86,7 @@ export default function LessonDeck({ slides, children }: { slides: readonly Less
 
   return <div ref={root} data-lesson-motion={!motionPaused && motionEnvironment === "animated" ? "animated" : "static"} className={`${styles.deck} ${slides[current].tone === "dark" ? styles.dark : ""}`}>
     <header className={styles.toolbar}>
-      <Link href="/ai-course" className={styles.brand} aria-label="AI 강의 소개로 돌아가기"><Sparkles size={21} aria-hidden /><span>명성비전교회 <b>AI 활용 · 1주차</b></span></Link>
+      <Link href="/ai-course/lessons" className={styles.brand} aria-label="챕터 선택으로 돌아가기"><ArrowLeft size={21} aria-hidden /><span>챕터 선택 <b>AI 활용 · {week}주차</b></span></Link>
       <div className={styles.tools}>
         <label className={styles.srOnly} htmlFor="lesson-slide">슬라이드 선택</label>
         <select id="lesson-slide" value={current} onChange={event => move(Number(event.target.value))} className={styles.jump}>
