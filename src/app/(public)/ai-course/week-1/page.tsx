@@ -45,14 +45,14 @@ export default function WeekOneLessonPage() {
       <p className={styles.caption}>버튼 위치는 앱과 계정에 따라 다를 수 있어요. 지금 사용하는 화면에서 함께 찾습니다.</p>
     </Slide>
 
-    <Slide index={3} lead="할 일, 참고 자료, 출력 형식, 주의할 점을 알려줍니다.">
+    <Slide index={3} lead="무엇을 만들고, 어떤 자료를 쓰며, 무엇을 확인할지 알려줍니다.">
       <div className={styles.fourGrid}>
         <div className={styles.criterion}><ListChecks size={28} aria-hidden /><b>할 일</b><p>모임 준비표를 만들어줘.</p></div>
         <div className={styles.criterion}><Paperclip size={28} aria-hidden /><b>참고 자료</b><p>첨부한 메모와 현황표를 사용해줘.</p></div>
         <div className={styles.criterion}><Table2 size={28} aria-hidden /><b>출력 형식</b><p>담당자와 기한을 표로 정리해줘.</p></div>
-        <div className={styles.criterion}><ShieldCheck size={28} aria-hidden /><b>주의할 점</b><p>모르는 내용은 추측하지 마.</p></div>
+        <div className={styles.criterion}><ShieldCheck size={28} aria-hidden /><b>확인 기준</b><p>이름·날짜·인원을 원문과 맞춰줘.</p></div>
       </div>
-      <p className={styles.caption}>네 가지를 항상 모두 채워야 하는 공식은 아닙니다. 결과에 필요한 것만 알려주세요.</p>
+      <p className={styles.caption}>없는 정보는 ‘확인 필요’로 표시합니다. 결과에 필요한 조건만 알려주세요.</p>
     </Slide>
 
     <Slide index={4} lead="가상 모임의 메모와 현황표입니다. 두 파일을 내려받으세요.">
