@@ -15,7 +15,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const lesson = getCourseLesson(week);
   if (!lesson) notFound();
   return {
-    title: `AI 활용 ${lesson.week}주차 · ${lesson.title}`,
+    title: `AI 활용 ${lesson.week}강 · ${lesson.title}`,
     description: lesson.description,
     alternates: { canonical: `https://www.msvch.org/ai-course/week-${lesson.week}` },
     robots: { index: false, follow: false },

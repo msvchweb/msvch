@@ -12,7 +12,7 @@ export const weeksTwoToFour: readonly CourseLesson[] = [
         phase: "시작",
         time: "0–3분",
         scene: 0, tone: "dark",
-        lead: "지난주 결과를 열고, 다음 작업에서도 쓰고 싶은 조건 하나를 골라 봅니다.",
+        lead: "이전 강의 결과를 열고, 다음 작업에서도 쓰고 싶은 조건 하나를 골라 봅니다.",
         blocks: [{ kind: "cards", items: [
           { title: "말투", body: "안내문을 짧고 공손하게 써 달라고 매번 설명했나요?" },
           { title: "결과 순서", body: "요약 다음에 할 일 표가 나오는 형식을 다시 쓰고 싶나요?" },
@@ -137,7 +137,7 @@ export const weeksTwoToFour: readonly CourseLesson[] = [
         phase: "정리",
         time: "44–48분",
         scene: 9,
-        lead: "회의록 예시를 열어 고정할 형식에 표시합니다. 5주차에 이 양식으로 스킬을 만듭니다.",
+        lead: "회의록 예시를 열어 고정할 형식에 표시합니다. 5강에 이 양식으로 스킬을 만듭니다.",
         blocks: [{ kind: "compare", left: {
           title: "계속 쓸 형식",
           items: ["요약·결정·할 일·확인 필요 항목", "할 일 표의 열 이름과 순서", "짧고 공손한 문장"],
@@ -184,7 +184,7 @@ export const weeksTwoToFour: readonly CourseLesson[] = [
         blocks: [{ kind: "cards", items: [
           { title: "20분 · 새 대화에서 실행", body: "본인의 공개 가능한 메모 하나를 같은 프로젝트에서 정리하고, 지침 적용 여부를 확인합니다." },
           { title: "5분 · 양식 준비", body: "다음에도 쓸 양식 하나를 고릅니다. 예시의 내용과 형식 중 무엇을 재사용할지 표시합니다." },
-          { title: "다음 주", body: "자료를 읽는 위치와 결과 파일을 저장하는 위치를 구분해 봅니다." },
+          { title: "다음 강의", body: "자료를 읽는 위치와 결과 파일을 저장하는 위치를 구분해 봅니다." },
         ] }],
       },
     ],
@@ -205,7 +205,7 @@ export const weeksTwoToFour: readonly CourseLesson[] = [
         phase: "시작",
         time: "0–3분",
         scene: 0, tone: "dark",
-        lead: "지난주 지침을 떠올리며, 이번에는 컴퓨터의 실습 폴더를 사용해 봅니다.",
+        lead: "이전 강의 지침을 떠올리며, 이번에는 컴퓨터의 실습 폴더를 사용해 봅니다.",
         blocks: [{ kind: "cards", items: [
           { title: "입력", body: "AI가 실제로 읽은 전사본과 현황표는 어느 폴더에 있나요?" },
           { title: "실행", body: "파일을 읽고 새 문서를 만드는 작업은 어느 컴퓨터에서 하나요?" },
@@ -233,7 +233,7 @@ export const weeksTwoToFour: readonly CourseLesson[] = [
         blocks: [{ kind: "cards", items: [
           { title: "클라우드", body: "제공되는 환경에서 업로드 자료와 연결 도구를 사용합니다. 내 컴퓨터 폴더를 항상 읽는 것은 아닙니다." },
           { title: "로컬", body: "허용된 내 컴퓨터의 파일과 도구로 작업합니다. 폴더와 권한을 확인합니다." },
-          { title: "원격 연결", body: "다른 기기에서 요청하더라도 실제 파일 작업은 연결된 컴퓨터에서 할 수 있습니다. 7주차에 다룹니다." },
+          { title: "원격 연결", body: "다른 기기에서 요청하더라도 실제 파일 작업은 연결된 컴퓨터에서 할 수 있습니다. 7강에 다룹니다." },
         ] }],
       },
       {
@@ -362,7 +362,7 @@ export const weeksTwoToFour: readonly CourseLesson[] = [
         scene: 12, tone: "dark",
         blocks: [{ kind: "cards", items: [
           { title: "20분 · 새 결과 만들기", body: "새 메모를 입력자료에 넣고 같은 순서로 실행합니다. 원본과 결과를 각각 열어 봅니다." },
-          { title: "5분 · 다음 주 준비", body: "개인 Drive 실습 폴더에 가상 준비 현황표와 변경 메모 사본을 넣어 둡니다." },
+          { title: "5분 · 다음 강의 준비", body: "개인 Drive 실습 폴더에 가상 준비 현황표와 변경 메모 사본을 넣어 둡니다." },
           { title: "음성을 사용한다면", body: "직접 처리 기능이 확인된 환경에서만 선택합니다. 전사된 이름·숫자·날짜도 원음과 대조합니다." },
         ] }],
       },
@@ -422,7 +422,7 @@ export const weeksTwoToFour: readonly CourseLesson[] = [
         blocks: [{ kind: "cards", items: [
           { title: "플러그인", body: "특정 작업에 필요한 기능을 묶습니다. Google Drive 플러그인으로 Drive 자료를 다룰 수 있습니다." },
           { title: "서비스 연결", body: "어느 계정으로 어떤 자료와 동작을 사용할지 인증하고 허용합니다." },
-          { title: "스킬", body: "같은 일을 다시 할 때 사용할 절차와 기준입니다. 5주차에 회의록 양식으로 만듭니다." },
+          { title: "스킬", body: "같은 일을 다시 할 때 사용할 절차와 기준입니다. 5강에 회의록 양식으로 만듭니다." },
         ] }],
       },
       {
@@ -572,7 +572,7 @@ export const weeksTwoToFour: readonly CourseLesson[] = [
         blocks: [{ kind: "cards", items: [
           { title: "20분 · 새 메모로 다시 작성", body: "실습 폴더에 가상 변경 메모를 추가하고 다시 읽게 합니다. 두 초안의 공통 사실을 비교합니다." },
           { title: "선택 · 강사 발송 시연", body: "사전 확인한 Gmail 기능과 강사 소유 주소 두 개로만 시연합니다. 수신자·본문을 검토하고 실제 도착을 확인합니다." },
-          { title: "다음 주", body: "오늘까지 모은 양식과 작성 기준으로 재사용할 스킬을 만듭니다. 발송은 이번 주 공통 과제가 아닙니다." },
+          { title: "다음 강의", body: "오늘까지 모은 양식과 작성 기준으로 재사용할 스킬을 만듭니다. 발송은 이번 강의 공통 과제가 아닙니다." },
         ] }],
       },
     ],

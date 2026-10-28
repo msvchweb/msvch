@@ -81,6 +81,7 @@ describe("LessonDeck", () => {
   it("moves one slide at a time without wrapping and keeps a reloadable URL", () => {
     showDeck();
     expect(screen.getByRole("heading", { name: "첫 화면" })).toBeVisible();
+    expect(screen.queryByText("0–5분")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "이전 슬라이드" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "다음 슬라이드" }));
     expect(screen.getByRole("heading", { name: "두 번째" })).toBeVisible();

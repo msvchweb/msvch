@@ -86,7 +86,7 @@ export default function LessonDeck({ slides, children, week = 1 }: { slides: rea
 
   return <div ref={root} data-lesson-motion={!motionPaused && motionEnvironment === "animated" ? "animated" : "static"} className={`${styles.deck} ${slides[current].tone === "dark" ? styles.dark : ""}`}>
     <header className={styles.toolbar}>
-      <Link href="/ai-course/lessons" className={styles.brand} aria-label="챕터 선택으로 돌아가기"><ArrowLeft size={21} aria-hidden /><span>챕터 선택 <b>AI 활용 · {week}주차</b></span></Link>
+      <Link href="/ai-course/lessons" className={styles.brand} aria-label="챕터 선택으로 돌아가기"><ArrowLeft size={21} aria-hidden /><span>챕터 선택 <b>AI 활용 · {week}강</b></span></Link>
       <div className={styles.tools}>
         <label className={styles.srOnly} htmlFor="lesson-slide">슬라이드 선택</label>
         <select id="lesson-slide" value={current} onChange={event => move(Number(event.target.value))} className={styles.jump}>
@@ -103,7 +103,7 @@ export default function LessonDeck({ slides, children, week = 1 }: { slides: rea
     </div>
     <footer className={styles.controls}>
       <button type="button" aria-label="이전 슬라이드" disabled={current === 0} onClick={() => move(current - 1)} className={styles.previous}><ArrowLeft size={20} aria-hidden /><span>이전</span></button>
-      <div className={styles.position}><span className={styles.phase}>{slides[current].phase} <span>{slides[current].time}</span></span><span aria-live="polite" aria-atomic="true"><b>{String(current + 1).padStart(2, "0")}</b><span className={styles.total}> / {String(count).padStart(2, "0")}</span><span className={styles.srOnly}> {slides[current].title}</span></span></div>
+      <div className={styles.position}><span className={styles.phase}>{slides[current].phase}</span><span aria-live="polite" aria-atomic="true"><b>{String(current + 1).padStart(2, "0")}</b><span className={styles.total}> / {String(count).padStart(2, "0")}</span><span className={styles.srOnly}> {slides[current].title}</span></span></div>
       <button type="button" aria-label="다음 슬라이드" disabled={current === count - 1} onClick={() => move(current + 1)} className={styles.next}><span>다음</span><ArrowRight size={20} aria-hidden /></button>
       <div className={styles.progress} role="progressbar" aria-label="슬라이드 진행" aria-valuemin={1} aria-valuemax={count} aria-valuenow={current + 1}><span style={{ width: `${((current + 1) / count) * 100}%` }} /></div>
     </footer>

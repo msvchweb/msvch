@@ -10,9 +10,10 @@ afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); });
 describe("course chapters", () => {
   it("opens eight actual lessons, including the existing first lesson", () => {
     render(<LessonsPage />);
+    expect(screen.queryByText(/60분/)).not.toBeInTheDocument();
     expect(courseChapters.map(chapter => chapter.week)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
     for (const chapter of courseChapters) {
-      expect(screen.getByRole("link", { name: `${chapter.week}주차 ${chapter.title}` })).toHaveAttribute("href", `/ai-course/week-${chapter.week}`);
+      expect(screen.getByRole("link", { name: `${chapter.week}강 ${chapter.title}` })).toHaveAttribute("href", `/ai-course/week-${chapter.week}`);
     }
   });
 
@@ -24,7 +25,7 @@ describe("course chapters", () => {
     const lesson = getCourseLesson(`week-${week}`)!;
     window.history.replaceState(null, "", `/ai-course/week-${week}`);
     render(<CourseLesson lesson={lesson} />);
-    expect(screen.getByText(`AI 활용 · ${week}주차`)).toBeVisible();
+    expect(screen.getByText(`AI 활용 · ${week}강`)).toBeVisible();
     expect(screen.getByRole("link", { name: "챕터 선택으로 돌아가기" })).toHaveAttribute("href", "/ai-course/lessons");
     expect(screen.getByRole("heading", { name: lesson.slides[0].title })).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "다음 슬라이드" }));

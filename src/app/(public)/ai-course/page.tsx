@@ -11,24 +11,24 @@ import AiCourseExamples from "@/components/ai-course/AiCourseExamples";
 import AiCourseRoadmap from "@/components/ai-course/motion/AiCourseRoadmap";
 import motionStyles from "@/components/ai-course/motion/ai-course-motion.module.css";
 
-const title = "AI로 내 일을 끝내는 12주";
-const description = "수업 자료 정리, 발표 준비, 나만의 앱까지. AI 활용을 주 1회 60분씩 12주 동안 함께 익힙니다.";
+const title = "AI로 내 일을 끝내는 12강";
+const description = "수업 자료 정리, 발표 준비, 나만의 앱까지. AI 활용 12강을 진도에 맞춰 함께 익힙니다.";
 export const metadata: Metadata = {
   title, description, alternates: { canonical: AI_COURSE_URL },
   openGraph: { title: title + " | 명성비전교회", description, url: AI_COURSE_URL, type: "website" },
 };
 const stages = [
-  { weeks: "1–2주", title: "AI와 친해지기", text: "원하는 일을 설명하고, 답을 확인하는 방법부터." },
-  { weeks: "3–8주", title: "공부와 생활에 활용하기", text: "자료 정리부터 자주 하는 일 줄이기까지." },
-  { weeks: "9–12주", title: "나만의 앱 만들기", text: "내 내용으로 만들고, 공개하고, 직접 고쳐봐요." },
+  { weeks: "1–2강", title: "AI와 친해지기", text: "원하는 일을 설명하고, 답을 확인하는 방법부터." },
+  { weeks: "3–8강", title: "공부와 생활에 활용하기", text: "자료 정리부터 자주 하는 일 줄이기까지." },
+  { weeks: "9–12강", title: "나만의 앱 만들기", text: "내 내용으로 만들고, 공개하고, 직접 고쳐봐요." },
 ];
 const curriculum = [
-  ["01–02주", "자료에서 결과물까지", "기본 요청과 결과 확인 · 프로젝트와 지침"],
-  ["03–04주", "내 자료와 다른 앱 연결하기", "파일 다루기 · 클라우드와 로컬 · 플러그인·외부 앱"],
-  ["05–06주", "자주 하는 일을 더 간단하게", "반복 작업을 스킬로 만들기 · 예약과 실행 결과 확인"],
-  ["07–08주", "내 공부와 생활에 연결하기", "휴대폰에서 작업 이어가기 · 나에게 필요한 작업 실습"],
-  ["09–10주", "나만의 앱 공개하기", "GitHub·Vercel 가입과 연동 · 앱 제작과 공개"],
-  ["11–12주", "필요할 때 직접 고쳐 쓰기", "작은 기능 추가 · 수정과 다시 공개하기 · 되돌리기"],
+  ["01–02강", "자료에서 결과물까지", "기본 요청과 결과 확인 · 프로젝트와 지침"],
+  ["03–04강", "내 자료와 다른 앱 연결하기", "파일 다루기 · 클라우드와 로컬 · 플러그인·외부 앱"],
+  ["05–06강", "자주 하는 일을 더 간단하게", "반복 작업을 스킬로 만들기 · 예약과 실행 결과 확인"],
+  ["07–08강", "내 공부와 생활에 연결하기", "휴대폰에서 작업 이어가기 · 나에게 필요한 작업 실습"],
+  ["09–10강", "나만의 앱 공개하기", "GitHub·Vercel 가입과 연동 · 앱 제작과 공개"],
+  ["11–12강", "필요할 때 직접 고쳐 쓰기", "작은 기능 추가 · 수정과 다시 공개하기 · 되돌리기"],
 ];
 const faq = [
   ["코딩을 몰라도 괜찮나요?", "코딩 경험을 전제로 하지 않아요. 원하는 것을 설명하고 결과를 확인하는 방법부터 함께 익혀요."],
@@ -51,8 +51,8 @@ export default async function AiCoursePage() {
         <div>
           <p className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs tracking-wide text-church-gold-light"><span className="h-1.5 w-1.5 rounded-full bg-church-gold" />명성비전교회 · AI 활용 과정</p>
           <h1 className="break-keep text-4xl font-bold leading-[1.3] tracking-tight sm:text-5xl"><span className={motionStyles.headlineLine}>아직도 AI에게</span><span className={motionStyles.headlineLine}>질문만 하세요?</span><span className={motionStyles.headlineLine + " text-church-gold"}>이제, 내 일을</span><span className={motionStyles.headlineLine + " text-church-gold"}>시키세요.</span></h1>
-          <p className="mt-7 max-w-md break-keep text-base leading-8 text-slate-200">수업 자료 정리, 발표 준비, 나만의 앱까지.<br />AI 활용을 12주 동안 함께 익혀요.</p>
-          <div className="mt-7 flex flex-wrap items-center gap-3 text-sm text-slate-200"><span className="rounded-lg bg-white/10 px-3 py-2">주 1회 60분 × 12주</span><span className="inline-flex items-center gap-1.5"><Check size={15} className="text-church-gold" />코딩 경험 없이 시작</span></div>
+          <p className="mt-7 max-w-md break-keep text-base leading-8 text-slate-200">수업 자료 정리, 발표 준비, 나만의 앱까지.<br />AI 활용 12강을 진도에 맞춰 함께 익혀요.</p>
+          <div className="mt-7 flex flex-wrap items-center gap-3 text-sm text-slate-200"><span className="rounded-lg bg-white/10 px-3 py-2">총 12강 · 진도에 맞춰 진행</span><span className="inline-flex items-center gap-1.5"><Check size={15} className="text-church-gold" />코딩 경험 없이 시작</span></div>
           <a href="#apply" className={motionStyles.cta + " mt-8 inline-flex min-h-13 items-center justify-center gap-6 rounded-xl bg-church-gold px-7 py-4 font-bold text-[#151d35] transition-colors hover:bg-church-gold-light"}>강의 신청하기 <ArrowRight size={19} /></a>
           <a href="#outcomes" className="ml-0 mt-4 flex items-center gap-2 text-sm text-slate-300 sm:ml-6 sm:inline-flex">어디에 쓸 수 있나요? <ArrowDown size={15} /></a>
         </div>
@@ -66,7 +66,7 @@ export default async function AiCoursePage() {
       <p className="mt-4 text-right text-xs text-gray-500">이해를 돕기 위한 실습 예시입니다.</p>
     </section>
     <section className="border-y border-gray-200/70 bg-white px-5 py-16 sm:px-8 sm:py-20"><div className="mx-auto max-w-3xl">
-      <SectionLabel>AI 활용 8주 + 앱 만들기 4주</SectionLabel><h2 className="text-3xl font-bold leading-snug sm:text-4xl">처음부터, 한 걸음씩.</h2>
+      <SectionLabel>AI 활용 8강 + 앱 만들기 4강</SectionLabel><h2 className="text-3xl font-bold leading-snug sm:text-4xl">처음부터, 한 걸음씩.</h2>
       <AiCourseRoadmap>{stages.map((stage, index) => <article key={stage.weeks} data-ai-course-stage={index} className="grid gap-3 rounded-2xl border border-gray-200 bg-church-cream p-6 sm:grid-cols-[95px_1fr] sm:gap-6 sm:p-7"><p className="text-lg font-bold text-primary-700">{stage.weeks}</p><div><h3 className="text-xl font-bold">{stage.title}</h3><p className="mt-2 text-base leading-7 text-gray-600">{stage.text}</p></div></article>)}</AiCourseRoadmap>
       <details className="group mt-7 rounded-2xl border border-gray-200">
         <summary className="flex min-h-16 cursor-pointer list-none items-center justify-between gap-4 px-6 py-5 font-semibold focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary-700">자세한 수업 내용 보기<ChevronDown size={18} className="shrink-0 transition-transform group-open:rotate-180" aria-hidden /></summary>

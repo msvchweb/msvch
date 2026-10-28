@@ -12,7 +12,7 @@ describe("weekly lesson route", () => {
   it("awaits Next route params and presents the selected week", async () => {
     const page = await WeekPage({ params: Promise.resolve({ week: "week-5" }) });
     render(page);
-    expect(screen.getByText("AI 활용 · 5주차")).toBeVisible();
+    expect(screen.getByText("AI 활용 · 5강")).toBeVisible();
     const metadata = await generateMetadata({ params: Promise.resolve({ week: "week-5" }) });
     expect(metadata.alternates?.canonical).toBe("https://www.msvch.org/ai-course/week-5");
     expect(metadata.robots).toEqual({ index: false, follow: false });

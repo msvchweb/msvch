@@ -137,7 +137,7 @@ export const weeksFiveToEight: readonly CourseLesson[] = [
       },
       {
         title: "새 자료로 한 번 더 써보세요", phase: "마무리 · 과제", time: "57–60분", scene: 12, tone: "dark",
-        blocks: [{ kind: "steps", items: ["20–30분: 공통 스킬 재실행 또는 선택 과제 하나를 합니다.", "사용한 입력·결과와 직접 확인한 두 항목을 남깁니다.", "다음 주 예약에 쓸 스킬과 입력 폴더를 준비합니다."] }],
+        blocks: [{ kind: "steps", items: ["20–30분: 공통 스킬 재실행 또는 선택 과제 하나를 합니다.", "사용한 입력·결과와 직접 확인한 두 항목을 남깁니다.", "다음 강의 예약에 쓸 스킬과 입력 폴더를 준비합니다."] }],
       },
     ],
   },
@@ -153,7 +153,7 @@ export const weeksFiveToEight: readonly CourseLesson[] = [
     slides: [
       {
         title: "준비 상황 브리핑을\n예약해봅니다", phase: "도입", time: "0–3분", scene: 0, tone: "dark",
-        lead: "지난주에 확인한 스킬을 정해진 시간에 실행합니다.",
+        lead: "이전 강의에서 확인한 스킬을 정해진 시간에 실행합니다.",
         blocks: [{ kind: "cards", items: [{ title: "오늘의 결과", body: "요약·할 일·확인 사항·안내문이 담긴 문서 한 개를 만듭니다." }] }],
       },
       {
@@ -297,8 +297,8 @@ export const weeksFiveToEight: readonly CourseLesson[] = [
     slides: [
       {
         title: "휴대폰에서\n같은 작업을 이어갑니다", phase: "도입", time: "0–3분", scene: 0, tone: "dark",
-        lead: "6주차 브리핑에 수정 지시를 보내봅니다.",
-        blocks: [{ kind: "cards", items: [{ title: "시작 전", body: "컴퓨터와 휴대폰의 계정·워크스페이스, 지난주 결과 파일을 확인합니다." }] }],
+        lead: "6강 브리핑에 수정 지시를 보내봅니다.",
+        blocks: [{ kind: "cards", items: [{ title: "시작 전", body: "컴퓨터와 휴대폰의 계정·워크스페이스, 이전 강의 결과 파일을 확인합니다." }] }],
       },
       {
         title: "오늘 남길 기록", phase: "목표 확인", time: "3–5분", scene: 1,
@@ -323,7 +323,7 @@ export const weeksFiveToEight: readonly CourseLesson[] = [
       },
       {
         title: "먼저 실행 위치를 물어봐요", phase: "연결 점검", time: "15–20분", scene: 5,
-        blocks: [{ kind: "prompt", excerpt: "지금 작업할 컴퓨터와 프로젝트를 확인해줘.\n읽을 수 있는 입력과 결과 위치를 알려줘.\n아직 파일은 바꾸지 마.", hint: "휴대폰에서 연결한 컴퓨터의 같은 프로젝트와 대화를 먼저 여세요.", text: `연결된 컴퓨터의 AI 실습 프로젝트에서 지난주 브리핑 작업을 이어가려고 해.
+        blocks: [{ kind: "prompt", excerpt: "지금 작업할 컴퓨터와 프로젝트를 확인해줘.\n읽을 수 있는 입력과 결과 위치를 알려줘.\n아직 파일은 바꾸지 마.", hint: "휴대폰에서 연결한 컴퓨터의 같은 프로젝트와 대화를 먼저 여세요.", text: `연결된 컴퓨터의 AI 실습 프로젝트에서 이전 강의 브리핑 작업을 이어가려고 해.
 현재 작업이 실행되는 컴퓨터 또는 환경과 프로젝트를 확인해줘.
 읽을 수 있는 입력자료 폴더의 파일과 기존 브리핑의 위치를 알려줘.
 ‘주간 업무 정리’ 스킬을 사용할 수 있는지도 확인해줘.
@@ -332,7 +332,7 @@ export const weeksFiveToEight: readonly CourseLesson[] = [
       },
       {
         title: "실습: 내 휴대폰을 연결해요", phase: "실습 · 5분", time: "20–25분", scene: 6,
-        blocks: [{ kind: "steps", items: ["컴퓨터를 켜고 앱·인터넷·같은 계정을 확인합니다.", "현재 앱이 안내하는 방법으로 기기를 연결합니다.", "지난주 프로젝트와 브리핑 대화를 찾습니다.", "지원되지 않으면 강사 시연을 보고 보완할 항목을 적습니다."] }],
+        blocks: [{ kind: "steps", items: ["컴퓨터를 켜고 앱·인터넷·같은 계정을 확인합니다.", "현재 앱이 안내하는 방법으로 기기를 연결합니다.", "이전 강의 프로젝트와 브리핑 대화를 찾습니다.", "지원되지 않으면 강사 시연을 보고 보완할 항목을 적습니다."] }],
       },
       {
         title: "휴대폰에서 수정 요청을 보내요", phase: "실습 · 13분", time: "25–38분", scene: 7,
@@ -567,7 +567,7 @@ export const weeksFiveToEight: readonly CourseLesson[] = [
         title: "다음에는 이 불편함을 다룹니다", phase: "마무리 · 과제", time: "56–60분", scene: 12, tone: "dark",
         blocks: [{ kind: "cards", items: [
           { title: "과제 · 20–30분", body: "새 자료로 같은 절차를 한 번 더 실행합니다. 걸린 시간과 직접 확인할 일을 적습니다." },
-          { title: "9주차 준비", body: "앱으로 줄이고 싶은 불편함 하나를 가져옵니다. GitHub·Vercel 가입과 첫 앱은 9주차부터 시작합니다." },
+          { title: "9강 준비", body: "앱으로 줄이고 싶은 불편함 하나를 가져옵니다. GitHub·Vercel 가입과 첫 앱은 9강부터 시작합니다." },
         ] }],
       },
     ],
