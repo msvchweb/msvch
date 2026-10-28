@@ -27,7 +27,7 @@ export default function CourseLesson({ lesson }: { lesson: CourseLessonData }) {
     {lesson.slides.map((slide, index) => <div key={slide.title} className={`${styles.canvas} ${courseStyles.lessonCanvas} ${index === 0 ? styles.hero : ""}`}>
       <LessonMotion index={slide.scene} />
       <p className={styles.eyebrow}>{index === 0 ? `AI 활용 ${lesson.week}주차` : slide.phase}</p>
-      <h1 className={styles.title} id={`lesson-title-${index}`}>{slide.title}</h1>
+      <h1 className={styles.title} id={`lesson-title-${index}`} style={lesson.week === 8 && index === 0 ? { color: "#f97316" } : undefined}>{slide.title}</h1>
       {slide.lead && <p className={styles.lead}>{slide.lead}</p>}
       <div className={`${styles.content} ${courseStyles.blocks}`}>{slide.blocks.map((block, blockIndex) => <Block key={blockIndex} block={block} />)}
         {index === lesson.slides.length - 1 && <div className={courseStyles.sources}><span>기능 안내</span>{lesson.sources.map(source => <a key={source.url} href={source.url} target="_blank" rel="noreferrer">{source.label}</a>)}</div>}
