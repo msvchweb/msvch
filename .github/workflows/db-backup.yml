@@ -49,7 +49,10 @@ jobs:
         run: |
           set -euo pipefail
           # 빈 덤프가 조용히 올라가면 "백업이 있다"는 착각만 남는다.
-          for f in roles schema data; do
+          # roles 는 직접 만든 역할이 없으면 머리말만 남아 작다. 존재만 확인한다.
+          [ -f dump/roles.sql ] || { echo "::error::dump/roles.sql 이 없습니다"; exit 1; }
+          echo "roles.sql = $(stat -c%s dump/roles.sql) bytes"
+          for f in schema data; do
             size=$(stat -c%s "dump/$f.sql")
             echo "$f.sql = $size bytes"
             if [ "$size" -lt 1024 ]; then
