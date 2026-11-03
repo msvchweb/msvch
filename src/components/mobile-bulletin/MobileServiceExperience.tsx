@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   extractYouTubeVideoId,
   isServiceLive,
+  normalizeBulletinText,
   selectMobileServiceId,
 } from "@/lib/mobile-bulletin";
 import type { MobileService, WorshipResource } from "@/types/mobile-bulletin";
@@ -280,39 +281,44 @@ export function MobileServiceExperience({
                     )}
                   </div>
                 </div>
-
-                {playableVideoId ? (
-                  <div className="mt-2.5 aspect-video w-full overflow-hidden rounded-[20px] bg-black">
-                    <iframe
-                      className="h-full w-full"
-                      src={`https://www.youtube-nocookie.com/embed/${playableVideoId}`}
-                      title={`${selectedService.label} 영상`}
-                      loading="lazy"
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                      allowFullScreen
-                    />
-                  </div>
-                ) : (
-                  <div className="mt-2.5 flex flex-wrap gap-2.5">
-                    <Link
-                      href="/sermons"
-                      className="inline-flex min-h-11 items-center rounded-full bg-[var(--bt-acc-soft)] px-4 text-[13px] font-bold text-[var(--bt-acc)]"
-                    >
-                      설교 영상 보기
-                    </Link>
-                    <a
-                      href="https://www.youtube.com/@msvchphoto"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex min-h-11 items-center rounded-full border border-[var(--bt-line)] bg-[var(--bt-card)] px-4 text-[13px] font-bold text-[var(--bt-sub)]"
-                    >
-                      교회 YouTube 채널
-                    </a>
-                  </div>
-                )}
               </div>
 
-              <div className="mt-6 scroll-mt-20 snap-start">
+              {/* 영상은 예배 순서를 따라 읽는 동안 계속 보여야 해서 sticky 로 둔다.
+                  sticky 는 부모 박스 안에서만 붙으므로, 히어로용 scroll-mt 래퍼 밖으로
+                  꺼내 애니메이션 래퍼(히어로~예배 순서 전체)의 직계 자식으로 만든다.
+                  top-16 은 전역 헤더(sticky top-0, 높이 h-16) 바로 아래 지점. */}
+              {playableVideoId ? (
+                <div className="sticky top-16 z-20 mt-2.5 aspect-video w-full overflow-hidden rounded-[20px] bg-black shadow-[0_8px_24px_rgba(6,10,18,0.18)]">
+                  <iframe
+                    className="h-full w-full"
+                    src={`https://www.youtube-nocookie.com/embed/${playableVideoId}`}
+                    title={`${selectedService.label} 영상`}
+                    loading="lazy"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; fullscreen; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  />
+                </div>
+              ) : (
+                <div className="mt-2.5 flex flex-wrap gap-2.5">
+                  <Link
+                    href="/sermons"
+                    className="inline-flex min-h-11 items-center rounded-full bg-[var(--bt-acc-soft)] px-4 text-[13px] font-bold text-[var(--bt-acc)]"
+                  >
+                    설교 영상 보기
+                  </Link>
+                  <a
+                    href="https://www.youtube.com/@msvchphoto"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex min-h-11 items-center rounded-full border border-[var(--bt-line)] bg-[var(--bt-card)] px-4 text-[13px] font-bold text-[var(--bt-sub)]"
+                  >
+                    교회 YouTube 채널
+                  </a>
+                </div>
+              )}
+
+              {/* 영상이 sticky 로 상단을 덮은 상태에서 스냅까지 걸면 "예배 순서" 제목이 영상 뒤로 숨는다. */}
+              <div className={`mt-6 scroll-mt-20 ${playableVideoId ? "" : "snap-start"}`}>
                 <div className="mb-3 flex items-baseline gap-2 px-0.5">
                   <h3 className="text-[17px] font-extrabold tracking-[-0.035em] text-[var(--bt-ink)]">
                     예배 순서
@@ -336,35 +342,44 @@ export function MobileServiceExperience({
                       return (
                         <li
                           key={item.id}
-                          className={`flex min-w-0 items-center gap-3.5 rounded-[15px] px-[15px] py-3.5 ${
+                          className={`flex min-w-0 items-start gap-3.5 rounded-[15px] px-[15px] py-3.5 ${
                             item.emphasized
                               ? "border border-transparent bg-[var(--bt-acc-soft)]"
                               : "border border-[var(--bt-line)] bg-[var(--bt-card)]"
                           }`}
                         >
-                          <span className="w-4 shrink-0 text-[11px] font-extrabold tabular-nums text-[var(--bt-acc)]">
+                          <span className="w-4 shrink-0 pt-[3px] text-[11px] font-extrabold tabular-nums text-[var(--bt-acc)]">
                             {index + 1}
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p
-                              className={`break-words text-[15px] tracking-[-0.025em] text-[var(--bt-ink)] ${
-                                item.emphasized ? "font-extrabold" : "font-bold"
-                              }`}
-                            >
-                              {item.standing && (
-                                <span
-                                  aria-hidden="true"
-                                  className="mr-1.5 align-[0.15em] text-[9px] text-[var(--bt-faint)]"
-                                >
-                                  ▲
+                            {/* 1행 — 순서명과 담당자를 종이 주보처럼 한 줄에 두고 담당자를 오른쪽 끝에 붙인다. */}
+                            <div className="flex items-baseline gap-2">
+                              <p
+                                className={`min-w-0 flex-1 break-words text-[15px] tracking-[-0.025em] text-[var(--bt-ink)] ${
+                                  item.emphasized ? "font-extrabold" : "font-bold"
+                                }`}
+                              >
+                                {item.standing && (
+                                  <span
+                                    aria-hidden="true"
+                                    className="mr-1 align-[0.1em] text-[10.5px] font-extrabold text-[var(--bt-acc)]"
+                                  >
+                                    ▲
+                                  </span>
+                                )}
+                                {item.standing && <span className="sr-only">기립 </span>}
+                                {normalizeBulletinText(item.label)}
+                              </p>
+                              {item.assignees.length > 0 && (
+                                <span className="shrink-0 whitespace-nowrap text-[11.5px] text-[var(--bt-faint)]">
+                                  {item.assignees.map(normalizeBulletinText).filter(Boolean).join(" · ")}
                                 </span>
                               )}
-                              {item.standing && <span className="sr-only">기립 </span>}
-                              {item.label}
-                            </p>
+                            </div>
+                            {/* 2행 — 내용 */}
                             {item.summary.trim() && (
                               <p
-                                className={`mt-0.5 whitespace-pre-wrap break-words text-[12.5px] leading-relaxed ${
+                                className={`mt-1 whitespace-pre-wrap break-words text-[12.5px] leading-relaxed ${
                                   item.emphasized
                                     ? "font-bold text-[var(--bt-acc)]"
                                     : "text-[var(--bt-sub)]"
@@ -373,14 +388,9 @@ export function MobileServiceExperience({
                                 {item.summary}
                               </p>
                             )}
-                            {item.assignees.length > 0 && (
-                              <p className="mt-0.5 break-words text-[11px] text-[var(--bt-faint)]">
-                                {item.assignees.join(" · ")}
-                              </p>
-                            )}
                           </div>
                           {(resource || externalUrl) && (
-                            <div className="flex shrink-0 items-center gap-1.5">
+                            <div className="flex shrink-0 items-center gap-1.5 self-center">
                               {resource && <WorshipResourceSheet resource={resource} />}
                               {externalUrl && (
                                 <a

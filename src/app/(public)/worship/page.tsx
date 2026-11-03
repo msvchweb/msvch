@@ -27,7 +27,7 @@ const schoolWorship: WorshipInfo[] = [
   { name: "영유치부", time: "낮 12:00", day: "매주 일요일", location: "본관 1층", accent: "from-pink-500 to-rose-600" },
   { name: "아동부", time: "오전 10:00", day: "매주 일요일", location: "교육관 2층", accent: "from-emerald-500 to-green-600" },
   { name: "청소년부", time: "낮 12:00", day: "매주 일요일", location: "교육관 3층 갈릴리실", accent: "from-blue-500 to-indigo-600" },
-  { name: "청년부", time: "오후 2:30", day: "매월 첫째주일", location: "본관 2층", accent: "from-violet-500 to-purple-600" },
+  { name: "청년부", time: "오후 2:00", day: "매월 첫째주일", location: "교육관 3층", accent: "from-violet-500 to-purple-600" },
 ];
 
 interface MeetingInfo {
