@@ -132,7 +132,7 @@ function highlightKeywords(text: string, keywords: string[]): string {
     .join("");
 }
 
-/** 한글 14자 폭으로 줄을 나누고, 최대 두 줄을 한 화면에 표시한다. */
+/** 한글 12자 폭(77px 기준 약 920px)으로 줄을 나누고, 최대 두 줄을 한 화면에 표시한다. */
 function splitCaption(text: string): {
   lines: string[];
   startRatio: number;
@@ -142,7 +142,7 @@ function splitCaption(text: string): {
   const lines: { text: string; end: number }[] = [];
   let start = 0;
   while (start < chars.length) {
-    let end = Math.min(start + 14, chars.length);
+    let end = Math.min(start + 12, chars.length);
     if (end < chars.length && chars[end] !== " ") {
       const wordEnd = chars.lastIndexOf(" ", end);
       if (wordEnd > start) end = wordEnd;
@@ -241,7 +241,7 @@ WrapStyle: 2
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Noto Sans CJK KR,64,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,40,40,240,1
+Style: Default,Noto Sans CJK KR,77,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,2,40,40,240,1
 Style: Card,Malgun Gothic,200,&H0000FFFF,&H000000FF,&H00000000,&H00000000,1,0,0,0,100,100,0,0,1,0,0,8,40,40,100,1
 
 [Events]
