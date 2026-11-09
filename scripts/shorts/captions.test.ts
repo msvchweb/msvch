@@ -79,7 +79,7 @@ function event(text: string, startMs = 0, durationMs = 10_000): SubtitleEvent {
   return { tStartMs: startMs, dDurationMs: durationMs, segs: [{ utf8: text }] };
 }
 
-const hangulLine = "가나다라마바사아자차카타파하";
+const hangulLine = "가나다라마바사아자차카타";
 
 beforeEach(() => {
   workDir = mkdtempSync(path.join(os.tmpdir(), "shorts-captions-test-"));
@@ -102,7 +102,7 @@ describe("쇼츠 자막 분할", () => {
     for (const caption of captions) {
       const lines = caption.text.split("\\N");
       expect(lines.length).toBeLessThanOrEqual(2);
-      expect(lines.every((line) => [...line].length <= 14)).toBe(true);
+      expect(lines.every((line) => [...line].length <= 12)).toBe(true);
     }
     expect(captions.map(({ text }) => text.replace(/\\N/g, "")).join("")).toBe(text);
   });
@@ -178,6 +178,6 @@ describe("쇼츠 자막 분할", () => {
 
   it("짧은 자막의 문구와 표시 시각을 유지한다", async () => {
     expect(await renderCaptions([event("열정이 있는 분이 있어요", 1_000, 3_000)]))
-      .toEqual([{ start: 1, end: 4, style: "Default", text: "열정이 있는 분이 있어요" }]);
+      .toEqual([{ start: 1, end: 4, style: "Default", text: "열정이 있는 분이\\N있어요" }]);
   });
 });
